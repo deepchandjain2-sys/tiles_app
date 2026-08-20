@@ -24,30 +24,38 @@ st.markdown("""
 SHEET_ID = "14lY-5Kjwx8hins1gSp6lR1C4_AOWOx2an8c-UgKaPY"
 GOOGLE_SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def load_busy_stock():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        df.columns = [str(c).strip().upper() for c in df.columns]
+        if df.empty:
+            return pd.DataFrame()
+            
+        # Strip string columns
+        df = df.dropna(how='all')
         
-        id_col = 'ITEM ID' if 'ITEM ID' in df.columns else df.columns[0]
-        name_col = 'ITEM NAME' if 'ITEM NAME' in df.columns else df.columns[1]
-        con_col = 'CON FACTOR' if 'CON FACTOR' in df.columns else df.columns[3]
-        pack_col = 'PACKING UNIT' if 'PACKING UNIT' in df.columns else df.columns[4]
+        # Identify columns dynamically
+        cols = list(df.columns)
+        id_col = cols[0]
+        name_col = cols[1] if len(cols) > 1 else cols[0]
+        con_col = cols[3] if len(cols) > 3 else (cols[2] if len(cols) > 2 else None)
+        pack_col = cols[4] if len(cols) > 4 else (cols[3] if len(cols) > 3 else None)
         
         cleaned_data = []
         for _, row in df.iterrows():
             name = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
-            if not name or name == "nan" or "ITEM NAME" in name:
+            if not name or name.lower() == "nan" or "item name" in name.lower():
                 continue
             
+            # Conversion factor
             try:
-                con_factor = float(row[con_col]) if pd.notna(row[con_col]) else 8.0
+                con_factor = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 8.0
             except:
                 con_factor = 8.0
                 
+            # Packing unit
             try:
-                packing_unit = float(row[pack_col]) if pd.notna(row[pack_col]) else 2.0
+                packing_unit = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 2.0
             except:
                 packing_unit = 2.0
                 
@@ -62,7 +70,7 @@ def load_busy_stock():
                 cat = "Wall Tile"
                 
             cleaned_data.append({
-                "ITEM_ID": str(row[id_col]).strip(),
+                "ITEM_ID": str(row[id_col]).strip() if pd.notna(row[id_col]) else "NA",
                 "ITEM_NAME": name,
                 "CON_FACTOR": con_factor,
                 "PACKING_UNIT": int(packing_unit),
@@ -117,7 +125,7 @@ tab1, tab2 = st.tabs(["📐 1. Rooms & Tile Selection", "📄 2. Estimate Summar
 
 # TAB 1: MEASUREMENTS & SELECTION
 with tab1:
-    col_rooms, col_catalog = st.columns([1.4, 1.1], gap="large")
+    col_rooms, col_catalog = st.columns([1.3, 1.2], gap="large")
     
     with col_rooms:
         st.subheader("Room Measurements")
@@ -181,40 +189,44 @@ with tab1:
 
     with col_catalog:
         st.subheader("📦 Live Tile Catalog")
-        search_query = st.text_input("🔍 Search Tile (e.g. 2X4, Varmora, Grey)", "")
-        cat_filter = st.radio("Category", ["All", "Floor Tile", "Wall Tile", "Granite"], horizontal=True)
         
-        filtered_df = stock_df.copy()
-        if cat_filter != "All" and not filtered_df.empty:
-            filtered_df = filtered_df[filtered_df["CATEGORY"] == cat_filter]
-        if search_query and not filtered_df.empty:
-            filtered_df = filtered_df[filtered_df["ITEM_NAME"].str.contains(search_query, case=False, na=False) | filtered_df["ITEM_ID"].str.contains(search_query, case=False, na=False)]
+        if stock_df.empty:
+            st.warning("⚠️ No items loaded. Check Google Sheet link or format.")
+        else:
+            search_query = st.text_input("🔍 Search Tile (e.g. 2X4, Varmora, Grey)", "")
+            cat_filter = st.radio("Category", ["All", "Floor Tile", "Wall Tile", "Granite"], horizontal=True)
             
-        st.write(f"Showing **{len(filtered_df)}** items")
-        
-        all_rooms_flat = []
-        for f in st.session_state.floors:
-            for r in f["rooms"]:
-                all_rooms_flat.append((f"{f['floor_name']} - {r['name']} (ID: {r['room_id']})", r))
+            filtered_df = stock_df.copy()
+            if cat_filter != "All":
+                filtered_df = filtered_df[filtered_df["CATEGORY"] == cat_filter]
+            if search_query:
+                filtered_df = filtered_df[filtered_df["ITEM_NAME"].str.contains(search_query, case=False, na=False) | filtered_df["ITEM_ID"].str.contains(search_query, case=False, na=False)]
                 
-        target_room_label = st.selectbox("Assign selected tile to:", [item[0] for item in all_rooms_flat])
-        target_room_obj = next((item[1] for item in all_rooms_flat if item[0] == target_room_label), None)
-        
-        catalog_container = st.container(height=520)
-        with catalog_container:
-            for _, item in filtered_df.head(60).iterrows():
-                with st.container():
-                    st.markdown(f"""
-                    <div class='tile-card'>
-                        <b>{item['ITEM_NAME']}</b><br>
-                        <small style='color:#64748b;'>Code: {item['ITEM_ID']} | Box Coverage: <b>{item['BOX_SQFT']} SqFt</b> ({item['PACKING_UNIT']} Pcs/Box)</small><br>
-                        <small style='color:#16a34a; font-weight:600;'>● Available</small>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    if st.button(f"Assign to {target_room_obj['name'] if target_room_obj else 'Room'}", key=f"assign_{item['ITEM_ID']}_{target_room_obj['room_id'] if target_room_obj else 0}"):
-                        if target_room_obj:
-                            target_room_obj["selected_tile"] = item.to_dict()
-                            st.rerun()
+            st.write(f"Showing **{len(filtered_df)}** items")
+            
+            all_rooms_flat = []
+            for f in st.session_state.floors:
+                for r in f["rooms"]:
+                    all_rooms_flat.append((f"{f['floor_name']} - {r['name']} (ID: {r['room_id']})", r))
+                    
+            target_room_label = st.selectbox("Assign selected tile to:", [item[0] for item in all_rooms_flat])
+            target_room_obj = next((item[1] for item in all_rooms_flat if item[0] == target_room_label), None)
+            
+            catalog_container = st.container(height=520)
+            with catalog_container:
+                for _, item in filtered_df.head(100).iterrows():
+                    with st.container():
+                        st.markdown(f"""
+                        <div class='tile-card'>
+                            <b>{item['ITEM_NAME']}</b><br>
+                            <small style='color:#64748b;'>Code: {item['ITEM_ID']} | Box Coverage: <b>{item['BOX_SQFT']} SqFt</b> ({item['PACKING_UNIT']} Pcs/Box)</small><br>
+                            <small style='color:#16a34a; font-weight:600;'>● Available</small>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        if st.button(f"Assign to {target_room_obj['name'] if target_room_obj else 'Room'}", key=f"assign_{item['ITEM_ID']}_{target_room_obj['room_id'] if target_room_obj else 0}"):
+                            if target_room_obj:
+                                target_room_obj["selected_tile"] = item.to_dict()
+                                st.rerun()
 
 # TAB 2: SUMMARY & PRINT
 with tab2:
