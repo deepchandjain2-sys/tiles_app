@@ -42,7 +42,6 @@ st.markdown("""
 # 2. GOOGLE SHEET LIVE CSV CONNECTOR (BUSY STOCK)
 # -------------------------------------------------------------
 FULL_SHEET_LINK = "https://docs.google.com/spreadsheets/d/14lY-SKjwd9hins1gSp6lR1C4_AOWOx2an8c-UgKaPY/edit?usp=sharing"
-
 @st.cache_data(ttl=60)
 def fetch_busy_inventory():
     try:
