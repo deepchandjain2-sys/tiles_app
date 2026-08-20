@@ -3,45 +3,60 @@ import pandas as pd
 import math
 from datetime import date
 
-# 1. Page Config
+# -------------------------------------------------------------
+# 1. PAGE CONFIGURATION & STYLING
+# -------------------------------------------------------------
 st.set_page_config(
-    page_title="Jay Granite & Tiles - Selection & Estimation",
-    page_icon="📐",
+    page_title="Jay Granite & Tiles - Smart Selection & Estimation",
+    page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 st.markdown("""
     <style>
-    .main-title { font-size: 26px; font-weight: 700; color: #1e3a8a; margin-bottom: 0px; }
-    .sub-title { font-size: 14px; color: #16a34a; font-weight: 600; margin-bottom: 20px; }
-    .tile-card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-    .summary-card { background-color: #eff6ff; border-left: 4px solid #2563eb; padding: 10px; border-radius: 4px; margin-top: 5px; }
+    .main-header { font-size: 26px; font-weight: 800; color: #1e3a8a; margin-bottom: 2px; }
+    .sub-header { font-size: 14px; color: #16a34a; font-weight: 600; margin-bottom: 15px; }
+    .tile-box { 
+        background: #ffffff; 
+        border: 1px solid #cbd5e1; 
+        border-radius: 8px; 
+        padding: 12px; 
+        margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .selection-banner {
+        background-color: #f0fdf4;
+        border: 1px solid #86efac;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 8px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Google Sheet (BUSY STOCK) Direct CSV Loader
-
+# -------------------------------------------------------------
+# 2. GOOGLE SHEET LIVE CSV CONNECTOR (BUSY STOCK)
+# -------------------------------------------------------------
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRMgTzS4kNWfaIOByOAZ-RS_XQP7zqiKXAgEkgVhrHNYQU5Jn-srXAfuOW_yPcAmW1G_FrEa59S-RyJ/pub?gid=0&single=true&output=csv"
 
 @st.cache_data(ttl=60)
-def load_busy_stock():
+def fetch_busy_inventory():
     try:
+        # Load raw sheet
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
         if df.empty:
             return pd.DataFrame()
-            
-        # Strip string columns
-        df = df.dropna(how='all')
         
-        # Identify columns dynamically
+        df = df.dropna(how='all')
         cols = list(df.columns)
+        
         id_col = cols[0]
         name_col = cols[1] if len(cols) > 1 else cols[0]
-        con_col = cols[3] if len(cols) > 3 else (cols[2] if len(cols) > 2 else None)
-        pack_col = cols[4] if len(cols) > 4 else (cols[3] if len(cols) > 3 else None)
-        
-        cleaned_data = []
+        con_col = cols[3] if len(cols) > 3 else None
+        pack_col = cols[4] if len(cols) > 4 else None
+
+        records = []
         for _, row in df.iterrows():
             name = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
             if not name or name.lower() == "nan" or "item name" in name.lower():
@@ -49,43 +64,77 @@ def load_busy_stock():
             
             # Conversion factor
             try:
-                con_factor = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 8.0
+                con_val = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 8.0
             except:
-                con_factor = 8.0
+                con_val = 8.0
                 
             # Packing unit
             try:
-                packing_unit = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 2.0
+                pack_val = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 2.0
             except:
-                packing_unit = 2.0
+                pack_val = 2.0
                 
-            box_sqft = round(con_factor * packing_unit, 2)
+            box_sqft = round(con_val * pack_val, 2)
             if box_sqft <= 0:
                 box_sqft = 16.0
                 
-            cat = "Floor Tile"
+            category = "Floor Tile"
             if "GRAN" in name.upper():
-                cat = "Granite"
-            elif "WALL" in name.upper() or "HL" in name.upper():
-                cat = "Wall Tile"
+                category = "Granite"
+            elif "WALL" in name.upper() or "HL" in name.upper() or "12X18" in name.upper() or "10X15" in name.upper():
+                category = "Wall Tile"
+            elif "16X16" in name.upper() or "PARKING" in name.upper():
+                category = "Parking Tile"
                 
-            cleaned_data.append({
+            records.append({
                 "ITEM_ID": str(row[id_col]).strip() if pd.notna(row[id_col]) else "NA",
                 "ITEM_NAME": name,
-                "CON_FACTOR": con_factor,
-                "PACKING_UNIT": int(packing_unit),
+                "CON_FACTOR": con_val,
+                "PACKING_UNIT": int(pack_val),
                 "BOX_SQFT": box_sqft,
-                "CATEGORY": cat
+                "CATEGORY": category
             })
             
-        return pd.DataFrame(cleaned_data)
-    except Exception as e:
-        st.error(f"Google Sheet Fetch Error: {e}")
+        return pd.DataFrame(records)
+    except Exception as err:
+        st.error(f"Google Sheet Fetch Error: {err}")
         return pd.DataFrame()
 
-stock_df = load_busy_stock()
+# -------------------------------------------------------------
+# 3. LOGIN & SECURITY SESSION
+# -------------------------------------------------------------
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-# 3. Session State
+def check_login(pin):
+    # Default Quick PIN: 1234 or 2026
+    if pin in ["1234", "2026"]:
+        st.session_state.authenticated = True
+        return True
+    return False
+
+if not st.session_state.authenticated:
+    st.markdown("<div class='main-header'>🏢 JAY GRANITE & TILES</div>", unsafe_allow_html=True)
+    st.caption("Staff & Sales Selection Portal")
+    st.markdown("---")
+    
+    col1, col2, _ = st.columns([1, 1, 2])
+    with col1:
+        st.subheader("🔐 Staff Login")
+        entered_pin = st.text_input("Enter Passcode / PIN", type="password", help="Default PIN: 1234")
+        if st.button("Unlock System", type="primary", use_container_width=True):
+            if check_login(entered_pin):
+                st.success("Login Successful!")
+                st.rerun()
+            else:
+                st.error("Invalid PIN. Please try again.")
+    st.stop()
+
+# -------------------------------------------------------------
+# 4. INITIALIZE APP SESSION DATA
+# -------------------------------------------------------------
+stock_data = fetch_busy_inventory()
+
 if "customer_name" not in st.session_state:
     st.session_state.customer_name = "Deepchand"
 if "customer_mobile" not in st.session_state:
@@ -99,186 +148,223 @@ if "floors" not in st.session_state:
             "floor_id": 1,
             "floor_name": "Ground Floor",
             "rooms": [
-                {"room_id": 101, "name": "Hall", "length": 10.0, "width": 10.0, "skirting": 0.0, "selected_tile": None}
+                {"room_id": 101, "name": "Hall", "length": 10.0, "width": 10.0, "skirting": 4.0, "selected_tile": None}
             ]
         }
     ]
 
-# 4. Sidebar
+# -------------------------------------------------------------
+# 5. SIDEBAR
+# -------------------------------------------------------------
 with st.sidebar:
-    st.header("👤 Customer Details")
+    st.markdown("### 👤 Customer Profile")
     st.session_state.customer_name = st.text_input("Customer Name", value=st.session_state.customer_name)
     st.session_state.customer_mobile = st.text_input("Mobile Number", value=st.session_state.customer_mobile)
     st.session_state.customer_address = st.text_area("Site / Delivery Address", value=st.session_state.customer_address)
-    st.write(f"**Date:** {date.today().strftime('%d-%b-%Y')}")
+    st.write(f"📅 **Date:** {date.today().strftime('%d-%b-%Y')}")
     
     st.markdown("---")
-    if st.button("🔄 Refresh BUSY Stock", use_container_width=True):
+    if st.button("🔄 Refresh BUSY Live Stock", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-
-# 5. Header & Tabs
-st.markdown("<div class='main-title'>JAY GRANITE & TILES</div>", unsafe_allow_html=True)
-st.markdown(f"<div class='sub-title'>● BUSY LIVE ({len(stock_df)} ITEMS AVAILABLE)</div>", unsafe_allow_html=True)
-
-tab1, tab2 = st.tabs(["📐 1. Rooms & Tile Selection", "📄 2. Estimate Summary & Print"])
-
-# TAB 1: MEASUREMENTS & SELECTION
-with tab1:
-    col_rooms, col_catalog = st.columns([1.3, 1.2], gap="large")
-    
-    with col_rooms:
-        st.subheader("Room Measurements")
         
-        if st.button("➕ Add New Floor", key="add_floor_btn"):
-            new_fl_id = len(st.session_state.floors) + 1
-            st.session_state.floors.append({
-                "floor_id": new_fl_id,
-                "floor_name": f"Floor {new_fl_id}",
-                "rooms": [{"room_id": int(f"{new_fl_id}01"), "name": "Hall", "length": 12.0, "width": 10.0, "skirting": 4.0, "selected_tile": None}]
-            })
-            st.rerun()
-            
-        for f_idx, floor in enumerate(st.session_state.floors):
-            with st.expander(f"🏢 {floor['floor_name']}", expanded=True):
-                if st.button(f"➕ Add Room to {floor['floor_name']}", key=f"add_room_{floor['floor_id']}"):
-                    new_r_id = int(f"{floor['floor_id']}{len(floor['rooms']) + 1}")
-                    floor["rooms"].append({"room_id": new_r_id, "name": f"Room {len(floor['rooms']) + 1}", "length": 10.0, "width": 10.0, "skirting": 4.0, "selected_tile": None})
+    if st.button("🔒 Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.rerun()
+
+# -------------------------------------------------------------
+# 6. MAIN NAVIGATION TABS
+# -------------------------------------------------------------
+st.markdown("<div class='main-header'>JAY GRANITE & TILES</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='sub-header'>● BUSY LIVE CONNECTED ({len(stock_data)} ITEMS IN STOCK)</div>", unsafe_allow_html=True)
+
+tab_measure, tab_select, tab_summary = st.tabs([
+    "📐 1. Room Measurements", 
+    "🎨 2. Tiles Selection Catalog", 
+    "📄 3. Estimate Summary & Print"
+])
+
+# -------------------------------------------------------------
+# TAB 1: ROOM MEASUREMENTS
+# -------------------------------------------------------------
+with tab_measure:
+    st.subheader("🏠 Site & Room Measurements")
+    st.caption("Add floors, rooms, and enter dimensions in feet. Skirting height in inches.")
+    
+    if st.button("➕ Add New Floor", key="btn_add_floor"):
+        new_fid = len(st.session_state.floors) + 1
+        st.session_state.floors.append({
+            "floor_id": new_fid,
+            "floor_name": f"Floor {new_fid}",
+            "rooms": [{"room_id": int(f"{new_fid}01"), "name": "Living Room", "length": 12.0, "width": 10.0, "skirting": 4.0, "selected_tile": None}]
+        })
+        st.rerun()
+        
+    for f_idx, fl in enumerate(st.session_state.floors):
+        with st.expander(f"🏢 {fl['floor_name']}", expanded=True):
+            if st.button(f"➕ Add Room to {fl['floor_name']}", key=f"add_room_btn_{fl['floor_id']}"):
+                new_rid = int(f"{fl['floor_id']}{len(fl['rooms']) + 1}")
+                fl["rooms"].append({"room_id": new_rid, "name": f"Room {len(fl['rooms']) + 1}", "length": 10.0, "width": 10.0, "skirting": 4.0, "selected_tile": None})
+                st.rerun()
+                
+            for r_idx, rm in enumerate(fl["rooms"]):
+                st.markdown(f"**Room #{r_idx+1}**")
+                c1, c2, c3, c4, c5 = st.columns([1.5, 1, 1, 1, 0.4])
+                
+                room_types = ["Hall", "Living Room", "Master Bedroom", "Bedroom 2", "Kitchen", "Bathroom", "Balcony", "Parking", "Pooja Room", "Custom"]
+                rm["name"] = c1.selectbox("Room Type", room_types, index=room_types.index(rm["name"]) if rm["name"] in room_types else 0, key=f"rname_{rm['room_id']}")
+                rm["length"] = c2.number_input("Length (ft)", value=float(rm["length"]), step=0.5, key=f"rlen_{rm['room_id']}")
+                rm["width"] = c3.number_input("Width (ft)", value=float(rm["width"]), step=0.5, key=f"rwid_{rm['room_id']}")
+                rm["skirting"] = c4.number_input("Skirting (in)", value=float(rm["skirting"]), step=1.0, key=f"rsk_{rm['room_id']}")
+                
+                if c5.button("❌", key=f"rdel_{rm['room_id']}"):
+                    fl["rooms"].pop(r_idx)
                     st.rerun()
+                    
+                floor_sqft = rm["length"] * rm["width"]
+                skirting_sqft = 2 * (rm["length"] + rm["width"]) * (rm["skirting"] / 12.0)
+                net_area = floor_sqft + skirting_sqft
                 
-                for r_idx, room in enumerate(floor["rooms"]):
-                    st.markdown(f"**Room #{r_idx+1}**")
-                    c_name, c_len, c_wid, c_skirt, c_del = st.columns([1.5, 1, 1, 1, 0.5])
-                    
-                    room["name"] = c_name.selectbox(
-                        "Type", 
-                        ["Hall", "Living Room", "Master Bedroom", "Kitchen", "Bathroom", "Balcony", "Parking", "Custom"],
-                        index=["Hall", "Living Room", "Master Bedroom", "Kitchen", "Bathroom", "Balcony", "Parking", "Custom"].index(room["name"]) if room["name"] in ["Hall", "Living Room", "Master Bedroom", "Kitchen", "Bathroom", "Balcony", "Parking"] else 7,
-                        key=f"name_{room['room_id']}"
-                    )
-                    room["length"] = c_len.number_input("Length (ft)", value=float(room["length"]), step=0.5, key=f"len_{room['room_id']}")
-                    room["width"] = c_wid.number_input("Width (ft)", value=float(room["width"]), step=0.5, key=f"wid_{room['room_id']}")
-                    room["skirting"] = c_skirt.number_input("Skirt (in)", value=float(room["skirting"]), step=1.0, key=f"sk_{room['room_id']}")
-                    
-                    if c_del.button("❌", key=f"del_{room['room_id']}"):
-                        floor["rooms"].pop(r_idx)
-                        st.rerun()
-                    
-                    floor_area = room["length"] * room["width"]
-                    skirting_area = 2 * (room["length"] + room["width"]) * (room["skirting"] / 12.0)
-                    total_sqft = floor_area + skirting_area
-                    
-                    if room["selected_tile"]:
-                        tile = room["selected_tile"]
-                        box_coverage = tile["BOX_SQFT"]
-                        exact_boxes = total_sqft / box_coverage
-                        req_boxes = math.ceil(exact_boxes)
-                        total_covered_sqft = req_boxes * box_coverage
-                        
-                        st.markdown(f"""
-                        <div class='summary-card'>
-                            <b>Selected:</b> {tile['ITEM_NAME']}<br>
-                            <b>Area:</b> {total_sqft:.1f} SqFt | <b>Required:</b> <span style='color:#2563eb; font-weight:bold;'>{req_boxes} Boxes</span> ({total_covered_sqft:.1f} SqFt) 
-                            <small style='color:#64748b;'>[Exact: {exact_boxes:.2f} Boxes]</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.caption("👉 Select a tile from the Live Catalog on the right.")
-                    
-                    st.divider()
+                if rm["selected_tile"]:
+                    tile_info = rm["selected_tile"]
+                    b_sqft = tile_info["BOX_SQFT"]
+                    boxes_exact = net_area / b_sqft
+                    boxes_req = math.ceil(boxes_exact)
+                    st.markdown(f"""
+                    <div class='selection-banner'>
+                        ✅ <b>Tile Assigned:</b> {tile_info['ITEM_NAME']} | <b>Total Area:</b> {net_area:.1f} SqFt<br>
+                        📦 <b>Required:</b> <span style='color:#1e3a8a; font-weight:bold; font-size:15px;'>{boxes_req} Boxes</span> ({boxes_req * b_sqft:.1f} SqFt) 
+                        <span style='color:#64748b; font-size:12px;'>[Exact: {boxes_exact:.2f} Boxes]</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.info(f"ℹ️ Area: **{net_area:.1f} SqFt** | Go to **Tab 2 (Tiles Selection Catalog)** to assign tile.")
+                st.divider()
 
-    with col_catalog:
-        st.subheader("📦 Live Tile Catalog")
+# -------------------------------------------------------------
+# TAB 2: TILES SELECTION CATALOG
+# -------------------------------------------------------------
+with tab_select:
+    st.subheader("🎨 Live Tiles & Granite Selection")
+    
+    if stock_data.empty:
+        st.warning("⚠️ No items available. Please check BUSY Google Sheet link.")
+    else:
+        # Search & Filter Row
+        f1, f2, f3 = st.columns([2, 1.5, 1.5])
+        with f1:
+            search_key = st.text_input("🔍 Search Tile / Design Name / Code", placeholder="e.g. 2X4, Varmora, Sega, Crayon, 12X18")
+        with f2:
+            cat_choice = st.selectbox("Filter Category", ["All", "Floor Tile", "Wall Tile", "Granite", "Parking Tile"])
+        with f3:
+            # Flatten room list for assignment
+            room_dropdown_options = []
+            room_map = {}
+            for fl in st.session_state.floors:
+                for rm in fl["rooms"]:
+                    label = f"{fl['floor_name']} ➔ {rm['name']} (ID: {rm['room_id']})"
+                    room_dropdown_options.append(label)
+                    room_map[label] = rm
+                    
+            target_room_label = st.selectbox("🎯 Assign Selected Tile To:", room_dropdown_options)
+            chosen_room = room_map.get(target_room_label)
+
+        # Filtered DataFrame
+        filtered_df = stock_data.copy()
+        if cat_choice != "All":
+            filtered_df = filtered_df[filtered_df["CATEGORY"] == cat_choice]
+        if search_key:
+            filtered_df = filtered_df[
+                filtered_df["ITEM_NAME"].str.contains(search_key, case=False, na=False) | 
+                filtered_df["ITEM_ID"].str.contains(search_key, case=False, na=False)
+            ]
+
+        st.write(f"Showing **{len(filtered_df)}** matching tiles in stock:")
         
-        if stock_df.empty:
-            st.warning("⚠️ No items loaded. Check Google Sheet link or format.")
-        else:
-            search_query = st.text_input("🔍 Search Tile (e.g. 2X4, Varmora, Grey)", "")
-            cat_filter = st.radio("Category", ["All", "Floor Tile", "Wall Tile", "Granite"], horizontal=True)
-            
-            filtered_df = stock_df.copy()
-            if cat_filter != "All":
-                filtered_df = filtered_df[filtered_df["CATEGORY"] == cat_filter]
-            if search_query:
-                filtered_df = filtered_df[filtered_df["ITEM_NAME"].str.contains(search_query, case=False, na=False) | filtered_df["ITEM_ID"].str.contains(search_query, case=False, na=False)]
-                
-            st.write(f"Showing **{len(filtered_df)}** items")
-            
-            all_rooms_flat = []
-            for f in st.session_state.floors:
-                for r in f["rooms"]:
-                    all_rooms_flat.append((f"{f['floor_name']} - {r['name']} (ID: {r['room_id']})", r))
+        # Display Grid
+        grid_cols = st.columns(3)
+        for idx, (_, tile_row) in enumerate(filtered_df.head(60).iterrows()):
+            col_idx = idx % 3
+            with grid_cols[col_idx]:
+                with st.container():
+                    st.markdown(f"""
+                    <div class='tile-box'>
+                        <div style='font-size:15px; font-weight:700; color:#0f172a;'>{tile_row['ITEM_NAME']}</div>
+                        <div style='font-size:12px; color:#64748b;'>Code: <b>{tile_row['ITEM_ID']}</b> | Category: {tile_row['CATEGORY']}</div>
+                        <div style='margin-top:6px; font-size:13px;'>📦 <b>{tile_row['BOX_SQFT']} SqFt / Box</b> ({tile_row['PACKING_UNIT']} Pcs)</div>
+                        <div style='color:#16a34a; font-size:12px; font-weight:600; margin-top:2px;'>● Ready in Stock</div>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-            target_room_label = st.selectbox("Assign selected tile to:", [item[0] for item in all_rooms_flat])
-            target_room_obj = next((item[1] for item in all_rooms_flat if item[0] == target_room_label), None)
-            
-            catalog_container = st.container(height=520)
-            with catalog_container:
-                for _, item in filtered_df.head(100).iterrows():
-                    with st.container():
-                        st.markdown(f"""
-                        <div class='tile-card'>
-                            <b>{item['ITEM_NAME']}</b><br>
-                            <small style='color:#64748b;'>Code: {item['ITEM_ID']} | Box Coverage: <b>{item['BOX_SQFT']} SqFt</b> ({item['PACKING_UNIT']} Pcs/Box)</small><br>
-                            <small style='color:#16a34a; font-weight:600;'>● Available</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if st.button(f"Assign to {target_room_obj['name'] if target_room_obj else 'Room'}", key=f"assign_{item['ITEM_ID']}_{target_room_obj['room_id'] if target_room_obj else 0}"):
-                            if target_room_obj:
-                                target_room_obj["selected_tile"] = item.to_dict()
-                                st.rerun()
+                    btn_text = f"Select for {chosen_room['name']}" if chosen_room else "Select Tile"
+                    if st.button(btn_text, key=f"btn_tile_{tile_row['ITEM_ID']}_{idx}", use_container_width=True):
+                        if chosen_room:
+                            chosen_room["selected_tile"] = tile_row.to_dict()
+                            st.success(f"Assigned '{tile_row['ITEM_NAME']}' to {chosen_room['name']}!")
+                            st.rerun()
 
-# TAB 2: SUMMARY & PRINT
-with tab2:
-    st.subheader("📄 Tile Requirement Estimate Summary")
+# -------------------------------------------------------------
+# TAB 3: ESTIMATE SUMMARY & PRINT
+# -------------------------------------------------------------
+with tab_summary:
+    st.subheader("📄 Material Requirement & Estimation Sheet")
     
-    st.write(f"**Customer:** {st.session_state.customer_name} | **Mobile:** {st.session_state.customer_mobile}")
-    if st.session_state.customer_address:
-        st.write(f"**Address:** {st.session_state.customer_address}")
-    st.write(f"**Date:** {date.today().strftime('%d-%b-%Y')}")
+    c_info1, c_info2 = st.columns(2)
+    with c_info1:
+        st.write(f"**Customer:** {st.session_state.customer_name}")
+        st.write(f"**Mobile:** {st.session_state.customer_mobile or 'N/A'}")
+    with c_info2:
+        st.write(f"**Date:** {date.today().strftime('%d-%b-%Y')}")
+        st.write(f"**Site Address:** {st.session_state.customer_address or 'N/A'}")
+        
+    st.markdown("---")
     
-    summary_rows = []
-    total_estimated_boxes = 0
-    total_estimated_sqft = 0.0
+    summary_data = []
+    grand_total_boxes = 0
+    grand_total_sqft = 0.0
     
-    for floor in st.session_state.floors:
-        for room in floor["rooms"]:
-            floor_area = room["length"] * room["width"]
-            skirting_area = 2 * (room["length"] + room["width"]) * (room["skirting"] / 12.0)
-            req_sqft = floor_area + skirting_area
+    for fl in st.session_state.floors:
+        for rm in fl["rooms"]:
+            fl_area = rm["length"] * rm["width"]
+            sk_area = 2 * (rm["length"] + rm["width"]) * (rm["skirting"] / 12.0)
+            room_net_area = fl_area + sk_area
             
-            if room["selected_tile"]:
-                tile = room["selected_tile"]
-                box_sqft = tile["BOX_SQFT"]
-                exact_boxes = req_sqft / box_sqft
-                req_boxes = math.ceil(exact_boxes)
-                covered_sqft = req_boxes * box_sqft
+            if rm["selected_tile"]:
+                tile_selected = rm["selected_tile"]
+                b_sqft = tile_selected["BOX_SQFT"]
+                exact_b = room_net_area / b_sqft
+                req_b = math.ceil(exact_b)
+                act_covered = req_b * b_sqft
                 
-                total_estimated_boxes += req_boxes
-                total_estimated_sqft += covered_sqft
+                grand_total_boxes += req_b
+                grand_total_sqft += act_covered
                 
-                summary_rows.append({
-                    "Floor / Room": f"{floor['floor_name']} - {room['name']}",
-                    "Selected Tile": tile['ITEM_NAME'],
-                    "Required Area (SqFt)": round(req_sqft, 1),
-                    "Boxes Required": f"{req_boxes} Boxes ({exact_boxes:.2f})",
-                    "Total Coverage (SqFt)": round(covered_sqft, 1)
+                summary_data.append({
+                    "Floor / Room": f"{fl['floor_name']} - {rm['name']}",
+                    "Dimensions": f"{rm['length']} x {rm['width']} ft (Sk: {rm['skirting']}\")",
+                    "Tile Selected": tile_selected['ITEM_NAME'],
+                    "Room Area (SqFt)": round(room_net_area, 1),
+                    "Box Coverage": f"{b_sqft} SqFt",
+                    "Required Boxes": f"{req_b} Boxes",
+                    "Delivered (SqFt)": round(act_covered, 1)
                 })
             else:
-                summary_rows.append({
-                    "Floor / Room": f"{floor['floor_name']} - {room['name']}",
-                    "Selected Tile": "Not Selected",
-                    "Required Area (SqFt)": round(req_sqft, 1),
-                    "Boxes Required": "-",
-                    "Total Coverage (SqFt)": "-"
+                summary_data.append({
+                    "Floor / Room": f"{fl['floor_name']} - {rm['name']}",
+                    "Dimensions": f"{rm['length']} x {rm['width']} ft",
+                    "Tile Selected": "⚠️ Not Selected",
+                    "Room Area (SqFt)": round(room_net_area, 1),
+                    "Box Coverage": "-",
+                    "Required Boxes": "-",
+                    "Delivered (SqFt)": "-"
                 })
                 
-    if summary_rows:
-        summary_df = pd.DataFrame(summary_rows)
-        st.table(summary_df)
+    if summary_data:
+        summary_table = pd.DataFrame(summary_data)
+        st.dataframe(summary_table, use_container_width=True)
         
         st.markdown(f"""
-        ### Total Requirement: **{total_estimated_boxes} Boxes** ({total_estimated_sqft:.1f} SqFt)
+        ### 📊 Total Order Estimate: **{grand_total_boxes} Boxes** ({grand_total_sqft:.1f} SqFt)
         """)
         
-    st.info("💡 **Print Tip:** ब्राउज़र में `Ctrl + P` दबाकर इसे सीधे PDF या प्रिंटर पर प्रिंट कर सकते हैं।")
+    st.info("💡 **Print Tip:** ब्राउज़र में `Ctrl + P` दबाकर ग्राहक के लिए सीधे कोटेशन PDF प्रिंट कर सकते हैं।")
