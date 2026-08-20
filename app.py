@@ -21,7 +21,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 2. Google Sheet (BUSY STOCK) Direct CSV Loader
-SHEET_ID = "14lY-SKjwd9hins1gSp6lR1C4_AOWOx2an8c-UgKaPY"
+SHEET_ID = "https://docs.google.com/spreadsheets/d/14fY-SKjwx8sins1gSp6iR1C4_AOWCXb2an8c-UgKaPY/edit?gid=0#gid=0"
 GOOGLE_SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 
 @st.cache_data(ttl=60)
