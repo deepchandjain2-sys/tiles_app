@@ -38,13 +38,23 @@ st.markdown("""
 # -------------------------------------------------------------
 # 2. GOOGLE SHEET LIVE CSV CONNECTOR (BUSY STOCK)
 # -------------------------------------------------------------
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/14lY-SKjwd9hins1gSp6lR1C4_AOWOx2an8c-UgKaPY/export?format=csv&gid=0"
+# -------------------------------------------------------------
+# 2. GOOGLE SHEET LIVE CSV CONNECTOR (BUSY STOCK)
+# -------------------------------------------------------------
+FULL_SHEET_LINK = "https://docs.google.com/spreadsheets/d/14lY-SKjwd9hins1gSp6lR1C4_AOWOx2an8c-UgKaPY/edit?usp=sharing"
 
 @st.cache_data(ttl=60)
 def fetch_busy_inventory():
     try:
-        # Load raw sheet
-        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        sheet_id = FULL_SHEET_LINK.split("/d/")[1].split("/")[0] if "/d/" in FULL_SHEET_LINK else FULL_SHEET_LINK
+        
+        gid_val = "0"
+        if "gid=" in FULL_SHEET_LINK:
+            gid_val = FULL_SHEET_LINK.split("gid=")[1].split("#")[0].split("&")[0]
+            
+        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid_val}"
+        
+        df = pd.read_csv(csv_url)
         if df.empty:
             return pd.DataFrame()
         
@@ -62,13 +72,11 @@ def fetch_busy_inventory():
             if not name or name.lower() == "nan" or "item name" in name.lower():
                 continue
             
-            # Conversion factor
             try:
                 con_val = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 8.0
             except:
                 con_val = 8.0
                 
-            # Packing unit
             try:
                 pack_val = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 2.0
             except:
@@ -98,9 +106,7 @@ def fetch_busy_inventory():
         return pd.DataFrame(records)
     except Exception as err:
         st.error(f"Google Sheet Fetch Error: {err}")
-        return pd.DataFrame()
-
-# -------------------------------------------------------------
+        return pd.DataFrame()# -------------------------------------------------------------
 # 3. LOGIN & SECURITY SESSION
 # -------------------------------------------------------------
 if "authenticated" not in st.session_state:
