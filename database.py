@@ -25,12 +25,12 @@ def create_tables():
     """)
     
     # Auto-insert default admin if not exists
-    c.execute("SELECT * FROM users WHERE username = 'admin'")
+    c.execute("SELECT * FROM users WHERE username = 'DEEPCHAND JAIN'")
     if not c.fetchone():
         c.execute("""
             INSERT INTO users (username, password_hash, role, security_pin)
             VALUES (?, ?, ?, ?)
-        """, ('admin', hash_pass('admin123'), 'admin', '1234'))
+        """, ('DEEPCHAND JAIN', hash_pass('deep123'), 'admin', '1234'))
         
     # Customers Table
     c.execute("""
