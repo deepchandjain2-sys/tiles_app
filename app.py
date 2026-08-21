@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+import urllib.parse
 from datetime import datetime
+from fpdf import FPDF
 import calculations
 import database
 
@@ -12,6 +14,51 @@ database.create_tables()
 
 def get_connection():
     return database.get_connection()
+
+# PDF Generator Function
+def generate_pdf(customer_name, mobile, df, total_sqft, total_boxes):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "JAY GRANITE & TILES", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, "Architectural Tile Selection & BOQ Estimate", ln=True, align="C")
+    pdf.ln(5)
+    
+    # Customer Details
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(100, 6, f"Customer: {customer_name}", ln=False)
+    pdf.cell(0, 6, f"Date: {datetime.now().strftime('%d-%m-%Y')}", ln=True, align="R")
+    pdf.cell(100, 6, f"Mobile: {mobile}", ln=True)
+    pdf.ln(5)
+    
+    # Table Header
+    pdf.set_fill_color(230, 230, 230)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(25, 7, "Floor", 1, 0, "C", fill=True)
+    pdf.cell(35, 7, "Area", 1, 0, "C", fill=True)
+    pdf.cell(65, 7, "Tile Name", 1, 0, "L", fill=True)
+    pdf.cell(20, 7, "Dimensions", 1, 0, "C", fill=True)
+    pdf.cell(22, 7, "Sq.Ft", 1, 0, "R", fill=True)
+    pdf.cell(23, 7, "Boxes", 1, 1, "R", fill=True)
+    
+    # Table Rows
+    pdf.set_font("Helvetica", "", 8)
+    for _, row in df.iterrows():
+        pdf.cell(25, 6, str(row["Floor"]), 1, 0, "C")
+        pdf.cell(35, 6, str(row["Area"])[:20], 1, 0, "L")
+        pdf.cell(65, 6, str(row["Tile"])[:35], 1, 0, "L")
+        pdf.cell(20, 6, str(row["Dimensions"]), 1, 0, "C")
+        pdf.cell(22, 6, f"{float(row['SqFt']):.2f}", 1, 0, "R")
+        pdf.cell(23, 6, f"{float(row['Boxes']):.2f}", 1, 1, "R")
+        
+    # Totals
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(145, 7, "Grand Total", 1, 0, "R", fill=True)
+    pdf.cell(22, 7, f"{total_sqft:.2f}", 1, 0, "R", fill=True)
+    pdf.cell(23, 7, f"{total_boxes:.2f}", 1, 1, "R", fill=True)
+    
+    return bytes(pdf.output())
 
 # Session State Setup
 if "authenticated" not in st.session_state:
@@ -48,7 +95,6 @@ if not st.session_state.authenticated:
                 if sub:
                     conn = get_connection()
                     c = conn.cursor()
-                    # Check user
                     c.execute("SELECT username, role FROM users WHERE username = ? AND password_hash = ?", (u, database.hash_pass(p)))
                     user = c.fetchone()
                     
@@ -85,12 +131,12 @@ if not st.session_state.authenticated:
                             conn.close()
                             st.success(f"Salesman **{new_u}** successfully created! Ab login tab se login karein.")
                         except Exception as ex:
-                            st.error(f"User already exists or error: {str(ex)}")
+                            st.error(f"User already exists: {str(ex)}")
                     else:
-                        st.error("Username aur password dono bharna zaroori hai.")
+                        st.error("Username aur password bharna zaroori hai.")
     st.stop()
 
-# --- SIDEBAR NAVIGATION (AFTER LOGIN) ---
+# --- SIDEBAR NAVIGATION ---
 st.sidebar.title(f"👤 {st.session_state.username.upper()}")
 st.sidebar.markdown(f"**Role:** `{st.session_state.role.upper()}`")
 if st.sidebar.button("🚪 Logout", use_container_width=True):
@@ -98,7 +144,6 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state.username = ""
     st.rerun()
 
-# Dynamic Menu based on Role
 nav_options = ["1️⃣ Customer Registration", "2️⃣ Tile Multi-Selection Hub"]
 if st.session_state.role == "admin":
     nav_options.extend(["📊 Executive Dashboard", "⚙️ Admin & Live Stock"])
@@ -124,11 +169,7 @@ if selected_page == "1️⃣ Customer Registration":
                 
                 if existing:
                     cust_id = existing[0]
-                    c.execute("""
-                        UPDATE customers 
-                        SET customer_name = ?, address = ?, engineer_name = ?, engineer_mobile = ? 
-                        WHERE id = ?
-                    """, (c_name.strip(), c_addr, eng_name, eng_mob, cust_id))
+                    c.execute("UPDATE customers SET customer_name = ?, address = ?, engineer_name = ?, engineer_mobile = ? WHERE id = ?", (c_name.strip(), c_addr, eng_name, eng_mob, cust_id))
                     st.session_state.cust_id = cust_id
                     st.session_state.cust_name = c_name.strip()
                     st.session_state.cust_mobile = c_mob.strip()
@@ -283,18 +324,42 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         c_kpi2.metric("Total Square Feet", f"{sum_sqft:.2f} sqft")
         c_kpi3.metric("Total Boxes", f"{sum_boxes:.2f} Boxes")
         
-        col_b1, col_b2 = st.columns(2)
-        with col_b1:
-            if st.button("💾 Finalize & Lock Estimate", type="primary", use_container_width=True):
-                conn = get_connection()
-                c = conn.cursor()
-                c.execute("UPDATE customer_selections SET status = 'FINALIZED' WHERE customer_id = ? AND status = 'DRAFT'", (st.session_state.cust_id,))
-                conn.commit()
-                conn.close()
-                st.success(f"{st.session_state.cust_name} ka estimate finalize ho gaya!")
-                st.rerun()
-        with col_b2:
-            if st.button("🗑️ Reset Cart", use_container_width=True):
+        pdf_bytes = generate_pdf(st.session_state.cust_name, st.session_state.cust_mobile, cart_df, sum_sqft, sum_boxes)
+        
+        btn_col1, btn_col2, btn_col3 = st.columns(3)
+        with btn_col1:
+            st.download_button(
+                label="📄 Download Quotation PDF",
+                data=pdf_bytes,
+                file_name=f"Estimate_{st.session_state.cust_name}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+            
+        with btn_col2:
+            wa_text = f"*🏛️ JAY GRANITE & TILES - Selection Estimate*\n\n"
+            wa_text += f"👤 *Client:* {st.session_state.cust_name}\n"
+            wa_text += f"📱 *Mobile:* {st.session_state.cust_mobile}\n"
+            wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
+            for _, r in cart_df.iterrows():
+                wa_text += f"▪️ *{r['Area']}* ({r['Floor']})\n"
+                wa_text += f"   Tile: {r['Tile']}\n"
+                wa_text += f"   Total: {r['SqFt']} Sq.Ft | *{r['Boxes']} Boxes*\n\n"
+            wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
+            wa_text += f"📊 *Total Area:* {sum_sqft:.2f} Sq.Ft\n"
+            wa_text += f"📦 *Total Required:* {sum_boxes:.2f} Boxes\n\n"
+            wa_text += f"Thank you for choosing Jay Granite & Tiles!"
+            
+            encoded_text = urllib.parse.quote(wa_text)
+            clean_mob = "".join(filter(str.isdigit, str(st.session_state.cust_mobile)))
+            if not clean_mob.startswith("91") and len(clean_mob) == 10:
+                clean_mob = "91" + clean_mob
+            
+            wa_link = f"https://wa.me/{clean_mob}?text={encoded_text}"
+            st.link_button("📲 1-Click WhatsApp Share", wa_link, use_container_width=True)
+            
+        with btn_col3:
+            if st.button("🗑️ Reset Active Cart", use_container_width=True):
                 conn = get_connection()
                 c = conn.cursor()
                 c.execute("DELETE FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'", (st.session_state.cust_id,))
@@ -302,7 +367,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
                 conn.close()
                 st.rerun()
 
-# --- PAGE 3: DASHBOARD (ADMIN ONLY) ---
+# --- PAGE 3: DASHBOARD ---
 elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "admin":
     st.title("📊 Executive Selections Dashboard")
     conn = get_connection()
@@ -310,7 +375,7 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
     conn.close()
     st.dataframe(all_selections, use_container_width=True)
 
-# --- PAGE 4: ADMIN CONTROL (ADMIN ONLY) ---
+# --- PAGE 4: ADMIN CONTROL ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
     t1, t2 = st.tabs(["📦 Inventory Stock Data", "📜 System Audits"])
