@@ -368,13 +368,130 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
                 st.rerun()
 
 # --- PAGE 3: DASHBOARD ---
+# --- PAGE 3: DASHBOARD (ADMIN ONLY) ---
 elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "admin":
-    st.title("📊 Executive Selections Dashboard")
+    st.title("📊 Executive Business & Selections Dashboard")
+    
     conn = get_connection()
-    all_selections = pd.read_sql_query("SELECT * FROM customer_selections ORDER BY id DESC", conn)
+    cust_df = pd.read_sql_query("SELECT * FROM customers", conn)
+    sel_df = pd.read_sql_query("SELECT * FROM customer_selections", conn)
     conn.close()
-    st.dataframe(all_selections, use_container_width=True)
 
+    # --- TOP KPI METRICS ---
+    k1, k2, k3, k4 = st.columns(4)
+    total_custs = len(cust_df)
+    active_selections = len(sel_df)
+    total_sqft_all = sel_df["sqft_covered"].sum() if not sel_df.empty else 0.0
+    total_boxes_all = sel_df["boxes_required"].sum() if not sel_df.empty else 0.0
+
+    k1.metric("👥 Total Walk-ins / Clients", total_custs)
+    k2.metric("📋 Total Tile Selections", active_selections)
+    k3.metric("📐 Total Area Selected", f"{total_sqft_all:,.2f} sqft")
+    k4.metric("📦 Total Boxes Estimated", f"{total_boxes_all:,.2f} Boxes")
+
+    st.markdown("---")
+
+    dash_tab1, dash_tab2, dash_tab3 = st.tabs([
+        "👥 Customer-wise Summary", 
+        "👔 Salesman Performance", 
+        "📑 Detailed Master Log"
+    ])
+
+    # --- TAB 1: CUSTOMER SUMMARY ---
+    with dash_tab1:
+        st.subheader("📋 Customer Wise Selection Status")
+        if not sel_df.empty:
+            cust_summary = sel_df.groupby(["customer_name", "mobile", "salesman"]).agg(
+                Total_Items=("id", "count"),
+                Total_SqFt=("sqft_covered", "sum"),
+                Total_Boxes=("boxes_required", "sum"),
+                Last_Active=("timestamp", "max")
+            ).reset_index()
+            
+            cust_summary["Total_SqFt"] = cust_summary["Total_SqFt"].round(2)
+            cust_summary["Total_Boxes"] = cust_summary["Total_Boxes"].round(2)
+            
+            st.dataframe(
+                cust_summary.rename(columns={
+                    "customer_name": "Customer Name",
+                    "mobile": "Mobile",
+                    "salesman": "Handled By (Salesman)",
+                    "Total_Items": "Total Areas/Tiles",
+                    "Total_SqFt": "Total Sq.Ft",
+                    "Total_Boxes": "Total Boxes",
+                    "Last_Active": "Last Updated"
+                }),
+                use_container_width=True
+            )
+        else:
+            st.info("Abhi tak koi selections data enter nahi hua hai.")
+
+    # --- TAB 2: SALESMAN PERFORMANCE ---
+    with dash_tab2:
+        st.subheader("👔 Staff & Salesman Attendance / Productivity")
+        if not sel_df.empty:
+            salesman_summary = sel_df.groupby("salesman").agg(
+                Unique_Clients=("customer_name", "nunique"),
+                Total_Selections=("id", "count"),
+                SqFt_Covered=("sqft_covered", "sum"),
+                Boxes_Sold=("boxes_required", "sum")
+            ).reset_index()
+
+            salesman_summary["SqFt_Covered"] = salesman_summary["SqFt_Covered"].round(2)
+            salesman_summary["Boxes_Sold"] = salesman_summary["Boxes_Sold"].round(2)
+
+            st.dataframe(
+                salesman_summary.rename(columns={
+                    "salesman": "Salesman Name",
+                    "Unique_Clients": "Clients Attended",
+                    "Total_Selections": "Tiles Pitched/Selected",
+                    "SqFt_Covered": "Total Sq.Ft",
+                    "Boxes_Sold": "Total Boxes"
+                }),
+                use_container_width=True
+            )
+        else:
+            st.info("Salesman activity log empty hai.")
+
+    # --- TAB 3: DETAILED ALL SELECTIONS LOG ---
+    with dash_tab3:
+        st.subheader("📑 Complete Raw Selections Log")
+        
+        # Quick Search & Filters
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            staff_filter = st.multiselect("Filter by Salesman", options=sel_df["salesman"].unique().tolist() if not sel_df.empty else [])
+        with col_f2:
+            search_key = st.text_input("🔍 Quick Search (Customer / Tile / Mobile)", "")
+
+        filtered_log = sel_df.copy()
+        if staff_filter:
+            filtered_log = filtered_log[filtered_log["salesman"].isin(staff_filter)]
+        if search_key:
+            filtered_log = filtered_log[
+                filtered_log["customer_name"].str.contains(search_key, case=False, na=False) |
+                filtered_log["mobile"].str.contains(search_key, case=False, na=False) |
+                filtered_log["tile_name"].str.contains(search_key, case=False, na=False)
+            ]
+
+        st.dataframe(
+            filtered_log.rename(columns={
+                "id": "Entry ID",
+                "customer_name": "Customer",
+                "mobile": "Mobile",
+                "salesman": "Salesman",
+                "floor": "Floor",
+                "area_type": "Type",
+                "area_name": "Area",
+                "tile_name": "Tile Name",
+                "dimensions": "Size",
+                "sqft_covered": "Sq.Ft",
+                "boxes_required": "Boxes",
+                "status": "Status",
+                "timestamp": "Date Time"
+            }),
+            use_container_width=True
+        )
 # --- PAGE 4: ADMIN CONTROL ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
