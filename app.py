@@ -366,25 +366,26 @@ if st.button("➕ Add This Area to Selection List", use_container_width=True):
                 st.rerun()
 
         
-    st.markdown("### 📋 Final Bill of Quantities (BOQ)")
-    
-    conn = get_connection()
-    cart_df = pd.read_sql_query(
-        "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes FROM customer_selections WHERE status = 'DRAFT'",
-        conn
-    )
-    conn.close()
-    
-    if not cart_df.empty:
-        st.dataframe(cart_df[["Floor", "Type", "Area", "Tile", "Dimensions", "SqFt", "Boxes"]], use_container_width=True)
-        
-        sum_sqft = cart_df["SqFt"].sum()
-        sum_boxes = round(cart_df["Boxes"].sum(), 2)
-        
-        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
-        c_kpi1.metric("Total Line Items", len(cart_df))
-        c_kpi2.metric("Total Square Feet", f"{sum_sqft:.2f} sqft")
-        c_kpi3.metric("Total Boxes Required", f"{sum_boxes:.2f} Boxes")
+    st.markdown("---")
+        st.markdown("### 📋 Final Bill of Quantities (BOQ)")
+
+        conn = get_connection()
+        cart_df = pd.read_sql_query(
+            "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes FROM customer_selections WHERE status = 'DRAFT'",
+            conn
+        )
+        conn.close()
+
+        if not cart_df.empty:
+            st.dataframe(cart_df[["Floor", "Type", "Area", "Tile", "Dimensions", "SqFt", "Boxes"]], use_container_width=True)
+            
+            sum_sqft = cart_df["SqFt"].sum()
+            sum_boxes = round(cart_df["Boxes"].sum(), 2)
+            
+            c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
+            c_kpi1.metric("Total Line Items", len(cart_df))
+            c_kpi2.metric("Total Square Feet", f"{sum_sqft:.2f} sqft")
+            c_kpi3.metric("Total Boxes Required", f"{sum_boxes:.2f} Boxes")v
     
 
 
