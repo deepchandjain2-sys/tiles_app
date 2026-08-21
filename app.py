@@ -97,11 +97,32 @@ if selected_page == "1️⃣ Customer Registration":
                 st.error("Name and Mobile are required.")
 
 # --- PAGE 2: SELECTION HUB ---
+# --- PAGE 2: SELECTION HUB ---
 elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     st.title("📐 Tile Multi-Selection Hub")
-    st.info(f"Active Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile})")
     
-    # Load Stock Items
+    # --- CUSTOMER SELECTOR / SWITCHER ---
+    conn = get_connection()
+    all_custs = pd.read_sql_query("SELECT id, customer_name, mobile FROM customers ORDER BY id DESC", conn)
+    conn.close()
+    
+    if not all_custs.empty:
+        cust_options = {f"{row['customer_name']} ({row['mobile']})": (row['id'], row['customer_name'], row['mobile']) for _, row in all_custs.iterrows()}
+        
+        # Determine default index
+        default_label = next((k for k, v in cust_options.items() if v[0] == st.session_state.get('cust_id')), list(cust_options.keys())[0])
+        default_idx = list(cust_options.keys()).index(default_label)
+        
+        selected_cust_label = st.selectbox("👤 Select / Switch Active Customer", list(cust_options.keys()), index=default_idx)
+        
+        # Set Active Customer in session
+        st.session_state.cust_id, st.session_state.cust_name, st.session_state.cust_mobile = cust_options[selected_cust_label]
+        st.info(f"Active Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile})")
+    else:
+        st.warning("Pehle Customer Registration page par jaakar customer add karein.")
+        st.stop()
+        
+    # --- LOAD STOCK ITEMS ---
     conn = get_connection()
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS inventory_stock (id INTEGER PRIMARY KEY AUTOINCREMENT, tile_name TEXT UNIQUE, sqft_per_box REAL)")
@@ -173,12 +194,13 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
             st.rerun()
 
     st.markdown("---")
-    st.markdown("### 📋 Final Bill of Quantities (BOQ)")
+    st.markdown(f"### 📋 Final Bill of Quantities (BOQ) - {st.session_state.cust_name}")
 
     conn = get_connection()
     cart_df = pd.read_sql_query(
-        "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes FROM customer_selections WHERE status = 'DRAFT'",
-        conn
+        "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes "
+        "FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'",
+        conn, params=(st.session_state.cust_id,)
     )
     conn.close()
 
@@ -198,20 +220,19 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
             if st.button("💾 Finalize & Lock Estimate", type="primary", use_container_width=True):
                 conn = get_connection()
                 c = conn.cursor()
-                c.execute("UPDATE customer_selections SET status = 'FINALIZED' WHERE status = 'DRAFT'")
+                c.execute("UPDATE customer_selections SET status = 'FINALIZED' WHERE customer_id = ? AND status = 'DRAFT'", (st.session_state.cust_id,))
                 conn.commit()
                 conn.close()
-                st.success("Estimate finalize ho gaya!")
+                st.success(f"{st.session_state.cust_name} ka estimate finalize ho gaya!")
                 st.rerun()
         with col_b2:
-            if st.button("🗑️ Reset Active Cart", use_container_width=True):
+            if st.button("🗑️ Reset Active Customer Cart", use_container_width=True):
                 conn = get_connection()
                 c = conn.cursor()
-                c.execute("DELETE FROM customer_selections WHERE status = 'DRAFT'")
+                c.execute("DELETE FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'", (st.session_state.cust_id,))
                 conn.commit()
                 conn.close()
                 st.rerun()
-
 # --- PAGE 3: DASHBOARD ---
 elif selected_page == "📊 Executive Dashboard":
     st.title("📊 Executive Selections Dashboard")
