@@ -445,12 +445,71 @@ elif selected_page == "📊 Executive Dashboard":
         st.dataframe(df_items.sort_values(by="id", ascending=False), use_container_width=True)
 
 # --- PAGE 4: ADMIN ---
+# --- PAGE 4: ADMIN & LIVE STOCK ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
     t1, t2 = st.tabs(["📦 Inventory Stock Data", "📜 System Audits"])
     
     with t1:
-        st.subheader(f"📦 Inventory Stock Management ({len(stock_df)} Items Loaded)")
+        st.subheader("📥 Upload BUSY Accounting Item Master / Stock Sheet")
+        st.markdown("Yahan apni Google Sheet ya BUSY se nikli **CSV / Excel** file upload karein:")
+        
+        uploaded_file = st.file_uploader("Upload CSV / Excel File", type=["csv", "xlsx", "xls"])
+        
+        if uploaded_file is not None:
+            if st.button("🚀 Import & Update All Stock Items", type="primary"):
+                try:
+                    if uploaded_file.name.endswith(".csv"):
+                        raw_df = pd.read_csv(uploaded_file, header=None)
+                    else:
+                        raw_df = pd.read_excel(uploaded_file, header=None)
+                        
+                    # Find Header row with 'ITEM NAME'
+                    h_idx = 0
+                    for i in range(min(15, len(raw_df))):
+                        row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
+                        if any("ITEM NAME" in s for s in row_vals):
+                            h_idx = i
+                            break
+                            
+                    headers = [str(c).strip().upper() if pd.notna(c) else f"COL_{idx}" for idx, c in enumerate(raw_df.iloc[h_idx].values)]
+                    df_clean = raw_df.iloc[h_idx + 1:].copy()
+                    df_clean.columns = headers
+                    
+                    # Identify Columns (Item Name, Con Factor, Packing Unit)
+                    name_col = next((c for c in df_clean.columns if "ITEM NAME" in c), df_clean.columns[1])
+                    cf_col = next((c for c in df_clean.columns if c == "CON FACTOR" or (("CON FACTOR" in c) and ("TYPE" not in c) and ("PACKING" not in c))), None)
+                    pack_col = next((c for c in df_clean.columns if "PACKING UNIT" in c or "PACKING" in c), None)
+                    
+                    # Calculate Sqft_Per_Box = Con Factor * Packing Unit
+                    if cf_col and pack_col:
+                        c1 = pd.to_numeric(df_clean[cf_col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(1.0)
+                        c2 = pd.to_numeric(df_clean[pack_col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(1.0)
+                        df_clean["Sqft_Per_Box"] = (c1 * c2).round(2)
+                    else:
+                        df_clean["Sqft_Per_Box"] = 16.0
+                        
+                    df_clean["Tile_Name"] = df_clean[name_col].astype(str).str.strip()
+                    df_clean = df_clean[df_clean["Tile_Name"] != ""]
+                    df_clean = df_clean[~df_clean["Tile_Name"].str.upper().isin(["NAN", "ITEM NAME", "TOTAL", "NONE", "UNNAMED", "NULL"])]
+                    
+                    final_items = df_clean[["Tile_Name", "Sqft_Per_Box"]].drop_duplicates(subset=["Tile_Name"]).reset_index(drop=True)
+                    
+                    if not final_items.empty:
+                        conn = get_connection()
+                        c = conn.cursor()
+                        c.execute("DELETE FROM inventory_stock")
+                        for _, row in final_items.iterrows():
+                            c.execute("INSERT OR REPLACE INTO inventory_stock (tile_name, sqft_per_box) VALUES (?, ?)", (str(row["Tile_Name"]), float(row["Sqft_Per_Box"])))
+                        conn.commit()
+                        conn.close()
+                        st.success(f"🎉 Total **{len(final_items)} Tiles** successfully live database mein load ho gayi!")
+                        st.rerun()
+                except Exception as ex:
+                    st.error(f"Error reading file: {str(ex)}")
+                    
+        st.markdown("---")
+        st.subheader(f"📦 Current Live Stock ({len(stock_df)} Items Loaded)")
         st.dataframe(stock_df, use_container_width=True)
         
     with t2:
