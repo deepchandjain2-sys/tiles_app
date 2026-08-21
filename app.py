@@ -335,22 +335,61 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
 
     st.caption(f"📦 Box Coverage: **{box_sqft:.2f} Sq.Ft / Box** (Con Factor: {con_factor} × Packing Unit: {packing_unit})")
     st.info(f"💡 Area: **{tot_sqft:.2f} Sq.Ft** | Box Estimate: **{req_boxes} Boxes**")
+if st.button("➕ Add This Area to Selection List", use_container_width=True):
+            if not area_name:
+                st.error("Area Name enter karna zaroori hai.")
+            else:
+                conn = get_connection()
+                c = conn.cursor()
+                c.execute("""
+                    INSERT INTO customer_selections 
+                    (customer_id, customer_name, mobile, salesman, floor, area_type, area_name, tile_name, dimensions, sqft_covered, boxes_required, status, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    st.session_state.get('cust_id', 1),
+                    st.session_state.get('cust_name', 'Walk-in Customer'),
+                    st.session_state.get('cust_mobile', '-'),
+                    st.session_state.get('username', 'admin'),
+                    floor,
+                    area_type,
+                    area_name,
+                    tile_name,
+                    f"{length}x{width} ft",
+                    round(tot_sqft, 2),
+                    req_boxes,
+                    'DRAFT',
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ))
+                conn.commit()
+                conn.close()
+                st.success(f"{area_name} list mein add ho gaya!")
+                st.rerun()
 
-    if st.button("➕ Add This Area to Selection List", use_container_width=True):
-        if not area_name:
-            st.error("Area Name enter karna zaroori hai.")
-        else:
-            st.session_state.current_cart.append({
-                "Floor": floor,
-                "Type": area_type,
-                "Area": area_name,
-                "Tile": tile_name,
-                "Dimensions": f"{length}x{width} ft",
-                "SqFt": round(tot_sqft, 2),
-                "Boxes": req_boxes
-            })
-            st.success(f"{area_name} list mein add ho gaya!")
+        st.markdown("---")
+        st.markdown("### 📋 Final Bill of Quantities (BOQ)")
 
+        conn = get_connection()
+        cart_df = pd.read_sql_query(
+            "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes FROM customer_selections WHERE status = 'DRAFT'",
+            conn
+        )
+        conn.close()
+
+        if not cart_df.empty:
+            st.dataframe(cart_df[["Floor", "Type", "Area", "Tile", "Dimensions", "SqFt", "Boxes"]], use_container_width=True)
+            
+            sum_sqft = cart_df["SqFt"].sum()
+            sum_boxes = round(cart_df["Boxes"].sum(), 2)
+            
+            c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
+            c_kpi1.metric("Total Line Items", len(cart_df))
+            c_kpi2.metric("Total Square Feet", f"{sum_sqft:.2f} sqft")
+            c_kpi3.metric("Total Boxes Required", f"{sum_boxes:.2f} Boxes")
+    
+
+
+
+    
     st.markdown("---")
     st.markdown("### 📋 Final Bill of Quantities (BOQ)")
     if st.session_state.current_cart:
