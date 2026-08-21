@@ -366,7 +366,7 @@ if st.button("➕ Add This Area to Selection List", use_container_width=True):
                 st.rerun()
 
         
-    st.markdown("---")
+        st.markdown("---")
         st.markdown("### 📋 Final Bill of Quantities (BOQ)")
 
         conn = get_connection()
