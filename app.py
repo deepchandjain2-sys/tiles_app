@@ -178,13 +178,36 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     if stock_df.empty:
         stock_df = pd.DataFrame([{"tile_name": "AKROS STEEL TEXTURA 2X4 ITALICA", "sqft_per_box": 16.0}])
         
-    c1, c2, c3 = st.columns(3)
+   c1, c2, c3 = st.columns(3)
     with c1:
         floor = st.selectbox("Floor Level", ["Ground Floor", "First Floor", "Second Floor", "Third Floor", "Terrace"])
     with c2:
         area_type = st.radio("Surface Type", ["Floor", "Wall"], horizontal=True)
     with c3:
-        area_name = st.text_input("Designated Area (e.g. Living Room, Kitchen)", "Living Room")
+        area_list = [
+            "Living Room / Hall", 
+            "Master Bedroom", 
+            "Bedroom 2", 
+            "Bedroom 3", 
+            "Kitchen", 
+            "Kitchen Dado / Wall",
+            "Dining Area", 
+            "Pooja Room", 
+            "Master Bathroom", 
+            "Common Bathroom", 
+            "Balcony", 
+            "Utility / Wash Area", 
+            "Parking / Porch", 
+            "Staircase", 
+            "Front Elevation", 
+            "✏️ Other (Type Custom)"
+        ]
+        selected_area = st.selectbox("Designated Area", area_list)
+        
+        if selected_area == "✏️ Other (Type Custom)":
+            area_name = st.text_input("Enter Custom Area Name", "Store Room").strip()
+        else:
+            area_name = selected_area
         
     search_q = st.text_input("🔍 Search Tile Name / Size", "")
     filtered_df = stock_df[stock_df["tile_name"].str.contains(search_q, case=False, na=False)] if search_q else stock_df
