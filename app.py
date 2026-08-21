@@ -178,7 +178,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     if stock_df.empty:
         stock_df = pd.DataFrame([{"tile_name": "AKROS STEEL TEXTURA 2X4 ITALICA", "sqft_per_box": 16.0}])
         
-   c1, c2, c3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
     with c1:
         floor = st.selectbox("Floor Level", ["Ground Floor", "First Floor", "Second Floor", "Third Floor", "Terrace"])
     with c2:
@@ -203,7 +203,6 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
             "✏️ Other (Type Custom)"
         ]
         selected_area = st.selectbox("Designated Area", area_list)
-        
         if selected_area == "✏️ Other (Type Custom)":
             area_name = st.text_input("Enter Custom Area Name", "Store Room").strip()
         else:
