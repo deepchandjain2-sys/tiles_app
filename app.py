@@ -5,10 +5,13 @@ from datetime import datetime
 import calculations
 import database
 
-st.set_page_config(page_title="Jay Granite Tiles Selection", page_icon="🏛️", layout="wide")
+st.set_page_config(page_title="Jay Granite Tile Selection", page_icon="🏛️", layout="wide")
 
-# Initialize DB
+# Initialize Tables
 database.create_tables()
+
+def get_connection():
+    return database.get_connection()
 
 # Session State Setup
 if "authenticated" not in st.session_state:
@@ -16,7 +19,7 @@ if "authenticated" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 if "role" not in st.session_state:
-    st.session_state.role = ""
+    st.session_state.role = "salesman"
 if "cust_id" not in st.session_state:
     st.session_state.cust_id = 1
 if "cust_name" not in st.session_state:
@@ -24,48 +27,81 @@ if "cust_name" not in st.session_state:
 if "cust_mobile" not in st.session_state:
     st.session_state.cust_mobile = "-"
 
-def get_connection():
-    return database.get_connection()
-
-# --- LOGIN SCREEN ---
+# --- LOGIN & ROLE SELECTION SCREEN ---
 if not st.session_state.authenticated:
     st.title("🏛️ Jay Granite Tile Selection")
     st.caption("Smart Architectural Tile Selection Portal")
     
-    with st.form("login_form"):
+    col_mid1, col_mid2, col_mid3 = st.columns([1, 2, 1])
+    with col_mid2:
         st.subheader("🔐 Staff Sign In")
-        u = st.text_input("Username").strip()
-        p = st.text_input("Password", type="password").strip()
-        sub = st.form_submit_button("Login", type="primary")
         
-        if sub:
-            conn = get_connection()
-            c = conn.cursor()
-            c.execute("SELECT username, role FROM users WHERE username = ? AND password_hash = ?", (u, database.hash_pass(p)))
-            user = c.fetchone()
-            if user:
-                st.session_state.authenticated = True
-                st.session_state.username = user[0]
-                st.session_state.role = user[1]
-                c.execute("INSERT INTO login_history (username, timestamp) VALUES (?, ?)", (u, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-                conn.commit()
-                conn.close()
-                st.rerun()
-            else:
-                conn.close()
-                st.error("Invalid credentials.")
+        login_tab1, login_tab2 = st.tabs(["👤 Existing User Login", "➕ Create Salesman Account"])
+        
+        with login_tab1:
+            with st.form("login_form"):
+                role_choice = st.radio("Choose Login Role", ["Salesman", "Admin"], horizontal=True)
+                u = st.text_input("Username").strip()
+                p = st.text_input("Password", type="password").strip()
+                sub = st.form_submit_button("🚀 Login", type="primary", use_container_width=True)
+                
+                if sub:
+                    conn = get_connection()
+                    c = conn.cursor()
+                    # Check user
+                    c.execute("SELECT username, role FROM users WHERE username = ? AND password_hash = ?", (u, database.hash_pass(p)))
+                    user = c.fetchone()
+                    
+                    if user:
+                        st.session_state.authenticated = True
+                        st.session_state.username = user[0]
+                        st.session_state.role = user[1].lower()
+                        c.execute("INSERT INTO login_history (username, timestamp) VALUES (?, ?)", (u, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                        conn.commit()
+                        conn.close()
+                        st.rerun()
+                    else:
+                        conn.close()
+                        st.error("Invalid Username or Password.")
+                        
+        with login_tab2:
+            with st.form("create_salesman_form"):
+                st.caption("Naye Salesman ka account create karein:")
+                new_u = st.text_input("New Salesman Username").strip()
+                new_p = st.text_input("New Password", type="password").strip()
+                new_pin = st.text_input("4-Digit Recovery PIN", max_chars=4, value="1234").strip()
+                reg_sub = st.form_submit_button("Create Salesman", use_container_width=True)
+                
+                if reg_sub:
+                    if new_u and new_p:
+                        try:
+                            conn = get_connection()
+                            c = conn.cursor()
+                            c.execute("""
+                                INSERT INTO users (username, password_hash, role, security_pin)
+                                VALUES (?, ?, 'salesman', ?)
+                            """, (new_u, database.hash_pass(new_p), new_pin))
+                            conn.commit()
+                            conn.close()
+                            st.success(f"Salesman **{new_u}** successfully created! Ab login tab se login karein.")
+                        except Exception as ex:
+                            st.error(f"User already exists or error: {str(ex)}")
+                    else:
+                        st.error("Username aur password dono bharna zaroori hai.")
     st.stop()
 
-# --- SIDEBAR NAVIGATION ---
+# --- SIDEBAR NAVIGATION (AFTER LOGIN) ---
 st.sidebar.title(f"👤 {st.session_state.username.upper()}")
-st.sidebar.caption(f"Role: {st.session_state.role}")
-if st.sidebar.button("🚪 Logout"):
+st.sidebar.markdown(f"**Role:** `{st.session_state.role.upper()}`")
+if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state.authenticated = False
+    st.session_state.username = ""
     st.rerun()
 
-nav_options = ["1️⃣ Customer Registration", "2️⃣ Tile Multi-Selection Hub", "📊 Executive Dashboard"]
+# Dynamic Menu based on Role
+nav_options = ["1️⃣ Customer Registration", "2️⃣ Tile Multi-Selection Hub"]
 if st.session_state.role == "admin":
-    nav_options.append("⚙️ Admin & Live Stock")
+    nav_options.extend(["📊 Executive Dashboard", "⚙️ Admin & Live Stock"])
 
 selected_page = st.sidebar.radio("Navigation Flow", nav_options)
 
@@ -73,56 +109,66 @@ selected_page = st.sidebar.radio("Navigation Flow", nav_options)
 if selected_page == "1️⃣ Customer Registration":
     st.title("📝 Customer Registration")
     with st.form("cust_reg_form"):
-        c_name = st.text_input("Customer Name *")
-        c_mob = st.text_input("Mobile Number *")
+        c_name = st.text_input("Customer Name *", value=st.session_state.get("cust_name", "") if st.session_state.get("cust_name") != "Walk-in Customer" else "")
+        c_mob = st.text_input("Mobile Number *", value=st.session_state.get("cust_mobile", "") if st.session_state.get("cust_mobile") != "-" else "")
         c_addr = st.text_area("Site Address")
         eng_name = st.text_input("Engineer / Contractor Name (Optional)")
         eng_mob = st.text_input("Engineer Mobile (Optional)")
         
         if st.form_submit_button("Save & Proceed to Selection", type="primary"):
-            if c_name and c_mob:
+            if c_name.strip() and c_mob.strip():
                 conn = get_connection()
                 c = conn.cursor()
-                c.execute("""
-                    INSERT INTO customers (salesman, customer_name, mobile, address, engineer_name, engineer_mobile, status, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
-                """, (st.session_state.username, c_name, c_mob, c_addr, eng_name, eng_mob, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-                st.session_state.cust_id = c.lastrowid
-                st.session_state.cust_name = c_name
-                st.session_state.cust_mobile = c_mob
-                conn.commit()
-                conn.close()
-                st.success(f"Customer {c_name} saved successfully!")
+                c.execute("SELECT id, customer_name FROM customers WHERE mobile = ?", (c_mob.strip(),))
+                existing = c.fetchone()
+                
+                if existing:
+                    cust_id = existing[0]
+                    c.execute("""
+                        UPDATE customers 
+                        SET customer_name = ?, address = ?, engineer_name = ?, engineer_mobile = ? 
+                        WHERE id = ?
+                    """, (c_name.strip(), c_addr, eng_name, eng_mob, cust_id))
+                    st.session_state.cust_id = cust_id
+                    st.session_state.cust_name = c_name.strip()
+                    st.session_state.cust_mobile = c_mob.strip()
+                    conn.commit()
+                    conn.close()
+                    st.success(f"Existing Customer **{c_name}** loaded!")
+                else:
+                    c.execute("""
+                        INSERT INTO customers (salesman, customer_name, mobile, address, engineer_name, engineer_mobile, status, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+                    """, (st.session_state.username, c_name.strip(), c_mob.strip(), c_addr, eng_name, eng_mob, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    st.session_state.cust_id = c.lastrowid
+                    st.session_state.cust_name = c_name.strip()
+                    st.session_state.cust_mobile = c_mob.strip()
+                    conn.commit()
+                    conn.close()
+                    st.success(f"Customer **{c_name}** registered successfully!")
             else:
-                st.error("Name and Mobile are required.")
+                st.error("Customer Name aur Mobile Number bharna zaroori hai.")
 
-# --- PAGE 2: SELECTION HUB ---
 # --- PAGE 2: SELECTION HUB ---
 elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     st.title("📐 Tile Multi-Selection Hub")
     
-    # --- CUSTOMER SELECTOR / SWITCHER ---
     conn = get_connection()
     all_custs = pd.read_sql_query("SELECT id, customer_name, mobile FROM customers ORDER BY id DESC", conn)
     conn.close()
     
     if not all_custs.empty:
         cust_options = {f"{row['customer_name']} ({row['mobile']})": (row['id'], row['customer_name'], row['mobile']) for _, row in all_custs.iterrows()}
-        
-        # Determine default index
         default_label = next((k for k, v in cust_options.items() if v[0] == st.session_state.get('cust_id')), list(cust_options.keys())[0])
         default_idx = list(cust_options.keys()).index(default_label)
         
-        selected_cust_label = st.selectbox("👤 Select / Switch Active Customer", list(cust_options.keys()), index=default_idx)
-        
-        # Set Active Customer in session
+        selected_cust_label = st.selectbox("👤 Select Active Customer", list(cust_options.keys()), index=default_idx)
         st.session_state.cust_id, st.session_state.cust_name, st.session_state.cust_mobile = cust_options[selected_cust_label]
-        st.info(f"Active Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile})")
+        st.info(f"Active Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile}) | Handled by: **{st.session_state.username}**")
     else:
-        st.warning("Pehle Customer Registration page par jaakar customer add karein.")
+        st.warning("Pehle Customer Registration page par jakar customer banayein.")
         st.stop()
         
-    # --- LOAD STOCK ITEMS ---
     conn = get_connection()
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS inventory_stock (id INTEGER PRIMARY KEY AUTOINCREMENT, tile_name TEXT UNIQUE, sqft_per_box REAL)")
@@ -145,7 +191,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     
     if filtered_df.empty:
         filtered_df = stock_df
-        st.caption("Tile match nahi hui, poori list show ho rahi hai.")
+        st.caption("Tile match nahi hui, saari items show ho rahi hain.")
         
     tile_name = st.selectbox("Select Tile", filtered_df["tile_name"].tolist())
     sqft_box_val = float(filtered_df[filtered_df["tile_name"] == tile_name]["sqft_per_box"].values[0]) if not filtered_df.empty else 16.0
@@ -165,7 +211,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     
     if st.button("➕ Add This Area to Selection List", use_container_width=True, type="primary"):
         if not area_name:
-            st.error("Area Name enter karna zaroori hai.")
+            st.error("Area Name bharna zaroori hai.")
         else:
             conn = get_connection()
             c = conn.cursor()
@@ -190,7 +236,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
             ))
             conn.commit()
             conn.close()
-            st.success(f"{area_name} list mein add ho gaya!")
+            st.success(f"{area_name} list mein save ho gaya!")
             st.rerun()
 
     st.markdown("---")
@@ -211,9 +257,9 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         sum_boxes = round(cart_df["Boxes"].sum(), 2)
         
         c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
-        c_kpi1.metric("Total Line Items", len(cart_df))
+        c_kpi1.metric("Total Items", len(cart_df))
         c_kpi2.metric("Total Square Feet", f"{sum_sqft:.2f} sqft")
-        c_kpi3.metric("Total Boxes Required", f"{sum_boxes:.2f} Boxes")
+        c_kpi3.metric("Total Boxes", f"{sum_boxes:.2f} Boxes")
         
         col_b1, col_b2 = st.columns(2)
         with col_b1:
@@ -226,22 +272,23 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
                 st.success(f"{st.session_state.cust_name} ka estimate finalize ho gaya!")
                 st.rerun()
         with col_b2:
-            if st.button("🗑️ Reset Active Customer Cart", use_container_width=True):
+            if st.button("🗑️ Reset Cart", use_container_width=True):
                 conn = get_connection()
                 c = conn.cursor()
                 c.execute("DELETE FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'", (st.session_state.cust_id,))
                 conn.commit()
                 conn.close()
                 st.rerun()
-# --- PAGE 3: DASHBOARD ---
-elif selected_page == "📊 Executive Dashboard":
+
+# --- PAGE 3: DASHBOARD (ADMIN ONLY) ---
+elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "admin":
     st.title("📊 Executive Selections Dashboard")
     conn = get_connection()
     all_selections = pd.read_sql_query("SELECT * FROM customer_selections ORDER BY id DESC", conn)
     conn.close()
     st.dataframe(all_selections, use_container_width=True)
 
-# --- PAGE 4: ADMIN CONTROL ---
+# --- PAGE 4: ADMIN CONTROL (ADMIN ONLY) ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
     t1, t2 = st.tabs(["📦 Inventory Stock Data", "📜 System Audits"])
