@@ -177,8 +177,14 @@ elif menu.startswith("2️⃣"):
             if st.button("💾 Save Tile Selection", type="primary"):
                 if selected_tile_name and selected_tile_name != "No matching tiles found":
                     st.session_state.items.append({
-                        "cid": cid, "floor": fl, "section": sec, "area": area,
-                        "tile": selected_tile_name, "box_sqft": box_sqft, "sqft": 100.0, "boxes": math.ceil(100.0/box_sqft)
+                        "cid": cid,
+                        "floor": str(fl),
+                        "section": str(sec),
+                        "area": str(area),
+                        "tile": str(selected_tile_name),
+                        "box_sqft": float(box_sqft),
+                        "sqft": 100.0,
+                        "boxes": math.ceil(100.0 / box_sqft)
                     })
                     st.success(f"Added {selected_tile_name} for {area}!")
                     st.rerun()
@@ -186,7 +192,7 @@ elif menu.startswith("2️⃣"):
                     st.error("Please select a valid tile.")
                     
         st.subheader("📋 Selected Items")
-        curr_items = [i for i in st.session_state.items if i.get("cid") == cid]
+        curr_items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
         if curr_items:
             st.dataframe(pd.DataFrame(curr_items)[["floor", "section", "area", "tile", "box_sqft"]], use_container_width=True)
         else:
@@ -205,12 +211,12 @@ elif menu.startswith("3️⃣"):
         cid = int(sel.split()[0].replace("#", ""))
         c_obj = next(c for c in st.session_state.customers if c["id"] == cid)
         
-        items = [i for i in st.session_state.items if i.get("cid") == cid]
+        items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
         if items:
-            for it in items:
-                st.markdown(f"**{it['floor']} - {it['area']} ({it['section']})** | Tile: `{it['tile']}` (Box: {it['box_sqft']} SqFt)")
-                it['sqft'] = st.number_input("Total Area (SqFt)", value=float(it['sqft']), key=f"sq_{cid}_{it['tile']}_{it['area']}")
-                it['boxes'] = math.ceil(it['sqft'] / it['box_sqft'])
+            for idx, it in enumerate(items):
+                st.markdown(f"**{it.get('floor')} - {it.get('area')} ({it.get('section')})** | Tile: `{it.get('tile')}` (Box: {it.get('box_sqft')} SqFt)")
+                it['sqft'] = st.number_input("Total Area (SqFt)", value=float(it.get('sqft', 100.0)), key=f"sq_{cid}_{idx}_{it.get('tile')}")
+                it['boxes'] = math.ceil(it['sqft'] / float(it.get('box_sqft', 16.0)))
                 st.caption(f"Required Boxes: **{it['boxes']} Boxes**")
                 st.divider()
                 
@@ -238,12 +244,12 @@ elif menu.startswith("3️⃣"):
                 pdf.set_font("Helvetica", "", 8)
                 tot_b = 0
                 for it in items:
-                    tot_b += it['boxes']
-                    pdf.cell(40, 6, f"{it['floor']} - {it['area']}", 1)
-                    pdf.cell(20, 6, str(it['section']), 1)
-                    pdf.cell(60, 6, str(it['tile'])[:28], 1)
-                    pdf.cell(35, 6, f"{it['sqft']:.1f}", 1, 0, "C")
-                    pdf.cell(35, 6, f"{it['boxes']} Boxes", 1, 1, "C")
+                    tot_b += it.get('boxes', 0)
+                    pdf.cell(40, 6, f"{it.get('floor')} - {it.get('area')}", 1)
+                    pdf.cell(20, 6, str(it.get('section')), 1)
+                    pdf.cell(60, 6, str(it.get('tile'))[:28], 1)
+                    pdf.cell(35, 6, f"{float(it.get('sqft', 0)):.1f}", 1, 0, "C")
+                    pdf.cell(35, 6, f"{it.get('boxes', 0)} Boxes", 1, 1, "C")
                     
                 pdf.ln(5)
                 pdf.set_font("Helvetica", "B", 10)
