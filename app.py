@@ -147,7 +147,8 @@ elif menu.startswith("2️⃣"):
         sel = st.selectbox("Choose Customer:", custs)
         cid = int(sel.split()[0].replace("#", ""))
         
-        with st.expander("➕ Add Tile from Uploaded Stock for Room / Area", expanded=True):
+        with st.form("tile_sel_form"):
+            st.markdown("### ➕ Add Tile for Room / Area")
             col_f, col_sec, col_area = st.columns(3)
             with col_f:
                 fl = st.selectbox("Floor Level", ["Ground Floor", "1st Floor", "2nd Floor", "Parking"])
@@ -171,10 +172,11 @@ elif menu.startswith("2️⃣"):
             box_sqft = 16.0
             if not filtered_stock.empty and selected_tile_name in filtered_stock["ITEM_NAME"].values:
                 tile_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile_name].iloc[0]
-                box_sqft = tile_obj["BOX_SQFT"]
+                box_sqft = float(tile_obj["BOX_SQFT"])
                 st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
             
-            if st.button("💾 Save Tile Selection", type="primary"):
+            submitted = st.form_submit_button("💾 Save Tile Selection", type="primary")
+            if submitted:
                 if selected_tile_name and selected_tile_name != "No matching tiles found":
                     st.session_state.items.append({
                         "cid": cid, "floor": fl, "section": sec, "area": area,
@@ -209,7 +211,7 @@ elif menu.startswith("3️⃣"):
         if items:
             for it in items:
                 st.markdown(f"**{it['floor']} - {it['area']} ({it['section']})** | Tile: `{it['tile']}` (Box: {it['box_sqft']} SqFt)")
-                it['sqft'] = st.number_input("Total Area (SqFt)", value=float(it['sqft']), key=f"sq_{it['tile']}_{it['area']}")
+                it['sqft'] = st.number_input("Total Area (SqFt)", value=float(it['sqft']), key=f"sq_{cid}_{it['tile']}_{it['area']}")
                 it['boxes'] = math.ceil(it['sqft'] / it['box_sqft'])
                 st.caption(f"Required Boxes: **{it['boxes']} Boxes**")
                 st.divider()
