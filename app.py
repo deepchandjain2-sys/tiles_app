@@ -16,8 +16,7 @@ if "items" not in st.session_state:
 # -------------------------------------------------------------
 # GOOGLE SHEET LIVE STOCK LOADER (ITEM MASTER FORMAT)
 # -------------------------------------------------------------
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRMgTzS4kNWfaIOByOAZ-RS_XQP7zqiKXAgEkgVhrHNYQU5Jn-srXAfuOW_yPcAmW1G_FrEa59S-RyJ/pub?gid=0&single=true&output=csv"
-
+GOOGLE_SHEET_CSV_URL = https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=0&single=true&output=csv
 @st.cache_data(ttl=30)
 def load_busy_inventory():
     try:
