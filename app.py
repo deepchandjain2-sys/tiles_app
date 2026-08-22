@@ -12,57 +12,8 @@ if "customers" not in st.session_state:
     st.session_state.customers = []
 if "items" not in st.session_state:
     st.session_state.items = []
-
-# -------------------------------------------------------------
-# GOOGLE SHEET LIVE STOCK LOADER (ITEM MASTER FORMAT)
-# -------------------------------------------------------------
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLldDAkQMXrbYKSrFcEhYvFdXv2XIABLxO6pA/export?format=csv&gid=0"
-
-@st.cache_data(ttl=30)
-def load_busy_inventory():
-    try:
-        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        if df.empty:
-            return pd.DataFrame()
-        df = df.dropna(how='all')
-        cols = list(df.columns)
-        
-        id_col = cols[0]
-        name_col = cols[1] if len(cols) > 1 else cols[0]
-        con_col = cols[3] if len(cols) > 3 else None
-        pack_col = cols[4] if len(cols) > 4 else None
-
-        records = []
-        for _, row in df.iterrows():
-            name = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
-            if not name or name.lower() == "nan" or "item name" in name.lower():
-                continue
-            try:
-                con_val = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 1.5
-            except:
-                con_val = 1.5
-            try:
-                pack_val = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 6.0
-            except:
-                pack_val = 6.0
-                
-            box_sqft = round(con_val * pack_val, 2)
-            if box_sqft <= 0:
-                box_sqft = 16.0
-                
-            records.append({
-                "ITEM_ID": str(row[id_col]).strip() if pd.notna(row[id_col]) else "NA",
-                "ITEM_NAME": name,
-                "CON_FACTOR": con_val,
-                "PACKING_UNIT": int(pack_val),
-                "BOX_SQFT": box_sqft,
-                "CATEGORY": "Granite" if "GRAN" in name.upper() else ("Wall" if any(x in name.upper() for x in ["WALL", "HL", "12X18"]) else "Floor")
-            })
-        return pd.DataFrame(records)
-    except Exception as e:
-        return pd.DataFrame()
-
-stock_df = load_busy_inventory()
+if "stock_df" not in st.session_state:
+    st.session_state.stock_df = pd.DataFrame()
 
 # -------------------------------------------------------------
 # LOGIN SCREEN
@@ -85,7 +36,7 @@ if not st.session_state.user:
     st.stop()
 
 # -------------------------------------------------------------
-# SIDEBAR NAVIGATION
+# SIDEBAR NAVIGATION & FILE UPLOAD
 # -------------------------------------------------------------
 with st.sidebar:
     st.markdown(f"### 👤 {st.session_state.user['username']}")
@@ -94,16 +45,68 @@ with st.sidebar:
         st.session_state.user = None
         st.rerun()
     st.markdown("---")
+    
+    st.subheader("📁 Upload BUSY Item Master")
+    uploaded_file = st.file_uploader("Upload CSV / Excel File", type=["csv", "xlsx", "xls"])
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
+                
+            df = df.dropna(how='all')
+            cols = list(df.columns)
+            id_col = cols[0]
+            name_col = cols[1] if len(cols) > 1 else cols[0]
+            con_col = cols[3] if len(cols) > 3 else None
+            pack_col = cols[4] if len(cols) > 4 else None
+
+            records = []
+            for _, row in df.iterrows():
+                name = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
+                if not name or name.lower() == "nan" or "item name" in name.lower():
+                    continue
+                try:
+                    con_val = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 1.5
+                except:
+                    con_val = 1.5
+                try:
+                    pack_val = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 6.0
+                except:
+                    pack_val = 6.0
+                    
+                box_sqft = round(con_val * pack_val, 2)
+                if box_sqft <= 0:
+                    box_sqft = 16.0
+                    
+                records.append({
+                    "ITEM_ID": str(row[id_col]).strip() if pd.notna(row[id_col]) else "NA",
+                    "ITEM_NAME": name,
+                    "CON_FACTOR": con_val,
+                    "PACKING_UNIT": int(pack_val),
+                    "BOX_SQFT": box_sqft
+                })
+            st.session_state.stock_df = pd.DataFrame(records)
+            st.success(f"Successfully loaded {len(records)} items!")
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+
+    st.markdown("---")
     menu = st.radio("Navigation Flow", [
         "1️⃣ New Customer Registration",
         "2️⃣ Customer Tile Selection",
         "3️⃣ Site Measurements & PDF",
         "4️⃣ Sales Dashboard"
     ])
-    st.markdown("---")
-    if st.button("🔄 Refresh Live Stock", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+
+# Fallback dummy stock if none uploaded
+if st.session_state.stock_df.empty:
+    st.session_state.stock_df = pd.DataFrame([
+        {"ITEM_ID": "1000", "ITEM_NAME": "1000 L 12X18 KK", "CON_FACTOR": 1.5, "PACKING_UNIT": 6, "BOX_SQFT": 9.0},
+        {"ITEM_ID": "10015", "ITEM_NAME": "10015 16X16 CIBELA", "CON_FACTOR": 1.73, "PACKING_UNIT": 5, "BOX_SQFT": 8.65},
+        {"ITEM_ID": "1002", "ITEM_NAME": "1002 EJ 2x1 Torino", "CON_FACTOR": 2.0, "PACKING_UNIT": 6, "BOX_SQFT": 12.0}
+    ])
 
 # -------------------------------------------------------------
 # 1. CUSTOMER REGISTRATION
@@ -133,7 +136,7 @@ if menu.startswith("1️⃣"):
                 st.error("Please enter Name and Mobile number!")
 
 # -------------------------------------------------------------
-# 2. TILE SELECTION (CONNECTED WITH GOOGLE SHEET)
+# 2. TILE SELECTION
 # -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection")
@@ -144,7 +147,7 @@ elif menu.startswith("2️⃣"):
         sel = st.selectbox("Choose Customer:", custs)
         cid = int(sel.split()[0].replace("#", ""))
         
-        with st.expander("➕ Add Tile from BUSY Stock for Room / Area", expanded=True):
+        with st.expander("➕ Add Tile from Uploaded Stock for Room / Area", expanded=True):
             col_f, col_sec, col_area = st.columns(3)
             with col_f:
                 fl = st.selectbox("Floor Level", ["Ground Floor", "1st Floor", "2nd Floor", "Parking"])
@@ -153,9 +156,9 @@ elif menu.startswith("2️⃣"):
             with col_area:
                 area = st.selectbox("Area", ["Living Room", "Hall", "Kitchen", "Bedroom", "Master Bedroom", "Bathroom", "Balcony", "Parking"])
                 
-            search_query = st.text_input("🔍 Search Tile Code / Name from Google Sheet (e.g. 1000, 10015, CIGAR, 12X18):", "")
+            search_query = st.text_input("🔍 Search Tile Code / Name:", "")
             
-            filtered_stock = stock_df.copy()
+            filtered_stock = st.session_state.stock_df.copy()
             if not filtered_stock.empty and search_query:
                 filtered_stock = filtered_stock[
                     filtered_stock["ITEM_NAME"].str.contains(search_query, case=False, na=False) |
@@ -163,13 +166,13 @@ elif menu.startswith("2️⃣"):
                 ]
                 
             tile_list = filtered_stock["ITEM_NAME"].tolist() if not filtered_stock.empty else ["No matching tiles found"]
-            selected_tile_name = st.selectbox(f"Select Tile ({len(filtered_stock)} available in stock):", tile_list)
+            selected_tile_name = st.selectbox(f"Select Tile ({len(filtered_stock)} available):", tile_list)
             
             box_sqft = 16.0
             if not filtered_stock.empty and selected_tile_name in filtered_stock["ITEM_NAME"].values:
                 tile_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile_name].iloc[0]
                 box_sqft = tile_obj["BOX_SQFT"]
-                st.info(f"📦 **Auto-Calculated Box Coverage:** {box_sqft} Sq.Ft / Box (Con Factor: {tile_obj['CON_FACTOR']} × Packing: {tile_obj['PACKING_UNIT']})")
+                st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
             
             if st.button("💾 Save Tile Selection", type="primary"):
                 if selected_tile_name and selected_tile_name != "No matching tiles found":
@@ -180,10 +183,10 @@ elif menu.startswith("2️⃣"):
                     st.success(f"Added {selected_tile_name} for {area}!")
                     st.rerun()
                 else:
-                    st.error("Please select a valid tile from stock.")
+                    st.error("Please select a valid tile.")
                     
         st.subheader("📋 Selected Items")
-        curr_items = [i for i in st.session_state.items if i["cid"] == cid]
+        curr_items = [i for i in st.session_state.items if i.get("cid") == cid]
         if curr_items:
             st.dataframe(pd.DataFrame(curr_items)[["floor", "section", "area", "tile", "box_sqft"]], use_container_width=True)
         else:
@@ -202,7 +205,7 @@ elif menu.startswith("3️⃣"):
         cid = int(sel.split()[0].replace("#", ""))
         c_obj = next(c for c in st.session_state.customers if c["id"] == cid)
         
-        items = [i for i in st.session_state.items if i["cid"] == cid]
+        items = [i for i in st.session_state.items if i.get("cid") == cid]
         if items:
             for it in items:
                 st.markdown(f"**{it['floor']} - {it['area']} ({it['section']})** | Tile: `{it['tile']}` (Box: {it['box_sqft']} SqFt)")
