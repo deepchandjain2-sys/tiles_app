@@ -1,86 +1,67 @@
 import sqlite3
-import hashlib
+import json
+from datetime import datetime
 
-DB_FILE = "tiles_app.db"
+DB_NAME = "tiles_business.db"
 
-def get_connection():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
-
-def hash_pass(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def create_tables():
-    conn = get_connection()
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     
-    # Users Table
-    c.execute("""
+    # 1. Users table
+    c.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password_hash TEXT,
+            username TEXT PRIMARY KEY,
+            password TEXT,
             role TEXT,
-            security_pin TEXT
+            full_name TEXT
         )
-    """)
+    ''')
     
-   # Auto-insert default Admins
-    admins_list = [
-        ("DEEPCHAND JAIN", "deep123", "1234"),
-        ("GOURAV", "GOURAV", "1234"),
-        ("JAY", "JAY", "1234")
-    ]
-    
-    for u_name, u_pass, u_pin in admins_list:
-        c.execute("SELECT * FROM users WHERE username = ?", (u_name,))
-        if not c.fetchone():
-            c.execute("""
-                INSERT INTO users (username, password_hash, role, security_pin)
-                VALUES (?, ?, 'admin', ?)
-            """, (u_name, hash_pass(u_pass), u_pin))
-    # Customers Table
-    c.execute("""
+    # 2. Customers table
+    c.execute('''
         CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            salesman TEXT,
-            customer_name TEXT,
+            name TEXT,
             mobile TEXT,
             address TEXT,
             engineer_name TEXT,
             engineer_mobile TEXT,
-            status TEXT,
-            created_at TEXT
+            salesman TEXT,
+            created_at TEXT,
+            status TEXT DEFAULT 'Shown', -- Shown, Selected, Finalized
+            stage TEXT DEFAULT 'Selection' -- Selection, Measurement, Closed
         )
-    """)
+    ''')
     
-    # Selections Table
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS customer_selections (
+    # 3. Selections / Measurements table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS customer_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER,
-            customer_name TEXT,
-            mobile TEXT,
-            salesman TEXT,
             floor TEXT,
-            area_type TEXT,
+            section_type TEXT, -- Floor or Wall
             area_name TEXT,
-            tile_name TEXT,
-            dimensions TEXT,
-            sqft_covered REAL,
-            boxes_required REAL,
-            status TEXT,
-            timestamp TEXT
+            item_id TEXT,
+            item_name TEXT,
+            box_sqft REAL,
+            calc_mode TEXT, -- Direct or LxW
+            length REAL,
+            width REAL,
+            wastage REAL,
+            sqft REAL,
+            boxes INTEGER,
+            exact_boxes REAL,
+            FOREIGN KEY (customer_id) REFERENCES customers (id)
         )
-    """)
+    ''')
     
-    # Login History Table
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS login_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            timestamp TEXT
-        )
-    """)
+    # Add default admin and salesman if not present
+    c.execute("INSERT OR IGNORE INTO users VALUES ('admin', 'admin123', 'admin', 'Deepchand Jain')")
+    c.execute("INSERT OR IGNORE INTO users VALUES ('sales1', '1234', 'salesman', 'Sales Executive 1')")
+    c.execute("INSERT OR IGNORE INTO users VALUES ('sales2', '1234', 'salesman', 'Sales Executive 2')")
     
     conn.commit()
     conn.close()
+
+init_db()
