@@ -24,14 +24,20 @@ def create_tables():
         )
     """)
     
-    # Auto-insert default admin if not exists
-    c.execute("SELECT * FROM users WHERE username = 'DEEPCHAND JAIN'")
-    if not c.fetchone():
-        c.execute("""
-            INSERT INTO users (username, password_hash, role, security_pin)
-            VALUES (?, ?, ?, ?)
-        """, ('DEEPCHAND JAIN', hash_pass('deep123'), 'admin', '1234'))
-        
+   # Auto-insert default Admins
+    admins_list = [
+        ("DEEPCHAND JAIN", "deep123", "1234"),
+        ("ADMIN2", "pass123", "1234"),
+        ("ADMIN3", "pass456", "1234")
+    ]
+    
+    for u_name, u_pass, u_pin in admins_list:
+        c.execute("SELECT * FROM users WHERE username = ?", (u_name,))
+        if not c.fetchone():
+            c.execute("""
+                INSERT INTO users (username, password_hash, role, security_pin)
+                VALUES (?, ?, 'admin', ?)
+            """, (u_name, hash_pass(u_pass), u_pin))
     # Customers Table
     c.execute("""
         CREATE TABLE IF NOT EXISTS customers (
