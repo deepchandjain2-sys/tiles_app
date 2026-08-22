@@ -27,8 +27,8 @@ def create_tables():
    # Auto-insert default Admins
     admins_list = [
         ("DEEPCHAND JAIN", "deep123", "1234"),
-        ("ADMIN2", "pass123", "1234"),
-        ("ADMIN3", "pass456", "1234")
+        ("GOURAV", "GOURAV", "1234"),
+        ("JAY", "JAY", "1234")
     ]
     
     for u_name, u_pass, u_pin in admins_list:
