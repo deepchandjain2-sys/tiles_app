@@ -2,3 +2,4 @@ streamlit
 pandas
 gspread
 fpdf2
+requests
