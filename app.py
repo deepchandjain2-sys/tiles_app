@@ -1,559 +1,416 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
-import urllib.parse
-from datetime import datetime
-from fpdf import FPDF
-import calculations
-import database
+import math
+from datetime import date
 
-st.set_page_config(page_title="Jay Granite Tile Selection", page_icon="🏛️", layout="wide")
+# -------------------------------------------------------------
+# 1. PAGE CONFIGURATION & STYLING
+# -------------------------------------------------------------
+st.set_page_config(
+    page_title="Jay Granite & Tiles - Smart Selection & Estimation",
+    page_icon="🏢",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Initialize Tables
-database.create_tables()
+st.markdown("""
+    <style>
+    .main-header { font-size: 26px; font-weight: 800; color: #1e3a8a; margin-bottom: 2px; }
+    .sub-header { font-size: 14px; color: #16a34a; font-weight: 600; margin-bottom: 15px; }
+    .tile-box { 
+        background: #ffffff; 
+        border: 1px solid #cbd5e1; 
+        border-radius: 8px; 
+        padding: 12px; 
+        margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .selection-banner {
+        background-color: #f0fdf4;
+        border: 1px solid #86efac;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 8px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-def get_connection():
-    return database.get_connection()
+# -------------------------------------------------------------
+# 2. GOOGLE SHEET LIVE CSV CONNECTOR (BUSY STOCK)
+# -------------------------------------------------------------
+FULL_SHEET_LINK = "https://docs.google.com/spreadsheets/d/14lY-SKjwd9hins1gSp6lR1C4_AOWOx2an8c-UgKaPY/edit?usp=sharing"
 
-# PDF Generator Function
-def generate_pdf(customer_name, mobile, df, total_sqft, total_boxes):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "JAY GRANITE & TILES", ln=True, align="C")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, "Architectural Tile Selection & BOQ Estimate", ln=True, align="C")
-    pdf.ln(5)
-    
-    # Customer Details
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(100, 6, f"Customer: {customer_name}", ln=False)
-    pdf.cell(0, 6, f"Date: {datetime.now().strftime('%d-%m-%Y')}", ln=True, align="R")
-    pdf.cell(100, 6, f"Mobile: {mobile}", ln=True)
-    pdf.ln(5)
-    
-    # Table Header
-    pdf.set_fill_color(230, 230, 230)
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(25, 7, "Floor", 1, 0, "C", fill=True)
-    pdf.cell(35, 7, "Area", 1, 0, "C", fill=True)
-    pdf.cell(65, 7, "Tile Name", 1, 0, "L", fill=True)
-    pdf.cell(20, 7, "Dimensions", 1, 0, "C", fill=True)
-    pdf.cell(22, 7, "Sq.Ft", 1, 0, "R", fill=True)
-    pdf.cell(23, 7, "Boxes", 1, 1, "R", fill=True)
-    
-    # Table Rows
-    pdf.set_font("Helvetica", "", 8)
-    for _, row in df.iterrows():
-        pdf.cell(25, 6, str(row["Floor"]), 1, 0, "C")
-        pdf.cell(35, 6, str(row["Area"])[:20], 1, 0, "L")
-        pdf.cell(65, 6, str(row["Tile"])[:35], 1, 0, "L")
-        pdf.cell(20, 6, str(row["Dimensions"]), 1, 0, "C")
-        pdf.cell(22, 6, f"{float(row['SqFt']):.2f}", 1, 0, "R")
-        pdf.cell(23, 6, f"{float(row['Boxes']):.2f}", 1, 1, "R")
+@st.cache_data(ttl=60)
+def fetch_busy_inventory():
+    try:
+        sheet_id = FULL_SHEET_LINK.split("/d/")[1].split("/")[0] if "/d/" in FULL_SHEET_LINK else FULL_SHEET_LINK
         
-    # Totals
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(145, 7, "Grand Total", 1, 0, "R", fill=True)
-    pdf.cell(22, 7, f"{total_sqft:.2f}", 1, 0, "R", fill=True)
-    pdf.cell(23, 7, f"{total_boxes:.2f}", 1, 1, "R", fill=True)
-    
-    return bytes(pdf.output())
+        gid_val = "0"
+        if "gid=" in FULL_SHEET_LINK:
+            gid_val = FULL_SHEET_LINK.split("gid=")[1].split("#")[0].split("&")[0]
+            
+        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid_val}"
+        
+        df = pd.read_csv(csv_url)
+        if df.empty:
+            return pd.DataFrame()
+        
+        df = df.dropna(how='all')
+        cols = list(df.columns)
+        
+        id_col = cols[0]
+        name_col = cols[1] if len(cols) > 1 else cols[0]
+        con_col = cols[3] if len(cols) > 3 else None
+        pack_col = cols[4] if len(cols) > 4 else None
 
-# Session State Setup
+        records = []
+        for _, row in df.iterrows():
+            name = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
+            if not name or name.lower() == "nan" or "item name" in name.lower():
+                continue
+            
+            try:
+                con_val = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 8.0
+            except:
+                con_val = 8.0
+                
+            try:
+                pack_val = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 2.0
+            except:
+                pack_val = 2.0
+                
+            box_sqft = round(con_val * pack_val, 2)
+            if box_sqft <= 0:
+                box_sqft = 16.0
+                
+            category = "Floor Tile"
+            if "GRAN" in name.upper():
+                category = "Granite"
+            elif "WALL" in name.upper() or "HL" in name.upper() or "12X18" in name.upper() or "10X15" in name.upper():
+                category = "Wall Tile"
+            elif "16X16" in name.upper() or "PARKING" in name.upper():
+                category = "Parking Tile"
+                
+            records.append({
+                "ITEM_ID": str(row[id_col]).strip() if pd.notna(row[id_col]) else "NA",
+                "ITEM_NAME": name,
+                "CON_FACTOR": con_val,
+                "PACKING_UNIT": int(pack_val),
+                "BOX_SQFT": box_sqft,
+                "CATEGORY": category
+            })
+            
+        return pd.DataFrame(records)
+    except Exception as err:
+        st.error(f"Google Sheet Fetch Error: {err}")
+        return pd.DataFrame()
+
+# -------------------------------------------------------------
+# 3. LOGIN & SECURITY SESSION
+# -------------------------------------------------------------
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "role" not in st.session_state:
-    st.session_state.role = "salesman"
-if "cust_id" not in st.session_state:
-    st.session_state.cust_id = 1
-if "cust_name" not in st.session_state:
-    st.session_state.cust_name = "Walk-in Customer"
-if "cust_mobile" not in st.session_state:
-    st.session_state.cust_mobile = "-"
 
-# --- LOGIN & ROLE SELECTION SCREEN ---
+def check_login(pin):
+    if pin in ["1234", "2026"]:
+        st.session_state.authenticated = True
+        return True
+    return False
+
 if not st.session_state.authenticated:
-    st.title("🏛️ Jay Granite Tile Selection")
-    st.caption("Smart Architectural Tile Selection Portal")
+    st.markdown("<div class='main-header'>🏢 JAY GRANITE & TILES</div>", unsafe_allow_html=True)
+    st.caption("Staff & Sales Selection Portal")
+    st.markdown("---")
     
-    col_mid1, col_mid2, col_mid3 = st.columns([1, 2, 1])
-    with col_mid2:
-        st.subheader("🔐 Staff Sign In")
-        
-        login_tab1, login_tab2 = st.tabs(["👤 Existing User Login", "➕ Create Salesman Account"])
-        
-        with login_tab1:
-            with st.form("login_form"):
-                role_choice = st.radio("Choose Login Role", ["Salesman", "Admin"], horizontal=True)
-                u = st.text_input("Username").strip()
-                p = st.text_input("Password", type="password").strip()
-                sub = st.form_submit_button("🚀 Login", type="primary", use_container_width=True)
-                
-                if sub:
-                    conn = get_connection()
-                    c = conn.cursor()
-                    c.execute("SELECT username, role FROM users WHERE username = ? AND password_hash = ?", (u, database.hash_pass(p)))
-                    user = c.fetchone()
-                    
-                    if user:
-                        st.session_state.authenticated = True
-                        st.session_state.username = user[0]
-                        st.session_state.role = user[1].lower()
-                        c.execute("INSERT INTO login_history (username, timestamp) VALUES (?, ?)", (u, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-                        conn.commit()
-                        conn.close()
-                        st.rerun()
-                    else:
-                        conn.close()
-                        st.error("Invalid Username or Password.")
-                        
-        with login_tab2:
-            with st.form("create_salesman_form"):
-                st.caption("Naye Salesman ka account create karein:")
-                new_u = st.text_input("New Salesman Username").strip()
-                new_p = st.text_input("New Password", type="password").strip()
-                new_pin = st.text_input("4-Digit Recovery PIN", max_chars=4, value="1234").strip()
-                reg_sub = st.form_submit_button("Create Salesman", use_container_width=True)
-                
-                if reg_sub:
-                    if new_u and new_p:
-                        try:
-                            conn = get_connection()
-                            c = conn.cursor()
-                            c.execute("""
-                                INSERT INTO users (username, password_hash, role, security_pin)
-                                VALUES (?, ?, 'salesman', ?)
-                            """, (new_u, database.hash_pass(new_p), new_pin))
-                            conn.commit()
-                            conn.close()
-                            st.success(f"Salesman **{new_u}** successfully created! Ab login tab se login karein.")
-                        except Exception as ex:
-                            st.error(f"User already exists: {str(ex)}")
-                    else:
-                        st.error("Username aur password bharna zaroori hai.")
+    col1, _, _ = st.columns([1, 1, 2])
+    with col1:
+        st.subheader("🔐 Staff Login")
+        entered_pin = st.text_input("Enter Passcode / PIN", type="password", help="Default PIN: 1234")
+        if st.button("Unlock System", type="primary", use_container_width=True):
+            if check_login(entered_pin):
+                st.success("Login Successful!")
+                st.rerun()
+            else:
+                st.error("Invalid PIN. Please try again.")
     st.stop()
 
-# --- SIDEBAR NAVIGATION ---
-st.sidebar.title(f"👤 {st.session_state.username.upper()}")
-st.sidebar.markdown(f"**Role:** `{st.session_state.role.upper()}`")
-if st.sidebar.button("🚪 Logout", use_container_width=True):
-    st.session_state.authenticated = False
-    st.session_state.username = ""
-    st.rerun()
+# -------------------------------------------------------------
+# 4. INITIALIZE APP SESSION DATA
+# -------------------------------------------------------------
+stock_data = fetch_busy_inventory()
 
-nav_options = ["1️⃣ Customer Registration", "2️⃣ Tile Multi-Selection Hub"]
-if st.session_state.role == "admin":
-    nav_options.extend(["📊 Executive Dashboard", "⚙️ Admin & Live Stock"])
+if "customer_name" not in st.session_state:
+    st.session_state.customer_name = "Deepchand"
+if "customer_mobile" not in st.session_state:
+    st.session_state.customer_mobile = ""
+if "customer_address" not in st.session_state:
+    st.session_state.customer_address = ""
 
-selected_page = st.sidebar.radio("Navigation Flow", nav_options)
+if "floors" not in st.session_state:
+    st.session_state.floors = [
+        {
+            "floor_id": 1,
+            "floor_name": "Ground Floor",
+            "rooms": [
+                {
+                    "room_id": 101, 
+                    "name": "Hall", 
+                    "calc_mode": "L x W (Feet)", 
+                    "length": 10.0, 
+                    "width": 10.0, 
+                    "skirting": 4.0, 
+                    "direct_sqft": 100.0,
+                    "selected_tile": None
+                }
+            ]
+        }
+    ]
 
-# --- PAGE 1: CUSTOMER REGISTRATION ---
-if selected_page == "1️⃣ Customer Registration":
-    st.title("📝 Customer Registration")
-    with st.form("cust_reg_form"):
-        c_name = st.text_input("Customer Name *", value=st.session_state.get("cust_name", "") if st.session_state.get("cust_name") != "Walk-in Customer" else "")
-        c_mob = st.text_input("Mobile Number *", value=st.session_state.get("cust_mobile", "") if st.session_state.get("cust_mobile") != "-" else "")
-        c_addr = st.text_area("Site Address")
-        eng_name = st.text_input("Engineer / Contractor Name (Optional)")
-        eng_mob = st.text_input("Engineer Mobile (Optional)")
-        
-        if st.form_submit_button("Save & Proceed to Selection", type="primary"):
-            if c_name.strip() and c_mob.strip():
-                conn = get_connection()
-                c = conn.cursor()
-                c.execute("SELECT id, customer_name FROM customers WHERE mobile = ?", (c_mob.strip(),))
-                existing = c.fetchone()
-                
-                if existing:
-                    cust_id = existing[0]
-                    c.execute("UPDATE customers SET customer_name = ?, address = ?, engineer_name = ?, engineer_mobile = ? WHERE id = ?", (c_name.strip(), c_addr, eng_name, eng_mob, cust_id))
-                    st.session_state.cust_id = cust_id
-                    st.session_state.cust_name = c_name.strip()
-                    st.session_state.cust_mobile = c_mob.strip()
-                    conn.commit()
-                    conn.close()
-                    st.success(f"Existing Customer **{c_name}** loaded!")
-                else:
-                    c.execute("""
-                        INSERT INTO customers (salesman, customer_name, mobile, address, engineer_name, engineer_mobile, status, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
-                    """, (st.session_state.username, c_name.strip(), c_mob.strip(), c_addr, eng_name, eng_mob, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-                    st.session_state.cust_id = c.lastrowid
-                    st.session_state.cust_name = c_name.strip()
-                    st.session_state.cust_mobile = c_mob.strip()
-                    conn.commit()
-                    conn.close()
-                    st.success(f"Customer **{c_name}** registered successfully!")
-            else:
-                st.error("Customer Name aur Mobile Number bharna zaroori hai.")
-
-# --- PAGE 2: SELECTION HUB ---
-elif selected_page == "2️⃣ Tile Multi-Selection Hub":
-    st.title("📐 Tile Multi-Selection Hub")
+# -------------------------------------------------------------
+# 5. SIDEBAR
+# -------------------------------------------------------------
+with st.sidebar:
+    st.markdown("### 👤 Customer Profile")
+    st.session_state.customer_name = st.text_input("Customer Name", value=st.session_state.customer_name)
+    st.session_state.customer_mobile = st.text_input("Mobile Number", value=st.session_state.customer_mobile)
+    st.session_state.customer_address = st.text_area("Site / Delivery Address", value=st.session_state.customer_address)
+    st.write(f"📅 **Date:** {date.today().strftime('%d-%b-%Y')}")
     
-    conn = get_connection()
-    all_custs = pd.read_sql_query("SELECT id, customer_name, mobile FROM customers ORDER BY id DESC", conn)
-    conn.close()
-    
-    if not all_custs.empty:
-        cust_options = {f"{row['customer_name']} ({row['mobile']})": (row['id'], row['customer_name'], row['mobile']) for _, row in all_custs.iterrows()}
-        default_label = next((k for k, v in cust_options.items() if v[0] == st.session_state.get('cust_id')), list(cust_options.keys())[0])
-        default_idx = list(cust_options.keys()).index(default_label)
-        
-        selected_cust_label = st.selectbox("👤 Select Active Customer", list(cust_options.keys()), index=default_idx)
-        st.session_state.cust_id, st.session_state.cust_name, st.session_state.cust_mobile = cust_options[selected_cust_label]
-        st.info(f"Active Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile}) | Handled by: **{st.session_state.username}**")
-    else:
-        st.warning("Pehle Customer Registration page par jakar customer banayein.")
-        st.stop()
-        
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS inventory_stock (id INTEGER PRIMARY KEY AUTOINCREMENT, tile_name TEXT UNIQUE, sqft_per_box REAL)")
-    stock_df = pd.read_sql_query("SELECT tile_name, sqft_per_box FROM inventory_stock", conn)
-    conn.close()
-    
-    if stock_df.empty:
-        stock_df = pd.DataFrame([{"tile_name": "AKROS STEEL TEXTURA 2X4 ITALICA", "sqft_per_box": 16.0}])
-        
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        floor = st.selectbox("Floor Level", ["Ground Floor", "First Floor", "Second Floor", "Third Floor", "Terrace"])
-    with c2:
-        area_type = st.radio("Surface Type", ["Floor", "Wall"], horizontal=True)
-    with c3:
-        area_list = [
-            "Living Room / Hall", 
-            "Master Bedroom", 
-            "Bedroom 2", 
-            "Bedroom 3", 
-            "Kitchen", 
-            "Kitchen Dado / Wall",
-            "Dining Area", 
-            "Pooja Room", 
-            "Master Bathroom", 
-            "Common Bathroom", 
-            "Balcony", 
-            "Utility / Wash Area", 
-            "Parking / Porch", 
-            "Staircase", 
-            "Front Elevation", 
-            "✏️ Other (Type Custom)"
-        ]
-        selected_area = st.selectbox("Designated Area", area_list)
-        if selected_area == "✏️ Other (Type Custom)":
-            area_name = st.text_input("Enter Custom Area Name", "Store Room").strip()
-        else:
-            area_name = selected_area
-        
-    search_q = st.text_input("🔍 Search Tile Name / Size", "")
-    filtered_df = stock_df[stock_df["tile_name"].str.contains(search_q, case=False, na=False)] if search_q else stock_df
-    
-    if filtered_df.empty:
-        filtered_df = stock_df
-        st.caption("Tile match nahi hui, saari items show ho rahi hain.")
-        
-    tile_name = st.selectbox("Select Tile", filtered_df["tile_name"].tolist())
-    sqft_box_val = float(filtered_df[filtered_df["tile_name"] == tile_name]["sqft_per_box"].values[0]) if not filtered_df.empty else 16.0
-    
-    col_l, col_w, col_waste = st.columns(3)
-    with col_l:
-        length = st.number_input("Length (Ft)", value=10.0, step=0.5)
-    with col_w:
-        width = st.number_input("Width / Height (Ft)", value=10.0, step=0.5)
-    with col_waste:
-        waste = st.number_input("Wastage %", value=0.0, step=1.0)
-        
-    tot_sqft, req_boxes = calculations.calculate_boxes(length, width, sqft_box_val, waste)
-    
-    st.caption(f"📦 Box Coverage: **{sqft_box_val:.2f} Sq.Ft / Box**")
-    st.info(f"💡 Area: **{tot_sqft:.2f} Sq.Ft** | Box Estimate: **{req_boxes:.2f} Boxes**")
-    
-    if st.button("➕ Add This Area to Selection List", use_container_width=True, type="primary"):
-        if not area_name:
-            st.error("Area Name bharna zaroori hai.")
-        else:
-            conn = get_connection()
-            c = conn.cursor()
-            c.execute("""
-                INSERT INTO customer_selections 
-                (customer_id, customer_name, mobile, salesman, floor, area_type, area_name, tile_name, dimensions, sqft_covered, boxes_required, status, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                st.session_state.cust_id,
-                st.session_state.cust_name,
-                st.session_state.cust_mobile,
-                st.session_state.username,
-                floor,
-                area_type,
-                area_name,
-                tile_name,
-                f"{length}x{width} ft",
-                round(tot_sqft, 2),
-                req_boxes,
-                'DRAFT',
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ))
-            conn.commit()
-            conn.close()
-            st.success(f"{area_name} list mein save ho gaya!")
-            st.rerun()
-
     st.markdown("---")
-    st.markdown(f"### 📋 Final Bill of Quantities (BOQ) - {st.session_state.cust_name}")
+    if st.button("🔄 Refresh BUSY Live Stock", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+        
+    if st.button("🔒 Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.rerun()
 
-    conn = get_connection()
-    cart_df = pd.read_sql_query(
-        "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes "
-        "FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'",
-        conn, params=(st.session_state.cust_id,)
-    )
-    conn.close()
+# -------------------------------------------------------------
+# 6. MAIN NAVIGATION TABS
+# -------------------------------------------------------------
+st.markdown("<div class='main-header'>JAY GRANITE & TILES</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='sub-header'>● BUSY LIVE CONNECTED ({len(stock_data)} ITEMS IN STOCK)</div>", unsafe_allow_html=True)
 
-    if not cart_df.empty:
-        st.dataframe(cart_df[["Floor", "Type", "Area", "Tile", "Dimensions", "SqFt", "Boxes"]], use_container_width=True)
+tab_measure, tab_select, tab_summary = st.tabs([
+    "📐 1. Room Measurements", 
+    "🎨 2. Tiles Selection Catalog", 
+    "📄 3. Estimate Summary & Print"
+])
+
+# -------------------------------------------------------------
+# TAB 1: ROOM MEASUREMENTS (WITH DIRECT SQFT OPTION)
+# -------------------------------------------------------------
+with tab_measure:
+    st.subheader("🏠 Site & Room Measurements")
+    st.caption("Enter dimensions via (L × W) or directly enter Total SqFt.")
+    
+    if st.button("➕ Add New Floor", key="btn_add_floor"):
+        new_fid = len(st.session_state.floors) + 1
+        st.session_state.floors.append({
+            "floor_id": new_fid,
+            "floor_name": f"Floor {new_fid}",
+            "rooms": [{
+                "room_id": int(f"{new_fid}01"), 
+                "name": "Living Room", 
+                "calc_mode": "L x W (Feet)", 
+                "length": 12.0, 
+                "width": 10.0, 
+                "skirting": 4.0, 
+                "direct_sqft": 120.0, 
+                "selected_tile": None
+            }]
+        })
+        st.rerun()
         
-        sum_sqft = cart_df["SqFt"].sum()
-        sum_boxes = round(cart_df["Boxes"].sum(), 2)
-        
-        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
-        c_kpi1.metric("Total Items", len(cart_df))
-        c_kpi2.metric("Total Square Feet", f"{sum_sqft:.2f} sqft")
-        c_kpi3.metric("Total Boxes", f"{sum_boxes:.2f} Boxes")
-        
-        pdf_bytes = generate_pdf(st.session_state.cust_name, st.session_state.cust_mobile, cart_df, sum_sqft, sum_boxes)
-        
-        btn_col1, btn_col2, btn_col3 = st.columns(3)
-        with btn_col1:
-            st.download_button(
-                label="📄 Download Quotation PDF",
-                data=pdf_bytes,
-                file_name=f"Estimate_{st.session_state.cust_name}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-            
-        with btn_col2:
-            wa_text = f"*🏛️ JAY GRANITE & TILES - Selection Estimate*\n\n"
-            wa_text += f"👤 *Client:* {st.session_state.cust_name}\n"
-            wa_text += f"📱 *Mobile:* {st.session_state.cust_mobile}\n"
-            wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
-            for _, r in cart_df.iterrows():
-                wa_text += f"▪️ *{r['Area']}* ({r['Floor']})\n"
-                wa_text += f"   Tile: {r['Tile']}\n"
-                wa_text += f"   Total: {r['SqFt']} Sq.Ft | *{r['Boxes']} Boxes*\n\n"
-            wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
-            wa_text += f"📊 *Total Area:* {sum_sqft:.2f} Sq.Ft\n"
-            wa_text += f"📦 *Total Required:* {sum_boxes:.2f} Boxes\n\n"
-            wa_text += f"Thank you for choosing Jay Granite & Tiles!"
-            
-            encoded_text = urllib.parse.quote(wa_text)
-            clean_mob = "".join(filter(str.isdigit, str(st.session_state.cust_mobile)))
-            if not clean_mob.startswith("91") and len(clean_mob) == 10:
-                clean_mob = "91" + clean_mob
-            
-            wa_link = f"https://wa.me/{clean_mob}?text={encoded_text}"
-            st.link_button("📲 1-Click WhatsApp Share", wa_link, use_container_width=True)
-            
-        with btn_col3:
-            if st.button("🗑️ Reset Active Cart", use_container_width=True):
-                conn = get_connection()
-                c = conn.cursor()
-                c.execute("DELETE FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'", (st.session_state.cust_id,))
-                conn.commit()
-                conn.close()
+    for f_idx, fl in enumerate(st.session_state.floors):
+        with st.expander(f"🏢 {fl['floor_name']}", expanded=True):
+            if st.button(f"➕ Add Room to {fl['floor_name']}", key=f"add_room_btn_{fl['floor_id']}"):
+                new_rid = int(f"{fl['floor_id']}{len(fl['rooms']) + 1}")
+                fl["rooms"].append({
+                    "room_id": new_rid, 
+                    "name": f"Room {len(fl['rooms']) + 1}", 
+                    "calc_mode": "L x W (Feet)", 
+                    "length": 10.0, 
+                    "width": 10.0, 
+                    "skirting": 4.0, 
+                    "direct_sqft": 100.0, 
+                    "selected_tile": None
+                })
                 st.rerun()
+                
+            for r_idx, rm in enumerate(fl["rooms"]):
+                st.markdown(f"**Room #{r_idx+1}**")
+                
+                # Mode selection: LxW or Direct SqFt
+                if "calc_mode" not in rm:
+                    rm["calc_mode"] = "L x W (Feet)"
+                if "direct_sqft" not in rm:
+                    rm["direct_sqft"] = 100.0
+                    
+                c_type, c_mode, c_del = st.columns([2, 2, 0.5])
+                room_types = ["Hall", "Living Room", "Master Bedroom", "Bedroom 2", "Kitchen", "Bathroom", "Balcony", "Parking", "Pooja Room", "Custom"]
+                rm["name"] = c_type.selectbox("Room Type", room_types, index=room_types.index(rm["name"]) if rm["name"] in room_types else 0, key=f"rname_{rm['room_id']}")
+                rm["calc_mode"] = c_mode.radio("Input Method", ["L x W (Feet)", "Direct SqFt"], horizontal=True, key=f"mode_{rm['room_id']}")
+                
+                if c_del.button("❌", key=f"rdel_{rm['room_id']}"):
+                    fl["rooms"].pop(r_idx)
+                    st.rerun()
+                    
+                if rm["calc_mode"] == "L x W (Feet)":
+                    c_l, c_w, c_sk = st.columns(3)
+                    rm["length"] = c_l.number_input("Length (ft)", value=float(rm.get("length", 10.0)), step=0.5, key=f"rlen_{rm['room_id']}")
+                    rm["width"] = c_w.number_input("Width (ft)", value=float(rm.get("width", 10.0)), step=0.5, key=f"rwid_{rm['room_id']}")
+                    rm["skirting"] = c_sk.number_input("Skirting (in)", value=float(rm.get("skirting", 4.0)), step=1.0, key=f"rsk_{rm['room_id']}")
+                    
+                    floor_sqft = rm["length"] * rm["width"]
+                    skirting_sqft = 2 * (rm["length"] + rm["width"]) * (rm["skirting"] / 12.0)
+                    net_area = floor_sqft + skirting_sqft
+                else:
+                    c_sqft, _ = st.columns([2, 1])
+                    rm["direct_sqft"] = c_sqft.number_input("Total Area (SqFt)", value=float(rm.get("direct_sqft", 100.0)), step=10.0, key=f"rdir_{rm['room_id']}")
+                    net_area = rm["direct_sqft"]
+                
+                if rm["selected_tile"]:
+                    tile_info = rm["selected_tile"]
+                    b_sqft = tile_info["BOX_SQFT"]
+                    boxes_exact = net_area / b_sqft
+                    boxes_req = math.ceil(boxes_exact)
+                    st.markdown(f"""
+                    <div class='selection-banner'>
+                        ✅ <b>Tile Assigned:</b> {tile_info['ITEM_NAME']} | <b>Total Area:</b> {net_area:.1f} SqFt<br>
+                        📦 <b>Required:</b> <span style='color:#1e3a8a; font-weight:bold; font-size:15px;'>{boxes_req} Boxes</span> ({boxes_req * b_sqft:.1f} SqFt) 
+                        <span style='color:#64748b; font-size:12px;'>[Exact: {boxes_exact:.2f} Boxes]</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.info(f"ℹ️ Area: **{net_area:.1f} SqFt** | Go to **Tab 2 (Tiles Selection Catalog)** to assign tile.")
+                st.divider()
 
-# --- PAGE 3: DASHBOARD ---
-# --- PAGE 3: DASHBOARD (ADMIN ONLY) ---
-elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "admin":
-    st.title("📊 Executive Business & Selections Dashboard")
+# -------------------------------------------------------------
+# TAB 2: TILES SELECTION CATALOG
+# -------------------------------------------------------------
+with tab_select:
+    st.subheader("🎨 Live Tiles & Granite Selection")
     
-    conn = get_connection()
-    cust_df = pd.read_sql_query("SELECT * FROM customers", conn)
-    sel_df = pd.read_sql_query("SELECT * FROM customer_selections", conn)
-    conn.close()
+    if stock_data.empty:
+        st.warning("⚠️ No items available. Please check BUSY Google Sheet link.")
+    else:
+        f1, f2, f3 = st.columns([2, 1.5, 1.5])
+        with f1:
+            search_key = st.text_input("🔍 Search Tile / Design Name / Code", placeholder="e.g. 2X4, Varmora, Sega, Crayon, 12X18")
+        with f2:
+            cat_choice = st.selectbox("Filter Category", ["All", "Floor Tile", "Wall Tile", "Granite", "Parking Tile"])
+        with f3:
+            room_dropdown_options = []
+            room_map = {}
+            for fl in st.session_state.floors:
+                for rm in fl["rooms"]:
+                    label = f"{fl['floor_name']} ➔ {rm['name']} (ID: {rm['room_id']})"
+                    room_dropdown_options.append(label)
+                    room_map[label] = rm
+                    
+            target_room_label = st.selectbox("🎯 Assign Selected Tile To:", room_dropdown_options)
+            chosen_room = room_map.get(target_room_label)
 
-    # --- TOP KPI METRICS ---
-    k1, k2, k3, k4 = st.columns(4)
-    total_custs = len(cust_df)
-    active_selections = len(sel_df)
-    total_sqft_all = sel_df["sqft_covered"].sum() if not sel_df.empty else 0.0
-    total_boxes_all = sel_df["boxes_required"].sum() if not sel_df.empty else 0.0
-
-    k1.metric("👥 Total Walk-ins / Clients", total_custs)
-    k2.metric("📋 Total Tile Selections", active_selections)
-    k3.metric("📐 Total Area Selected", f"{total_sqft_all:,.2f} sqft")
-    k4.metric("📦 Total Boxes Estimated", f"{total_boxes_all:,.2f} Boxes")
-
-    st.markdown("---")
-
-    dash_tab1, dash_tab2, dash_tab3 = st.tabs([
-        "👥 Customer-wise Summary", 
-        "👔 Salesman Performance", 
-        "📑 Detailed Master Log"
-    ])
-
-    # --- TAB 1: CUSTOMER SUMMARY ---
-    with dash_tab1:
-        st.subheader("📋 Customer Wise Selection Status")
-        if not sel_df.empty:
-            cust_summary = sel_df.groupby(["customer_name", "mobile", "salesman"]).agg(
-                Total_Items=("id", "count"),
-                Total_SqFt=("sqft_covered", "sum"),
-                Total_Boxes=("boxes_required", "sum"),
-                Last_Active=("timestamp", "max")
-            ).reset_index()
-            
-            cust_summary["Total_SqFt"] = cust_summary["Total_SqFt"].round(2)
-            cust_summary["Total_Boxes"] = cust_summary["Total_Boxes"].round(2)
-            
-            st.dataframe(
-                cust_summary.rename(columns={
-                    "customer_name": "Customer Name",
-                    "mobile": "Mobile",
-                    "salesman": "Handled By (Salesman)",
-                    "Total_Items": "Total Areas/Tiles",
-                    "Total_SqFt": "Total Sq.Ft",
-                    "Total_Boxes": "Total Boxes",
-                    "Last_Active": "Last Updated"
-                }),
-                use_container_width=True
-            )
-        else:
-            st.info("Abhi tak koi selections data enter nahi hua hai.")
-
-    # --- TAB 2: SALESMAN PERFORMANCE ---
-    with dash_tab2:
-        st.subheader("👔 Staff & Salesman Attendance / Productivity")
-        if not sel_df.empty:
-            salesman_summary = sel_df.groupby("salesman").agg(
-                Unique_Clients=("customer_name", "nunique"),
-                Total_Selections=("id", "count"),
-                SqFt_Covered=("sqft_covered", "sum"),
-                Boxes_Sold=("boxes_required", "sum")
-            ).reset_index()
-
-            salesman_summary["SqFt_Covered"] = salesman_summary["SqFt_Covered"].round(2)
-            salesman_summary["Boxes_Sold"] = salesman_summary["Boxes_Sold"].round(2)
-
-            st.dataframe(
-                salesman_summary.rename(columns={
-                    "salesman": "Salesman Name",
-                    "Unique_Clients": "Clients Attended",
-                    "Total_Selections": "Tiles Pitched/Selected",
-                    "SqFt_Covered": "Total Sq.Ft",
-                    "Boxes_Sold": "Total Boxes"
-                }),
-                use_container_width=True
-            )
-        else:
-            st.info("Salesman activity log empty hai.")
-
-    # --- TAB 3: DETAILED ALL SELECTIONS LOG ---
-    with dash_tab3:
-        st.subheader("📑 Complete Raw Selections Log")
-        
-        # Quick Search & Filters
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-            staff_filter = st.multiselect("Filter by Salesman", options=sel_df["salesman"].unique().tolist() if not sel_df.empty else [])
-        with col_f2:
-            search_key = st.text_input("🔍 Quick Search (Customer / Tile / Mobile)", "")
-
-        filtered_log = sel_df.copy()
-        if staff_filter:
-            filtered_log = filtered_log[filtered_log["salesman"].isin(staff_filter)]
+        filtered_df = stock_data.copy()
+        if cat_choice != "All":
+            filtered_df = filtered_df[filtered_df["CATEGORY"] == cat_choice]
         if search_key:
-            filtered_log = filtered_log[
-                filtered_log["customer_name"].str.contains(search_key, case=False, na=False) |
-                filtered_log["mobile"].str.contains(search_key, case=False, na=False) |
-                filtered_log["tile_name"].str.contains(search_key, case=False, na=False)
+            filtered_df = filtered_df[
+                filtered_df["ITEM_NAME"].str.contains(search_key, case=False, na=False) | 
+                filtered_df["ITEM_ID"].str.contains(search_key, case=False, na=False)
             ]
 
-        st.dataframe(
-            filtered_log.rename(columns={
-                "id": "Entry ID",
-                "customer_name": "Customer",
-                "mobile": "Mobile",
-                "salesman": "Salesman",
-                "floor": "Floor",
-                "area_type": "Type",
-                "area_name": "Area",
-                "tile_name": "Tile Name",
-                "dimensions": "Size",
-                "sqft_covered": "Sq.Ft",
-                "boxes_required": "Boxes",
-                "status": "Status",
-                "timestamp": "Date Time"
-            }),
-            use_container_width=True
-        )
-# --- PAGE 4: ADMIN CONTROL ---
-elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
-    st.title("⚙️ Administrative Control")
-    t1, t2 = st.tabs(["📦 Inventory Stock Data", "📜 System Audits"])
+        st.write(f"Showing **{len(filtered_df)}** matching tiles in stock:")
+        
+        grid_cols = st.columns(3)
+        for idx, (_, tile_row) in enumerate(filtered_df.head(60).iterrows()):
+            col_idx = idx % 3
+            with grid_cols[col_idx]:
+                with st.container():
+                    st.markdown(f"""
+                    <div class='tile-box'>
+                        <div style='font-size:15px; font-weight:700; color:#0f172a;'>{tile_row['ITEM_NAME']}</div>
+                        <div style='font-size:12px; color:#64748b;'>Code: <b>{tile_row['ITEM_ID']}</b> | Category: {tile_row['CATEGORY']}</div>
+                        <div style='margin-top:6px; font-size:13px;'>📦 <b>{tile_row['BOX_SQFT']} SqFt / Box</b> ({tile_row['PACKING_UNIT']} Pcs)</div>
+                        <div style='color:#16a34a; font-size:12px; font-weight:600; margin-top:2px;'>● Ready in Stock</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    btn_text = f"Select for {chosen_room['name']}" if chosen_room else "Select Tile"
+                    if st.button(btn_text, key=f"btn_tile_{tile_row['ITEM_ID']}_{idx}", use_container_width=True):
+                        if chosen_room:
+                            chosen_room["selected_tile"] = tile_row.to_dict()
+                            st.success(f"Assigned '{tile_row['ITEM_NAME']}' to {chosen_room['name']}!")
+                            st.rerun()
+
+# -------------------------------------------------------------
+# TAB 3: ESTIMATE SUMMARY & PRINT
+# -------------------------------------------------------------
+with tab_summary:
+    st.subheader("📄 Material Requirement & Estimation Sheet")
     
-    with t1:
-        st.subheader("📥 Upload BUSY Accounting Item Master / Stock Sheet")
-        uploaded_file = st.file_uploader("Upload CSV / Excel File", type=["csv", "xlsx", "xls"])
+    c_info1, c_info2 = st.columns(2)
+    with c_info1:
+        st.write(f"**Customer:** {st.session_state.customer_name}")
+        st.write(f"**Mobile:** {st.session_state.customer_mobile or 'N/A'}")
+    with c_info2:
+        st.write(f"**Date:** {date.today().strftime('%d-%b-%Y')}")
+        st.write(f"**Site Address:** {st.session_state.customer_address or 'N/A'}")
         
-        if uploaded_file is not None:
-            if st.button("🚀 Import & Update All Stock Items", type="primary"):
-                try:
-                    raw_df = pd.read_csv(uploaded_file, header=None) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file, header=None)
-                    h_idx = 0
-                    for i in range(min(15, len(raw_df))):
-                        row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
-                        if any("ITEM NAME" in s for s in row_vals):
-                            h_idx = i
-                            break
-                    headers = [str(c).strip().upper() if pd.notna(c) else f"COL_{idx}" for idx, c in enumerate(raw_df.iloc[h_idx].values)]
-                    df_clean = raw_df.iloc[h_idx + 1:].copy()
-                    df_clean.columns = headers
-                    
-                    name_col = next((c for c in df_clean.columns if "ITEM NAME" in c), df_clean.columns[1])
-                    cf_col = next((c for c in df_clean.columns if c == "CON FACTOR" or (("CON FACTOR" in c) and ("TYPE" not in c) and ("PACKING" not in c))), None)
-                    pack_col = next((c for c in df_clean.columns if "PACKING UNIT" in c or "PACKING" in c), None)
-                    
-                    if cf_col and pack_col:
-                        c1 = pd.to_numeric(df_clean[cf_col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(1.0)
-                        c2 = pd.to_numeric(df_clean[pack_col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(1.0)
-                        df_clean["Sqft_Per_Box"] = (c1 * c2).round(2)
-                    else:
-                        df_clean["Sqft_Per_Box"] = 16.0
-                        
-                    df_clean["Tile_Name"] = df_clean[name_col].astype(str).str.strip()
-                    df_clean = df_clean[df_clean["Tile_Name"] != ""]
-                    df_clean = df_clean[~df_clean["Tile_Name"].str.upper().isin(["NAN", "ITEM NAME", "TOTAL", "NONE", "UNNAMED", "NULL"])]
-                    
-                    final_items = df_clean[["Tile_Name", "Sqft_Per_Box"]].drop_duplicates(subset=["Tile_Name"]).reset_index(drop=True)
-                    
-                    if not final_items.empty:
-                        conn = get_connection()
-                        c = conn.cursor()
-                        c.execute("CREATE TABLE IF NOT EXISTS inventory_stock (id INTEGER PRIMARY KEY AUTOINCREMENT, tile_name TEXT UNIQUE, sqft_per_box REAL)")
-                        c.execute("DELETE FROM inventory_stock")
-                        for _, row in final_items.iterrows():
-                            c.execute("INSERT OR REPLACE INTO inventory_stock (tile_name, sqft_per_box) VALUES (?, ?)", (str(row["Tile_Name"]), float(row["Sqft_Per_Box"])))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"🎉 Total **{len(final_items)} Tiles** live database mein load ho gayi!")
-                        st.rerun()
-                except Exception as ex:
-                    st.error(f"Error reading file: {str(ex)}")
+    st.markdown("---")
+    
+    summary_data = []
+    grand_total_boxes = 0
+    grand_total_sqft = 0.0
+    
+    for fl in st.session_state.floors:
+        for rm in fl["rooms"]:
+            if rm.get("calc_mode") == "Direct SqFt":
+                room_net_area = rm.get("direct_sqft", 100.0)
+                dim_str = f"Direct: {room_net_area:.0f} SqFt"
+            else:
+                fl_area = rm["length"] * rm["width"]
+                sk_area = 2 * (rm["length"] + rm["width"]) * (rm["skirting"] / 12.0)
+                room_net_area = fl_area + sk_area
+                dim_str = f"{rm['length']} x {rm['width']} ft (Sk: {rm['skirting']}\")"
+            
+            if rm["selected_tile"]:
+                tile_selected = rm["selected_tile"]
+                b_sqft = tile_selected["BOX_SQFT"]
+                exact_b = room_net_area / b_sqft
+                req_b = math.ceil(exact_b)
+                act_covered = req_b * b_sqft
+                
+                grand_total_boxes += req_b
+                grand_total_sqft += act_covered
+                
+                summary_data.append({
+                    "Floor / Room": f"{fl['floor_name']} - {rm['name']}",
+                    "Dimensions / Input": dim_str,
+                    "Tile Selected": tile_selected['ITEM_NAME'],
+                    "Room Area (SqFt)": round(room_net_area, 1),
+                    "Box Coverage": f"{b_sqft} SqFt",
+                    "Required Boxes": f"{req_b} Boxes",
+                    "Delivered (SqFt)": round(act_covered, 1)
+                })
+            else:
+                summary_data.append({
+                    "Floor / Room": f"{fl['floor_name']} - {rm['name']}",
+                    "Dimensions / Input": dim_str,
+                    "Tile Selected": "⚠️ Not Selected",
+                    "Room Area (SqFt)": round(room_net_area, 1),
+                    "Box Coverage": "-",
+                    "Required Boxes": "-",
+                    "Delivered (SqFt)": "-"
+                })
+                
+    if summary_data:
+        summary_table = pd.DataFrame(summary_data)
+        st.dataframe(summary_table, use_container_width=True)
         
-        conn = get_connection()
-        stock_view = pd.read_sql_query("SELECT * FROM inventory_stock", conn)
-        conn.close()
-        st.subheader(f"📦 Current Live Stock ({len(stock_view)} Items Loaded)")
-        st.dataframe(stock_view, use_container_width=True)
+        st.markdown(f"""
+        ### 📊 Total Order Estimate: **{grand_total_boxes} Boxes** ({grand_total_sqft:.1f} SqFt)
+        """)
         
-    with t2:
-        st.subheader("Recent Sign-in Audits")
-        conn = get_connection()
-        st.dataframe(pd.read_sql_query("SELECT * FROM login_history ORDER BY id DESC LIMIT 50", conn), use_container_width=True)
-        conn.close()
+    st.info("💡 **Print Tip:** ब्राउज़र में `Ctrl + P` दबाकर ग्राहक के लिए सीधे कोटेशन PDF प्रिंट कर सकते हैं।")
