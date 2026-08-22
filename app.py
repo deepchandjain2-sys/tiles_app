@@ -13,7 +13,60 @@ if "customers" not in st.session_state:
 if "items" not in st.session_state:
     st.session_state.items = []
 
-# Login Screen
+# -------------------------------------------------------------
+# GOOGLE SHEET LIVE STOCK LOADER (ITEM MASTER FORMAT)
+# -------------------------------------------------------------
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRMgTzS4kNWfaIOByOAZ-RS_XQP7zqiKXAgEkgVhrHNYQU5Jn-srXAfuOW_yPcAmW1G_FrEa59S-RyJ/pub?gid=0&single=true&output=csv"
+
+@st.cache_data(ttl=30)
+def load_busy_inventory():
+    try:
+        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        if df.empty:
+            return pd.DataFrame()
+        df = df.dropna(how='all')
+        cols = list(df.columns)
+        
+        id_col = cols[0]
+        name_col = cols[1] if len(cols) > 1 else cols[0]
+        con_col = cols[3] if len(cols) > 3 else None
+        pack_col = cols[4] if len(cols) > 4 else None
+
+        records = []
+        for _, row in df.iterrows():
+            name = str(row[name_col]).strip() if pd.notna(row[name_col]) else ""
+            if not name or name.lower() == "nan" or "item name" in name.lower():
+                continue
+            try:
+                con_val = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 1.5
+            except:
+                con_val = 1.5
+            try:
+                pack_val = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 6.0
+            except:
+                pack_val = 6.0
+                
+            box_sqft = round(con_val * pack_val, 2)
+            if box_sqft <= 0:
+                box_sqft = 16.0
+                
+            records.append({
+                "ITEM_ID": str(row[id_col]).strip() if pd.notna(row[id_col]) else "NA",
+                "ITEM_NAME": name,
+                "CON_FACTOR": con_val,
+                "PACKING_UNIT": int(pack_val),
+                "BOX_SQFT": box_sqft,
+                "CATEGORY": "Granite" if "GRAN" in name.upper() else ("Wall" if any(x in name.upper() for x in ["WALL", "HL", "12X18"]) else "Floor")
+            })
+        return pd.DataFrame(records)
+    except Exception as e:
+        return pd.DataFrame()
+
+stock_df = load_busy_inventory()
+
+# -------------------------------------------------------------
+# LOGIN SCREEN
+# -------------------------------------------------------------
 if not st.session_state.user:
     st.markdown("<h2 style='color:#1e3a8a; text-align:center;'>🏢 JAY GRANITE & TILES</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;'>Sales & Material Selection Portal</p>", unsafe_allow_html=True)
@@ -31,7 +84,9 @@ if not st.session_state.user:
                     st.error("Invalid Credentials! (Use admin/admin123 or sales1/1234)")
     st.stop()
 
-# Sidebar Navigation
+# -------------------------------------------------------------
+# SIDEBAR NAVIGATION
+# -------------------------------------------------------------
 with st.sidebar:
     st.markdown(f"### 👤 {st.session_state.user['username']}")
     st.caption(f"Role: {st.session_state.user['role'].upper()}")
@@ -45,8 +100,14 @@ with st.sidebar:
         "3️⃣ Site Measurements & PDF",
         "4️⃣ Sales Dashboard"
     ])
+    st.markdown("---")
+    if st.button("🔄 Refresh Live Stock", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
-# 1. Customer Registration
+# -------------------------------------------------------------
+# 1. CUSTOMER REGISTRATION
+# -------------------------------------------------------------
 if menu.startswith("1️⃣"):
     st.header("👤 Customer & Site Registration")
     with st.form("cust_reg"):
@@ -71,7 +132,9 @@ if menu.startswith("1️⃣"):
             else:
                 st.error("Please enter Name and Mobile number!")
 
-# 2. Tile Selection
+# -------------------------------------------------------------
+# 2. TILE SELECTION (CONNECTED WITH GOOGLE SHEET)
+# -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection")
     if not st.session_state.customers:
@@ -81,7 +144,7 @@ elif menu.startswith("2️⃣"):
         sel = st.selectbox("Choose Customer:", custs)
         cid = int(sel.split()[0].replace("#", ""))
         
-        with st.expander("➕ Add Tile for Room / Area", expanded=True):
+        with st.expander("➕ Add Tile from BUSY Stock for Room / Area", expanded=True):
             col_f, col_sec, col_area = st.columns(3)
             with col_f:
                 fl = st.selectbox("Floor Level", ["Ground Floor", "1st Floor", "2nd Floor", "Parking"])
@@ -90,19 +153,34 @@ elif menu.startswith("2️⃣"):
             with col_area:
                 area = st.selectbox("Area", ["Living Room", "Hall", "Kitchen", "Bedroom", "Master Bedroom", "Bathroom", "Balcony", "Parking"])
                 
-            t_name = st.text_input("Tile Name / Code (e.g. 2X4 Vitrified, 1002)")
-            box_sq = st.number_input("SqFt per Box", value=16.0)
+            search_query = st.text_input("🔍 Search Tile Code / Name from Google Sheet (e.g. 1000, 10015, CIGAR, 12X18):", "")
+            
+            filtered_stock = stock_df.copy()
+            if not filtered_stock.empty and search_query:
+                filtered_stock = filtered_stock[
+                    filtered_stock["ITEM_NAME"].str.contains(search_query, case=False, na=False) |
+                    filtered_stock["ITEM_ID"].str.contains(search_query, case=False, na=False)
+                ]
+                
+            tile_list = filtered_stock["ITEM_NAME"].tolist() if not filtered_stock.empty else ["No matching tiles found"]
+            selected_tile_name = st.selectbox(f"Select Tile ({len(filtered_stock)} available in stock):", tile_list)
+            
+            box_sqft = 16.0
+            if not filtered_stock.empty and selected_tile_name in filtered_stock["ITEM_NAME"].values:
+                tile_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile_name].iloc[0]
+                box_sqft = tile_obj["BOX_SQFT"]
+                st.info(f"📦 **Auto-Calculated Box Coverage:** {box_sqft} Sq.Ft / Box (Con Factor: {tile_obj['CON_FACTOR']} × Packing: {tile_obj['PACKING_UNIT']})")
             
             if st.button("💾 Save Tile Selection", type="primary"):
-                if t_name:
+                if selected_tile_name and selected_tile_name != "No matching tiles found":
                     st.session_state.items.append({
                         "cid": cid, "floor": fl, "section": sec, "area": area,
-                        "tile": t_name, "box_sqft": box_sq, "sqft": 100.0, "boxes": math.ceil(100.0/box_sq)
+                        "tile": selected_tile_name, "box_sqft": box_sqft, "sqft": 100.0, "boxes": math.ceil(100.0/box_sqft)
                     })
-                    st.success(f"Added {t_name} for {area}!")
+                    st.success(f"Added {selected_tile_name} for {area}!")
                     st.rerun()
                 else:
-                    st.error("Enter Tile Name/Code")
+                    st.error("Please select a valid tile from stock.")
                     
         st.subheader("📋 Selected Items")
         curr_items = [i for i in st.session_state.items if i["cid"] == cid]
@@ -111,7 +189,9 @@ elif menu.startswith("2️⃣"):
         else:
             st.info("No tiles selected yet.")
 
-# 3. Measurements & PDF
+# -------------------------------------------------------------
+# 3. MEASUREMENTS & PDF
+# -------------------------------------------------------------
 elif menu.startswith("3️⃣"):
     st.header("📐 Site Measurements & PDF Quotation")
     if not st.session_state.customers:
@@ -125,7 +205,7 @@ elif menu.startswith("3️⃣"):
         items = [i for i in st.session_state.items if i["cid"] == cid]
         if items:
             for it in items:
-                st.markdown(f"**{it['floor']} - {it['area']} ({it['section']})** | Tile: `{it['tile']}`")
+                st.markdown(f"**{it['floor']} - {it['area']} ({it['section']})** | Tile: `{it['tile']}` (Box: {it['box_sqft']} SqFt)")
                 it['sqft'] = st.number_input("Total Area (SqFt)", value=float(it['sqft']), key=f"sq_{it['tile']}_{it['area']}")
                 it['boxes'] = math.ceil(it['sqft'] / it['box_sqft'])
                 st.caption(f"Required Boxes: **{it['boxes']} Boxes**")
@@ -177,7 +257,9 @@ elif menu.startswith("3️⃣"):
         else:
             st.info("No items added for this customer yet.")
 
-# 4. Sales Dashboard
+# -------------------------------------------------------------
+# 4. SALES DASHBOARD
+# -------------------------------------------------------------
 elif menu.startswith("4️⃣"):
     st.header("📊 Sales Team Scorecard & Dashboard")
     if st.session_state.customers:
