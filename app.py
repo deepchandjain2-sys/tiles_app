@@ -147,8 +147,7 @@ elif menu.startswith("2️⃣"):
         sel = st.selectbox("Choose Customer:", custs)
         cid = int(sel.split()[0].replace("#", ""))
         
-        with st.form("tile_sel_form"):
-            st.markdown("### ➕ Add Tile for Room / Area")
+        with st.expander("➕ Add Tile for Room / Area", expanded=True):
             col_f, col_sec, col_area = st.columns(3)
             with col_f:
                 fl = st.selectbox("Floor Level", ["Ground Floor", "1st Floor", "2nd Floor", "Parking"])
@@ -175,8 +174,7 @@ elif menu.startswith("2️⃣"):
                 box_sqft = float(tile_obj["BOX_SQFT"])
                 st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
             
-            submitted = st.form_submit_button("💾 Save Tile Selection", type="primary")
-            if submitted:
+            if st.button("💾 Save Tile Selection", type="primary"):
                 if selected_tile_name and selected_tile_name != "No matching tiles found":
                     st.session_state.items.append({
                         "cid": cid, "floor": fl, "section": sec, "area": area,
