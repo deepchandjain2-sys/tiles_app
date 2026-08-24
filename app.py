@@ -21,8 +21,8 @@ if "user" not in st.session_state:
     st.session_state.user = None
 if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
     st.session_state.customers = load_customers_from_disk()
-if "items" not in st.session_state or not isinstance(st.session_state.items, list):
-    st.session_state.items = []
+if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
+    st.session_state.my_selected_tiles = []
 if "stock_df" not in st.session_state or not isinstance(st.session_state.stock_df, pd.DataFrame):
     saved_stock = load_stock_from_disk()
     st.session_state.stock_df = saved_stock if not saved_stock.empty else pd.DataFrame()
@@ -190,7 +190,7 @@ if menu.startswith("1️⃣"):
         )
 
 # -------------------------------------------------------------
-# 3. TILES SELECTION (Search above Select Tile)
+# 3. TILES SELECTION (Search above Select Tile & Safe append)
 # -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection (Area-Wise)")
@@ -246,8 +246,8 @@ elif menu.startswith("2️⃣"):
             
         if st.button("➕ Add This Tile Selection", type="primary"):
             if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
-                if "items" not in st.session_state or not isinstance(st.session_state.items, list):
-                    st.session_state.items = []
+                if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
+                    st.session_state.my_selected_tiles = []
                 
                 new_item = {
                     "cid": int(cid),
@@ -259,7 +259,7 @@ elif menu.startswith("2️⃣"):
                     "sqft": 100.0,
                     "boxes": calculate_boxes(100.0, box_sqft)
                 }
-                st.session_state.items.append(new_item)
+                st.session_state.my_selected_tiles.append(new_item)
                 st.success(f"Added {selected_tile} for {area_name} successfully!")
                 st.rerun()
             else:
@@ -267,7 +267,7 @@ elif menu.startswith("2️⃣"):
                 
         st.subheader("📋 Selected Items for this Customer")
         curr_items = []
-        safe_items = st.session_state.get("items", [])
+        safe_items = st.session_state.get("my_selected_tiles", [])
         if isinstance(safe_items, list):
             for i in safe_items:
                 if isinstance(i, dict) and i.get("cid") == cid:
@@ -282,7 +282,7 @@ elif menu.startswith("2️⃣"):
         if curr_items:
             st.dataframe(pd.DataFrame(curr_items), use_container_width=True)
             if st.button("🗑️ Clear All Selections for Customer"):
-                st.session_state.items = [i for i in st.session_state.get("items", []) if not (isinstance(i, dict) and i.get("cid") == cid)]
+                st.session_state.my_selected_tiles = [i for i in st.session_state.get("my_selected_tiles", []) if not (isinstance(i, dict) and i.get("cid") == cid)]
                 st.rerun()
         else:
             st.info("No tiles selected yet for this customer.")
@@ -300,7 +300,7 @@ elif menu.startswith("3️⃣"):
         cid = int(sel_cust.split()[0].replace("#", ""))
         c_obj = next(c for c in st.session_state.customers if c["id"] == cid)
         
-        safe_items = st.session_state.get("items", [])
+        safe_items = st.session_state.get("my_selected_tiles", [])
         items = [i for i in safe_items if isinstance(i, dict) and i.get("cid") == cid]
         if items:
             st.markdown("### Enter Actual Area (SqFt) for Each Selection:")
