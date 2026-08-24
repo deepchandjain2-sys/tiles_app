@@ -265,7 +265,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.error(f"Error reading default master file: {e}")
     else:
       st.warning("Please upload or ensure ITEM MASTER.csv is present.")
-            if df is not None:
+      if df is not None:
       try:
         records = []
         for _, row in df.iterrows():
