@@ -1,21 +1,26 @@
 import math
 
-def calculate_boxes(length, width, sqft_per_box=16.0, wastage=0.0):
+def calculate_boxes(sqft, box_sqft):
+    """
+    कुल स्क्वायर फीट और प्रति बॉक्स कवरेज के आधार पर 
+    जरूरी बॉक्स की संख्या (ceil करके) कैलकुलेट करता है।
+    """
     try:
-        length = float(length)
-        width = float(width)
-        sqft_per_box = float(sqft_per_box) if float(sqft_per_box) > 0 else 16.0
-        wastage = float(wastage)
-    except Exception:
-        length, width, sqft_per_box, wastage = 0.0, 0.0, 16.0, 0.0
+        sqft_val = float(sqft)
+        box_val = float(box_sqft)
+        if box_val <= 0:
+            box_val = 16.0
+        return math.ceil(sqft_val / box_val)
+    except:
+        return 0
 
-    # Base Area
-    base_sqft = length * width
-    
-    # Area including Wastage
-    total_sqft = base_sqft * (1.0 + (wastage / 100.0))
-    
-    # Accurate Box Calculation
-    boxes_required = round(total_sqft / sqft_per_box, 2)
-    
-    return round(total_sqft, 2), boxes_required
+def calculate_box_sqft(con_factor, packing_unit):
+    """
+    कन्वर्जन फैक्टर और पैकिंग यूनिट से एक बॉक्स की स्क्वायर फीट निकालता है।
+    """
+    try:
+        cf = float(con_factor)
+        pu = float(packing_unit)
+        return round(cf * pu, 2)
+    except:
+        return 16.0
