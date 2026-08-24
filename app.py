@@ -18,20 +18,59 @@ if "my_selected_tiles" not in st.session_state:
 if "customers" not in st.session_state:
     st.session_state.customers = []
 
+if "sales_history" not in st.session_state:
+    st.session_state.sales_history = []
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "current_nav" not in st.session_state:
+    st.session_state.current_nav = "1 Customer Registration"
+
+# --- LOGIN SCREEN ---
+if not st.session_state.logged_in:
+    st.markdown("<h2 style='text-align: center;'>🏢 Jay Granite & Tiles Hub - Login</h2>", unsafe_allow_html=True)
+    col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+    with col_l2:
+        with st.form("login_form"):
+            user_id = st.text_input("User ID (Text / Number)")
+            password = st.text_input("Password", type="password")
+            role_choice = st.selectbox("Select Role", ["Admin", "Salesman"])
+            submitted_login = st.form_submit_button("🔐 Login", type="primary")
+            
+            if submitted_login:
+                if user_id.strip() and password.strip():
+                    st.session_state.logged_in = True
+                    st.session_state.user_role = role_choice
+                    st.session_state.username = user_id.strip()
+                    st.session_state.current_nav = "1 Customer Registration"
+                    st.success("Login Successful!")
+                    st.rer_run() if hasattr(st, "rer_run") else st.rerun()
+                else:
+                    st.error("Please enter valid User ID and Password.")
+    st.stop()
+
+# --- SIDEBAR NAVIGATION (Flow Controlled) ---
 st.sidebar.title("🏢 Jay Granite & Tiles")
-menu = st.sidebar.radio("Navigation Flow", [
+st.sidebar.markdown(f"👤 **User:** {st.session_state.get('username', 'User')} ({st.session_state.get('user_role', 'Staff')})")
+
+nav_options = [
     "1 Customer Registration",
     "2 Tiles Selection (Area-Wise)",
     "3 Measurements, PDF & WhatsApp",
     "4 Sales Dashboard & History"
-])
+]
 
-role = st.sidebar.selectbox("Role", ["ADMIN", "STAFF"])
-if st.sidebar.button("Logout"):
-    st.success("Logged out successfully.")
+selected_menu = st.sidebar.radio("Navigation Flow", nav_options, index=nav_options.index(st.session_state.current_nav) if st.session_state.current_nav in nav_options else 0)
+st.session_state.current_nav = selected_menu
+
+if st.sidebar.button("🚪 Logout"):
+    st.session_state.logged_in = False
+    st.session_state.current_nav = "1 Customer Registration"
+    st.rerun()
 
 # --- 1. CUSTOMER REGISTRATION ---
-if menu == "1 Customer Registration":
+if st.session_state.current_nav == "1 Customer Registration":
     st.header("👤 Customer Registration")
     
     with st.form("customer_form"):
@@ -43,7 +82,7 @@ if menu == "1 Customer Registration":
             cust_city = st.text_input("City / Location", value="Hiriyur")
             cust_gst = st.text_input("GSTIN (Optional)")
             
-        submitted = st.form_submit_button("Register & Proceed")
+        submitted = st.form_submit_button("Register & Proceed to Tiles Selection", type="primary")
         if submitted:
             if cust_name.strip():
                 new_cid = len(st.session_state.customers) + 1
@@ -52,33 +91,43 @@ if menu == "1 Customer Registration":
                     "name": cust_name,
                     "phone": cust_phone,
                     "city": cust_city,
-                    "gst": cust_gst
+                    "gst": cust_gst,
+                    "salesman": st.session_state.get('username', 'Admin'),
+                    "status": "Registered"
                 }
                 st.session_state.customers.append(cust_data)
                 st.session_state.current_cid = new_cid
-                st.success(f"Customer {cust_name} registered successfully! Proceed to Tiles Selection.")
+                st.success(f"Customer {cust_name} registered successfully!")
+                st.session_state.current_nav = "2 Tiles Selection (Area-Wise)"
+                st.rerun()
             else:
                 st.error("Please enter the customer name.")
 
     if st.session_state.customers:
         st.subheader("Select Existing Customer")
-        c_options = {f"{c['cid']} - {c['name']} ({c['city']})": c['cid'] for c in st.session_state.customers}
+        c_options = {f"{c['cid']} - {c['name']} ({c['city']}) [Attended by: {c.get('salesman', 'Admin')}]": c['cid'] for c in st.session_state.customers}
         selected_c_label = st.selectbox("Registered Customers", list(c_options.keys()))
         if selected_c_label:
             st.session_state.current_cid = c_options[selected_c_label]
-            st.info(f"Active Customer: {selected_c_label}")
+            col_go1, col_go2 = st.columns([1, 4])
+            with col_go1:
+                if st.button("➡️ Proceed to Selection"):
+                    st.session_state.current_nav = "2 Tiles Selection (Area-Wise)"
+                    st.rerun()
 
 # --- 2. TILES SELECTION (AREA-WISE) ---
-elif menu == "2 Tiles Selection (Area-Wise)":
+elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
     st.header("🏠 Tiles Selection (Area-Wise)")
     
     if not st.session_state.customers:
-        st.warning("Please register a customer first in step 1.")
+        st.warning("Please register a customer first.")
+        if st.button("Go to Customer Registration"):
+            st.session_state.current_nav = "1 Customer Registration"
+            st.rerun()
     else:
         cid = st.session_state.get("current_cid", st.session_state.customers[0]["cid"])
         current_cust = next((c for c in st.session_state.customers if c['cid'] == cid), {"name": "Unknown", "phone": "", "city": ""})
         
-        # Display Active Customer details at the top
         st.markdown(f"### 👤 Active Customer: **{current_cust['name']}** | 📞 Phone: **{current_cust.get('phone', 'N/A')}** | 📍 City: **{current_cust.get('city', '')}**")
         st.markdown("---")
         
@@ -164,6 +213,12 @@ elif menu == "2 Tiles Selection (Area-Wise)":
                     }
                     st.session_state.my_selected_tiles.append(new_item)
                     save_items_to_disk(st.session_state.my_selected_tiles)
+                    
+                    # Update customer status to Selected
+                    for c in st.session_state.customers:
+                        if c['cid'] == cid:
+                            c['status'] = 'Selected'
+                            
                     st.success(f"Added {selected_tile} for {area_name} successfully!")
                     st.rerun()
                 else:
@@ -193,15 +248,20 @@ elif menu == "2 Tiles Selection (Area-Wise)":
                     st.success("Item deleted successfully!")
                     st.rerun()
                     
-                if st.button("🗑️ Clear All Selections for Customer"):
+                if st.button("🗑️ Clear All Selections"):
                     st.session_state.my_selected_tiles = [i for i in st.session_state.my_selected_tiles if not (isinstance(i, dict) and i.get("cid") == cid)]
                     save_items_to_disk(st.session_state.my_selected_tiles)
+                    st.rerun()
+                    
+                st.markdown("---")
+                if st.button("➡️ Proceed to Measurements", type="primary"):
+                    st.session_state.current_nav = "3 Measurements, PDF & WhatsApp"
                     st.rerun()
             else:
                 st.info("No tiles selected yet for this customer.")
 
 # --- 3. MEASUREMENTS, PDF & WHATSAPP ---
-elif menu == "3 Measurements, PDF & WhatsApp":
+elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     st.header("📐 Measurements, PDF & WhatsApp")
     
     if not st.session_state.customers:
@@ -255,10 +315,10 @@ elif menu == "3 Measurements, PDF & WhatsApp":
                 summary_text += f"• {it.get('floor')} - {it.get('area')} ({it.get('section')}): {it.get('tile')} | Area: {it.get('sqft')} SqFt | Boxes: {it.get('boxes')}\n"
             summary_text += f"\n*Total Boxes Required: {total_boxes}*"
 
-            col_btn1, col_btn2 = st.columns(2)
+            col_btn1, col_btn2, col_btn3 = st.columns(3)
             with col_btn1:
                 st.download_button(
-                    label="📄 Download / Open Quotation (TXT)",
+                    label="📄 Download Quotation (TXT)",
                     data=summary_text,
                     file_name=f"Quotation_{current_cust['name']}.txt",
                     mime="text/plain",
@@ -267,9 +327,66 @@ elif menu == "3 Measurements, PDF & WhatsApp":
             with col_btn2:
                 encoded_message = urllib.parse.quote(summary_text)
                 whatsapp_url = f"https://wa.me/?text={encoded_message}"
-                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; width:100%;">💬 Share on WhatsApp</button></a>', unsafe_allow_html=True)
+                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; width:100%;">💬 WhatsApp</button></a>', unsafe_allow_html=True)
+            with col_btn3:
+                if st.button("✅ Finalize Order & Go to Dashboard", type="primary"):
+                    for c in st.session_state.customers:
+                        if c['cid'] == cid:
+                            c['status'] = 'Finalized'
+                            c['total_boxes'] = total_boxes
+                    
+                    # Save to sales history
+                    history_record = {
+                        "customer": current_cust['name'],
+                        "phone": current_cust.get('phone', ''),
+                        "city": current_cust['city'],
+                        "salesman": current_cust.get('salesman', 'Admin'),
+                        "boxes": total_boxes,
+                        "items_count": len(items)
+                    }
+                    st.session_state.sales_history.append(history_record)
+                    st.success("Order Finalized Successfully!")
+                    st.session_state.current_nav = "4 Sales Dashboard & History"
+                    st.rerun()
 
 # --- 4. SALES DASHBOARD & HISTORY ---
-elif menu == "4 Sales Dashboard & History":
-    st.header("📊 Sales Dashboard & History")
-    st.info("Dashboard and past customer history records will appear here.")
+elif st.session_state.current_nav == "4 Sales Dashboard & History":
+    st.header("📊 Professional Sales Dashboard & History")
+    
+    customers_df = pd.DataFrame(st.session_state.customers) if st.session_state.customers else pd.DataFrame(columns=["cid", "name", "phone", "city", "status", "salesman"])
+    
+    total_new_customers = len(st.session_state.customers)
+    total_selected = len(customers_df[customers_df['status'] == 'Selected']) if not customers_df.empty else 0
+    total_finalized = len(customers_df[customers_df['status'] == 'Finalized']) if not customers_df.empty else 0
+    
+    # KPI Metrics Cards
+    kpi1, kpi2, kpi3 = st.columns(3)
+    kpi1.metric("👥 Total New Customers", total_new_customers)
+    kpi2.metric("📋 Tiles Selected", total_selected)
+    kpi3.metric("✅ Orders Finalized", total_finalized)
+    
+    st.markdown("---")
+    st.subheader("👨‍💼 Salesman Performance Analysis")
+    
+    if not customers_df.empty and 'salesman' in customers_df.columns:
+        # Group by salesman
+        salesman_summary = customers_df.groupby('salesman').agg(
+            Total_Attended=('name', 'count'),
+            Finalized_Orders=('status', lambda x: (x == 'Finalized').sum())
+        ).reset_index()
+        
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            st.dataframe(salesman_summary, use_container_width=True)
+        with col_g2:
+            st.markdown("#### 📈 Salesman Performance Chart")
+            st.bar_chart(salesman_summary.set_index('salesman')[['Total_Attended', 'Finalized_Orders']])
+    else:
+        st.info("No salesman activity data available yet.")
+        
+    st.markdown("---")
+    st.subheader("📜 Detailed Customer History")
+    if not customers_df.empty:
+        st.dataframe(customers_df[['cid', 'name', 'phone', 'city', 'salesman', 'status']], use_container_width=True)
+    else:
+        st.info("No customer records found.")
