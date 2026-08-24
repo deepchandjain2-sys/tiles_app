@@ -131,20 +131,36 @@ else:
   username_input = st.sidebar.text_input("Username")
   pin_input = st.sidebar.text_input("PIN / Password", type="password")
 
-  if st.sidebar.button("Login"):
-    matched_user = None
-    for u in st.session_state.registered_users:
-      if u["username"] == username_input and str(u["pin"]) == str(pin_input):
-        matched_user = u
-        break
-    if matched_user:
-      st.session_state.logged_in = True
-      st.session_state.current_user = matched_user
-      st.sidebar.success("Logged in successfully!")
-      st.rerun()
-    else:
-      st.sidebar.error("Invalid Username or PIN")
+ # Initialize session state safely
+if "stock_df" not in st.session_state:
+  st.session_state.stock_df = load_stock_from_upload(None)
 
+if "my_selected_tiles" not in st.session_state:
+  st.session_state.my_selected_tiles = []
+
+if "registered_users" not in st.session_state:
+  st.session_state.registered_users = load_users_from_disk()
+
+if "customers" not in st.session_state:
+  st.session_state.customers = load_customers_from_disk()
+
+if "sales_history" not in st.session_state:
+  st.session_state.sales_history = []
+
+if "logged_in" not in st.session_state:
+  st.session_state.logged_in = False
+
+if "current_user" not in st.session_state:
+  st.session_state.current_user = None
+
+if "current_nav" not in st.session_state:
+  st.session_state.current_nav = "2 Tiles Selection (Area-Wise)"
+
+if "current_cid" not in st.session_state:
+  if st.session_state.customers:
+    st.session_state.current_cid = st.session_state.customers[0]["cid"]
+  else:
+    st.session_state.current_cid = "CUST-001"
 
 # Main Page Routing
 if not st.session_state.logged_in:
