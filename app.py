@@ -21,33 +21,90 @@ if "customers" not in st.session_state:
 if "sales_history" not in st.session_state:
     st.session_state.sales_history = []
 
+# Persistent Users Database in Session State
+if "registered_users" not in st.session_state:
+    # Default Admin account pre-configured
+    st.session_state.registered_users = {
+        "admin": {"password": "123", "role": "Admin", "name": "Jayantilal"}
+    }
+
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 if "current_nav" not in st.session_state:
     st.session_state.current_nav = "1 Customer Registration"
 
-# --- LOGIN SCREEN ---
+# --- AUTHENTICATION SCREEN (LOGIN / REGISTER / FORGOT PASSWORD) ---
 if not st.session_state.logged_in:
-    st.markdown("<h2 style='text-align: center;'>🏢 Jay Granite & Tiles Hub - Login</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>🏢 Jay Granite & Tiles Hub - Portal</h2>", unsafe_allow_html=True)
+    
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
-        with st.form("login_form"):
-            user_id = st.text_input("User ID (Text / Number)")
-            password = st.text_input("Password", type="password")
-            role_choice = st.selectbox("Select Role", ["Admin", "Salesman"])
-            submitted_login = st.form_submit_button("🔐 Login", type="primary")
-            
-            if submitted_login:
-                if user_id.strip() and password.strip():
-                    st.session_state.logged_in = True
-                    st.session_state.user_role = role_choice
-                    st.session_state.username = user_id.strip()
-                    st.session_state.current_nav = "1 Customer Registration"
-                    st.success("Login Successful!")
-                    st.rer_run() if hasattr(st, "rer_run") else st.rerun()
-                else:
-                    st.error("Please enter valid User ID and Password.")
+        auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Login", "📝 New User Register", "🔄 Forgot Password"])
+        
+        # 1. Login Tab
+        with auth_tab1:
+            with st.form("login_form"):
+                l_user = st.text_input("User ID (Text / Number)", key="l_user")
+                l_pass = st.text_input("Password", type="password", key="l_pass")
+                l_btn = st.form_submit_button("Login", type="primary")
+                
+                if l_btn:
+                    clean_user = l_user.strip().lower()
+                    if clean_user in st.session_state.registered_users:
+                        if st.session_state.registered_users[clean_user]["password"] == l_pass.strip():
+                            st.session_state.logged_in = True
+                            st.session_state.username = st.session_state.registered_users[clean_user]["name"]
+                            st.session_state.user_role = st.session_state.registered_users[clean_user]["role"]
+                            st.session_state.current_nav = "1 Customer Registration"
+                            st.success("Login Successful!")
+                            st.rerun()
+                        else:
+                            st.error("Incorrect Password!")
+                    else:
+                        st.error("User ID not found! Please register first.")
+                        
+        # 2. Register Tab
+        with auth_tab2:
+            with st.form("register_form"):
+                r_name = st.text_input("Full Name")
+                r_user = st.text_input("Choose User ID (Text / Number)")
+                r_pass = st.text_input("Choose Password", type="password")
+                r_role = st.selectbox("Select Role", ["Admin", "Salesman"])
+                r_btn = st.form_submit_button("Register Account", type="primary")
+                
+                if r_btn:
+                    clean_r_user = r_user.strip().lower()
+                    if clean_r_user and r_pass.strip() and r_name.strip():
+                        if clean_r_user in st.session_state.registered_users:
+                            st.warning("User ID already exists! Choose another ID.")
+                        else:
+                            st.session_state.registered_users[clean_r_user] = {
+                                "password": r_pass.strip(),
+                                "role": r_role,
+                                "name": r_name.strip()
+                            }
+                            st.success("Registration successful! Now go to Login tab and sign in.")
+                    else:
+                        st.error("Please fill all fields correctly.")
+                        
+        # 3. Forgot Password Tab
+        with auth_tab3:
+            with st.form("forgot_form"):
+                f_user = st.text_input("Enter your User ID")
+                f_new_pass = st.text_input("Enter New Password", type="password")
+                f_btn = st.form_submit_button("Reset Password", type="primary")
+                
+                if f_btn:
+                    clean_f_user = f_user.strip().lower()
+                    if clean_f_user in st.session_state.registered_users:
+                        if f_new_pass.strip():
+                            st.session_state.registered_users[clean_f_user]["password"] = f_new_pass.strip()
+                            st.success("Password updated successfully! You can login now.")
+                        else:
+                            st.error("Please enter a new password.")
+                    else:
+                        st.error("User ID does not exist.")
     st.stop()
 
 # --- SIDEBAR NAVIGATION (Flow Controlled) ---
@@ -214,7 +271,6 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                     st.session_state.my_selected_tiles.append(new_item)
                     save_items_to_disk(st.session_state.my_selected_tiles)
                     
-                    # Update customer status to Selected
                     for c in st.session_state.customers:
                         if c['cid'] == cid:
                             c['status'] = 'Selected'
@@ -335,7 +391,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                             c['status'] = 'Finalized'
                             c['total_boxes'] = total_boxes
                     
-                    # Save to sales history
                     history_record = {
                         "customer": current_cust['name'],
                         "phone": current_cust.get('phone', ''),
@@ -359,7 +414,6 @@ elif st.session_state.current_nav == "4 Sales Dashboard & History":
     total_selected = len(customers_df[customers_df['status'] == 'Selected']) if not customers_df.empty else 0
     total_finalized = len(customers_df[customers_df['status'] == 'Finalized']) if not customers_df.empty else 0
     
-    # KPI Metrics Cards
     kpi1, kpi2, kpi3 = st.columns(3)
     kpi1.metric("👥 Total New Customers", total_new_customers)
     kpi2.metric("📋 Tiles Selected", total_selected)
@@ -369,7 +423,6 @@ elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.subheader("👨‍💼 Salesman Performance Analysis")
     
     if not customers_df.empty and 'salesman' in customers_df.columns:
-        # Group by salesman
         salesman_summary = customers_df.groupby('salesman').agg(
             Total_Attended=('name', 'count'),
             Finalized_Orders=('status', lambda x: (x == 'Finalized').sum())
