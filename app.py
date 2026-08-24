@@ -313,6 +313,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                 st.info("No tiles selected yet for this customer.")
 
 # --- 3. MEASUREMENTS, PDF & WHATSAPP ---
+# --- 3. MEASUREMENTS, PDF & WHATSAPP ---
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     st.header("📐 Measurements, PDF & WhatsApp")
     
@@ -320,7 +321,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         st.warning("Please register a customer first.")
     else:
         cid = st.session_state.get("current_cid", st.session_state.customers[0]["cid"])
-        current_cust = next((c for c in st.session_state.customers if c['cid'] == cid), {"name": "Customer", "phone": ""})
+        current_cust = next((c for c in st.session_state.customers if c['cid'] == cid), {"name": "Customer", "phone": "", "city": ""})
         items = [i for i in st.session_state.get("my_selected_tiles", []) if isinstance(i, dict) and i.get("cid") == cid]
         
         if not items:
@@ -359,55 +360,25 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 
             st.markdown(f"### Total Material Required: **{total_boxes} Boxes**")
             
-            # Generate Real PDF using FPDF
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", "B", 16)
-            pdf.cell(200, 10, txt="JAY GRANITE & TILES - QUOTATION", ln=True, align="C")
-            pdf.set_font("Arial", "", 12)
-            pdf.cell(200, 8, txt=f"Customer Name: {current_cust['name']}", ln=True)
-            pdf.cell(200, 8, txt=f"Phone: {current_cust.get('phone', '')}", ln=True)
-            pdf.cell(200, 8, txt=f"City: {current_cust['city']}", ln=True)
-            pdf.ln(5)
-            
-            pdf.set_font("Arial", "B", 10)
-            pdf.cell(40, 8, "Floor / Area", 1)
-            pdf.cell(40, 8, "Section", 1)
-            pdf.cell(70, 8, "Tile Name", 1)
-            pdf.cell(20, 8, "SqFt", 1)
-            pdf.cell(20, 8, "Boxes", 1)
-            pdf.ln()
-            
-            pdf.set_font("Arial", "", 10)
-            for it in items:
-                pdf.cell(40, 8, f"{it.get('floor')} - {it.get('area')}", 1)
-                pdf.cell(40, 8, str(it.get('section')), 1)
-                pdf.cell(70, 8, str(it.get('tile'))[:30], 1)
-                pdf.cell(20, 8, str(it.get('sqft')), 1)
-                pdf.cell(20, 8, str(it.get('boxes')), 1)
-                pdf.ln()
-                
-            pdf.ln(5)
-            pdf.set_font("Arial", "B", 12)
-            pdf.cell(200, 10, txt=f"Total Boxes Required: {total_boxes}", ln=True)
-            
-            pdf_bytes = pdf.output()
-
-            summary_text = f"*JAY GRANITE & TILES - QUOTATION*\n\n" \
-                           f"Customer: {current_cust['name']}\n" \
+            # सुरक्षित टेक्स्ट कोटेशन जनरेशन (जो बिना किसी एरर के तुरंत डाउनलोड होगी)
+            summary_text = f"JAY GRANITE & TILES - QUOTATION\n" \
+                           f"----------------------------------------\n" \
+                           f"Customer Name: {current_cust['name']}\n" \
                            f"Phone: {current_cust.get('phone', '')}\n" \
-                           f"City: {current_cust['city']}\n\n"
+                           f"City: {current_cust['city']}\n\n" \
+                           f"Selected Items:\n"
             for it in items:
-                summary_text += f"• {it.get('floor')} - {it.get('area')} ({it.get('section')}): {it.get('tile')} | Area: {it.get('sqft')} SqFt | Boxes: {it.get('boxes')}\n"
-            summary_text += f"\n*Total Boxes Required: {total_boxes}*"
+                summary_text += f"- {it.get('floor')} | {it.get('area')} ({it.get('section')}): {it.get('tile')} -> Area: {it.get('sqft')} SqFt -> Boxes: {it.get('boxes')}\n"
+            summary_text += f"\nTotal Boxes Required: {total_boxes}\n" \
+                           f"----------------------------------------"
 
             col_btn1, col_btn2, col_btn3 = st.columns(3)
             with col_btn1:
                 st.download_button(
-                    label="Download Official PDF Quotation",
-                    data=pdf_bytes,
-                    file_name=f"Quotation_{current_cust['name']}.pdf",
-                    mime="application/pdf",
+                    label="Download Quotation File",
+                    data=summary_text,
+                    file_name=f"Quotation_{current_cust['name']}.txt",
+                    mime="text/plain",
                     type="primary"
                 )
             with col_btn2:
@@ -415,7 +386,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 whatsapp_url = f"https://wa.me/?text={encoded_message}"
                 st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; width:100%;">💬 WhatsApp</button></a>', unsafe_allow_html=True)
             with col_btn3:
-                if st.button("✅ Finalize Order & Go to Dashboard", type="primary"):
+                if st.button("✅ Finalize & Dashboard", type="primary"):
                     for c in st.session_state.customers:
                         if c['cid'] == cid:
                             c['status'] = 'Finalized'
@@ -433,7 +404,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     st.success("Order Finalized Successfully!")
                     st.session_state.current_nav = "4 Sales Dashboard & History"
                     st.rerun()
-
 # --- 4. SALES DASHBOARD & HISTORY ---
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.header("📊 Professional Sales Dashboard & History")
