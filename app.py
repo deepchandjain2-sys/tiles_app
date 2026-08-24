@@ -19,14 +19,14 @@ st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layou
 # Persistent State Initialization with Disk Recovery
 if "user" not in st.session_state:
     st.session_state.user = None
-if "customers" not in st.session_state:
+if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
     st.session_state.customers = load_customers_from_disk()
-if "items" not in st.session_state:
+if "items" not in st.session_state or not isinstance(st.session_state.items, list):
     st.session_state.items = []
-if "stock_df" not in st.session_state:
+if "stock_df" not in st.session_state or not isinstance(st.session_state.stock_df, pd.DataFrame):
     saved_stock = load_stock_from_disk()
     st.session_state.stock_df = saved_stock if not saved_stock.empty else pd.DataFrame()
-if "login_history" not in st.session_state:
+if "login_history" not in st.session_state or not isinstance(st.session_state.login_history, list):
     st.session_state.login_history = []
 
 # -------------------------------------------------------------
@@ -117,7 +117,7 @@ with st.sidebar:
                         "BOX_SQFT": box_sqft
                     })
                 st.session_state.stock_df = pd.DataFrame(records)
-                save_stock_to_disk(st.session_state.stock_df) # Save permanently to disk
+                save_stock_to_disk(st.session_state.stock_df)
                 st.success(f"Successfully loaded and saved {len(records)} items!")
             except Exception as e:
                 st.error(f"Error processing records: {e}")
@@ -170,7 +170,7 @@ if menu.startswith("1️⃣"):
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M")
                 }
                 st.session_state.customers.append(cust_dict)
-                save_customers_to_disk(st.session_state.customers) # Save permanently to disk
+                save_customers_to_disk(st.session_state.customers)
                 st.success(f"Customer registered successfully with ID #{new_id}!")
             else:
                 st.error("Please enter Customer Name and Mobile Number!")
@@ -244,7 +244,7 @@ elif menu.startswith("2️⃣"):
                 if selected_tile and selected_tile != "No matching tiles found" and area_name.strip():
                     if "items" not in st.session_state or not isinstance(st.session_state.items, list):
                         st.session_state.items = []
-                    
+                        
                     st.session_state.items.append({
                         "cid": cid,
                         "floor": str(floor_name),
