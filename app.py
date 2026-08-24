@@ -7,6 +7,7 @@ import urllib.parse
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
+# Persistent storage across reruns
 if "user" not in st.session_state:
     st.session_state.user = None
 if "customers" not in st.session_state:
@@ -17,7 +18,7 @@ if "stock_df" not in st.session_state:
     st.session_state.stock_df = pd.DataFrame()
 
 # -------------------------------------------------------------
-# LOGIN SCREEN
+# LOGIN & FORGOT PASSWORD SCREEN
 # -------------------------------------------------------------
 if not st.session_state.user:
     st.markdown("<h2 style='color:#1e3a8a; text-align:center;'>🏢 JAY GRANITE & TILES</h2>", unsafe_allow_html=True)
@@ -25,15 +26,30 @@ if not st.session_state.user:
     
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        with st.form("login_form"):
-            u = st.text_input("Username")
-            p = st.text_input("Password", type="password")
-            if st.form_submit_button("Sign In", use_container_width=True, type="primary"):
-                if (u == "admin" and p == "admin123") or (u in ["sales1", "sales2"] and p == "1234"):
-                    st.session_state.user = {"username": u, "role": "admin" if u=="admin" else "salesman", "full_name": f"User ({u})"}
-                    st.rerun()
-                else:
-                    st.error("Invalid Credentials! (Use admin/admin123 or sales1/1234)")
+        tab_login, tab_forgot = st.tabs(["🔑 Sign In", "❓ Forgot Password"])
+        
+        with tab_login:
+            with st.form("login_form"):
+                u = st.text_input("Username")
+                p = st.text_input("Password", type="password")
+                if st.form_submit_button("Sign In", use_container_width=True, type="primary"):
+                    if (u == "admin" and p == "admin123") or (u in ["sales1", "sales2"] and p == "1234"):
+                        st.session_state.user = {"username": u, "role": "admin" if u=="admin" else "salesman", "full_name": f"User ({u})"}
+                        st.rerun()
+                    else:
+                        st.error("Invalid Credentials! (Use admin/admin123 or sales1/1234)")
+                        
+        with tab_forgot:
+            with st.form("forgot_form"):
+                st.info("Default Passwords:\n- Admin: `admin123`\n- Salesmen (sales1/sales2): `1234`")
+                f_user = st.text_input("Enter Username")
+                if st.form_submit_button("Recover Password", use_container_width=True):
+                    if f_user == "admin":
+                        st.success("Admin Password is: `admin123`")
+                    elif f_user in ["sales1", "sales2"]:
+                        st.success(f"Salesman {f_user} Password is: `1234`")
+                    else:
+                        st.error("Unknown username!")
     st.stop()
 
 # -------------------------------------------------------------
@@ -48,7 +64,7 @@ with st.sidebar:
     st.markdown("---")
     
     st.subheader("📁 Upload BUSY Item Master")
-    uploaded_file = st.file_uploader("Upload CSV / Excel File", type=["csv", "xlsx", "xls"])
+    uploaded_file = st.file_uploader("Upload CSV / Excel File", type=["csv", "xlsx", "xls"], key="stock_file_uploader")
     if uploaded_file is not None:
         try:
             if uploaded_file.name.endswith('.csv'):
@@ -194,14 +210,21 @@ elif menu.startswith("2️⃣"):
                     st.error("Please select a valid tile.")
                     
         st.subheader("📋 Selected Items for this Customer")
-        # Safe filtering of items
-        curr_items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
+        # Fully secured item filtering to prevent any TypeError
+        curr_items = []
+        for i in st.session_state.items:
+            if isinstance(i, dict) and i.get("cid") == cid:
+                curr_items.append({
+                    "floor": str(i.get("floor", "")),
+                    "section": str(i.get("section", "")),
+                    "area": str(i.get("area", "")),
+                    "tile": str(i.get("tile", "")),
+                    "box_sqft": float(i.get("box_sqft", 16.0))
+                })
+                
         if curr_items:
             df_display = pd.DataFrame(curr_items)
-            if not df_display.empty and all(col in df_display.columns for col in ["floor", "section", "area", "tile", "box_sqft"]):
-                st.dataframe(df_display[["floor", "section", "area", "tile", "box_sqft"]], use_container_width=True)
-            else:
-                st.write(curr_items)
+            st.dataframe(df_display, use_container_width=True)
             
             if st.button("🗑️ Clear All Selected Items for Customer"):
                 st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") != cid]
