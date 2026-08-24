@@ -2,8 +2,9 @@ import math
 
 def calculate_boxes(sqft, box_sqft):
     """
-    यूज़र के दिए गए Area (SqFt) को Box Coverage से भाग देकर 
-    math.ceil (ऊपर की तरफ राउंड ऑफ) करके सही बक्से निकालता है।
+    सटीक फॉर्मूला: 
+    Required Boxes = math.ceil( Manual Area / (Con Factor * Packing Unit) )
+    यहाँ box_sqft असल में (Con Factor * Packing Unit) है।
     """
     try:
         sqft_val = float(sqft)
@@ -16,7 +17,7 @@ def calculate_boxes(sqft, box_sqft):
 
 def calculate_box_sqft(con_factor, packing_unit):
     """
-    Con factor x packing unit का सटीक फॉर्मूला।
+    Con Factor * Packing Unit से प्रति बॉक्स कवरेज (SqFt) निकालता है।
     """
     try:
         cf = float(con_factor)
