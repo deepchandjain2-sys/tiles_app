@@ -210,24 +210,28 @@ elif menu.startswith("2️⃣"):
                     st.error("Please select a valid tile.")
                     
         st.subheader("📋 Selected Items for this Customer")
-        # Fully secured item filtering to prevent any TypeError
-        curr_items = []
+        
+        # Strongly protected cleaning of session items to avoid any TypeError
+        clean_items = []
         for i in st.session_state.items:
-            if isinstance(i, dict) and i.get("cid") == cid:
-                curr_items.append({
-                    "floor": str(i.get("floor", "")),
-                    "section": str(i.get("section", "")),
-                    "area": str(i.get("area", "")),
-                    "tile": str(i.get("tile", "")),
-                    "box_sqft": float(i.get("box_sqft", 16.0))
-                })
-                
+            if isinstance(i, dict) and "cid" in i:
+                clean_items.append(i)
+        st.session_state.items = clean_items
+        
+        curr_items = [i for i in st.session_state.items if i.get("cid") == cid]
         if curr_items:
-            df_display = pd.DataFrame(curr_items)
+            df_display = pd.DataFrame([{
+                "Floor": i.get("floor"),
+                "Type": i.get("section"),
+                "Area": i.get("area"),
+                "Tile": i.get("tile"),
+                "Box SqFt": i.get("box_sqft")
+            } for i in curr_items])
+            
             st.dataframe(df_display, use_container_width=True)
             
             if st.button("🗑️ Clear All Selected Items for Customer"):
-                st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") != cid]
+                st.session_state.items = [i for i in st.session_state.items if i.get("cid") != cid]
                 st.rerun()
         else:
             st.info("No tiles selected yet. Add items above.")
