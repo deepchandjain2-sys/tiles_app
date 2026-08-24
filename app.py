@@ -190,7 +190,7 @@ if menu.startswith("1️⃣"):
         )
 
 # -------------------------------------------------------------
-# 3. TILES SELECTION (Area-Wise without Form Bug)
+# 3. TILES SELECTION (Completely Bulletproofed)
 # -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection (Area-Wise)")
@@ -247,11 +247,12 @@ elif menu.startswith("2️⃣"):
             
         if st.button("➕ Add This Tile Selection", type="primary"):
             if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
-                if "items" not in st.session_state or not isinstance(st.session_state.items, list):
+                # Safe type ensuring for items list
+                if not isinstance(st.session_state.get("items"), list):
                     st.session_state.items = []
-                    
-                st.session_state.items.append({
-                    "cid": cid,
+                
+                new_item = {
+                    "cid": int(cid),
                     "floor": str(floor_name),
                     "section": str(section_type),
                     "area": str(area_name).strip(),
@@ -259,7 +260,8 @@ elif menu.startswith("2️⃣"):
                     "box_sqft": float(box_sqft),
                     "sqft": 100.0,
                     "boxes": calculate_boxes(100.0, box_sqft)
-                })
+                }
+                st.session_state.items.append(new_item)
                 st.success(f"Added {selected_tile} for {area_name} successfully!")
                 st.rerun()
             else:
@@ -267,8 +269,9 @@ elif menu.startswith("2️⃣"):
                 
         st.subheader("📋 Selected Items for this Customer")
         curr_items = []
-        if isinstance(st.session_state.items, list):
-            for i in st.session_state.items:
+        safe_items = st.session_state.get("items", [])
+        if isinstance(safe_items, list):
+            for i in safe_items:
                 if isinstance(i, dict) and i.get("cid") == cid:
                     curr_items.append({
                         "Floor": i.get("floor"),
@@ -281,7 +284,7 @@ elif menu.startswith("2️⃣"):
         if curr_items:
             st.dataframe(pd.DataFrame(curr_items), use_container_width=True)
             if st.button("🗑️ Clear All Selections for Customer"):
-                st.session_state.items = [i for i in st.session_state.items if not (isinstance(i, dict) and i.get("cid") == cid)]
+                st.session_state.items = [i for i in st.session_state.get("items", []) if not (isinstance(i, dict) and i.get("cid") == cid)]
                 st.rerun()
         else:
             st.info("No tiles selected yet for this customer.")
@@ -299,7 +302,8 @@ elif menu.startswith("3️⃣"):
         cid = int(sel_cust.split()[0].replace("#", ""))
         c_obj = next(c for c in st.session_state.customers if c["id"] == cid)
         
-        items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
+        safe_items = st.session_state.get("items", [])
+        items = [i for i in safe_items if isinstance(i, dict) and i.get("cid") == cid]
         if items:
             st.markdown("### Enter Actual Area (SqFt) for Each Selection:")
             total_boxes = 0
