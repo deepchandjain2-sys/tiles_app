@@ -16,7 +16,7 @@ from database import (
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Persistent State Initialization with Disk Recovery
+# Persistent State Initialization
 if "user" not in st.session_state:
     st.session_state.user = None
 if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
@@ -188,7 +188,7 @@ if menu.startswith("1️⃣"):
         )
 
 # -------------------------------------------------------------
-# 3. TILES SELECTION (Area-Wise)
+# 3. TILES SELECTION (Area-Wise with Live Search Outside Form)
 # -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection (Area-Wise)")
@@ -198,6 +198,19 @@ elif menu.startswith("2️⃣"):
         custs = [f"#{c['id']} - {c['name']} ({c['mobile']})" for c in st.session_state.customers]
         sel_cust = st.selectbox("Choose Customer:", custs)
         cid = int(sel_cust.split()[0].replace("#", ""))
+        
+        st.markdown("---")
+        st.subheader("🔍 Search Tile from Master Stock")
+        search_query = st.text_input("Type Tile Name or Code to Search:", "")
+        
+        filtered_stock = st.session_state.stock_df.copy()
+        if not filtered_stock.empty and search_query.strip():
+            filtered_stock = filtered_stock[
+                filtered_stock["ITEM_NAME"].astype(str).str.contains(search_query, case=False, na=False) |
+                filtered_stock["ITEM_ID"].astype(str).str.contains(search_query, case=False, na=False)
+            ]
+            
+        tile_list = filtered_stock["ITEM_NAME"].tolist() if not filtered_stock.empty else ["No matching tiles found"]
         
         with st.form("tile_selection_form"):
             c_f1, c_f2 = st.columns(2)
@@ -221,16 +234,6 @@ elif menu.startswith("2️⃣"):
                 else:
                     area_name = chosen_wall
                     
-            search_query = st.text_input("🔍 Search Tile Code / Name from Stock:", "")
-            
-            filtered_stock = st.session_state.stock_df.copy()
-            if not filtered_stock.empty and search_query:
-                filtered_stock = filtered_stock[
-                    filtered_stock["ITEM_NAME"].str.contains(search_query, case=False, na=False) |
-                    filtered_stock["ITEM_ID"].str.contains(search_query, case=False, na=False)
-                ]
-                
-            tile_list = filtered_stock["ITEM_NAME"].tolist() if not filtered_stock.empty else ["No matching tiles found"]
             selected_tile = st.selectbox(f"Select Tile ({len(filtered_stock)} available):", tile_list)
             
             box_sqft = 16.0
@@ -241,7 +244,7 @@ elif menu.startswith("2️⃣"):
                 
             submitted_tile = st.form_submit_button("➕ Add This Tile Selection", type="primary")
             if submitted_tile:
-                if selected_tile and selected_tile != "No matching tiles found" and area_name.strip():
+                if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
                     if "items" not in st.session_state or not isinstance(st.session_state.items, list):
                         st.session_state.items = []
                         
@@ -249,7 +252,7 @@ elif menu.startswith("2️⃣"):
                         "cid": cid,
                         "floor": str(floor_name),
                         "section": str(section_type),
-                        "area": str(area_name.strip()),
+                        "area": str(area_name).strip(),
                         "tile": str(selected_tile),
                         "box_sqft": float(box_sqft),
                         "sqft": 100.0,
