@@ -276,13 +276,14 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                 else:
                     st.error("Please enter/select a valid Area Name and Tile.")
 
-          st.markdown("---")
+            st.markdown("---")
             st.subheader("📋 Selected Items for this Customer")
             
             if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
                 st.session_state.my_selected_tiles = []
                 
-            customer_items = [i for i in st.session_state.my_selected_tiles if isinstance(i, dict) and i.get("cid") == cid]      
+            customer_items = [i for i in st.session_state.my_selected_tiles if isinstance(i, dict) and i.get("cid") == cid]
+            
             if customer_items:
                 item_to_remove = None
                 for idx, i in enumerate(customer_items):
@@ -358,7 +359,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 
             st.markdown(f"### Total Material Required: **{total_boxes} Boxes**")
             
-            # Generate Real PDF using FPDF (Fixed for modern FPDF output)
+            # Generate Real PDF using FPDF
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", "B", 16)
@@ -392,7 +393,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             
             pdf_bytes = pdf.output()
 
-            # WhatsApp message text
             summary_text = f"*JAY GRANITE & TILES - QUOTATION*\n\n" \
                            f"Customer: {current_cust['name']}\n" \
                            f"Phone: {current_cust.get('phone', '')}\n" \
