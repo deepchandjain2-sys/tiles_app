@@ -5,12 +5,7 @@ import urllib.parse
 import pandas as pd
 import streamlit as st
 from calculations import calculate_boxes, calculate_box_sqft
-from database import (
-    load_stock_from_upload,
-    save_stock_to_disk,
-    load_items_from_disk,
-    save_items_from_disk,
-)
+from database import load_stock_from_upload
 
 st.set_page_config(
     page_title="Jay Granite & Tiles Hub", page_icon="🪨", layout="wide"
