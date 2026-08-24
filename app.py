@@ -282,7 +282,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
             if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
                 st.session_state.my_selected_tiles = []
                 
-            customer_items = [i for i in st.session_state.my_selected_tiles if isinstance(i, dict) and i.get("cid") == cid]
+            customer_items = [i for i in st.session_state.my_selected_tiles if isinstance(i, dict) and i.get("cid"] == cid]
             
             if customer_items:
                 item_to_remove = None
@@ -359,7 +359,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 
             st.markdown(f"### Total Material Required: **{total_boxes} Boxes**")
             
-            # Generate Real PDF using FPDF
+            # Generate Real PDF using FPDF (Fixed for modern FPDF output)
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", "B", 16)
@@ -391,7 +391,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             pdf.set_font("Arial", "B", 12)
             pdf.cell(200, 10, txt=f"Total Boxes Required: {total_boxes}", ln=True)
             
-            pdf_bytes = pdf.output(dest='S').encode('latin1')
+            pdf_bytes = pdf.output()
 
             # WhatsApp message text
             summary_text = f"*JAY GRANITE & TILES - QUOTATION*\n\n" \
