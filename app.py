@@ -190,7 +190,7 @@ if menu.startswith("1️⃣"):
         )
 
 # -------------------------------------------------------------
-# 3. TILES SELECTION (Completely Bulletproofed)
+# 3. TILES SELECTION (Search above Select Tile)
 # -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection (Area-Wise)")
@@ -200,19 +200,6 @@ elif menu.startswith("2️⃣"):
         custs = [f"#{c['id']} - {c['name']} ({c['mobile']})" for c in st.session_state.customers]
         sel_cust = st.selectbox("Choose Customer:", custs)
         cid = int(sel_cust.split()[0].replace("#", ""))
-        
-        st.markdown("---")
-        st.subheader("🔍 Search Tile from Master Stock")
-        search_query = st.text_input("Type Tile Name or Code to Search:", "")
-        
-        filtered_stock = st.session_state.stock_df.copy()
-        if not filtered_stock.empty and search_query.strip():
-            filtered_stock = filtered_stock[
-                filtered_stock["ITEM_NAME"].astype(str).str.contains(search_query, case=False, na=False) |
-                filtered_stock["ITEM_ID"].astype(str).str.contains(search_query, case=False, na=False)
-            ]
-            
-        tile_list = filtered_stock["ITEM_NAME"].tolist() if not filtered_stock.empty else ["No matching tiles found"]
         
         c_f1, c_f2 = st.columns(2)
         with c_f1:
@@ -235,6 +222,18 @@ elif menu.startswith("2️⃣"):
             else:
                 area_name = chosen_wall
                 
+        # Search Tile placed right above Select Tile
+        st.markdown("---")
+        search_query = st.text_input("🔍 Search Tile Code / Name from Stock:", "")
+        
+        filtered_stock = st.session_state.stock_df.copy()
+        if not filtered_stock.empty and search_query.strip():
+            filtered_stock = filtered_stock[
+                filtered_stock["ITEM_NAME"].astype(str).str.contains(search_query, case=False, na=False) |
+                filtered_stock["ITEM_ID"].astype(str).str.contains(search_query, case=False, na=False)
+            ]
+            
+        tile_list = filtered_stock["ITEM_NAME"].tolist() if not filtered_stock.empty else ["No matching tiles found"]
         selected_tile = st.selectbox(f"Select Tile ({len(filtered_stock)} available):", tile_list)
         
         box_sqft = 16.0
@@ -245,14 +244,12 @@ elif menu.startswith("2️⃣"):
                 box_sqft = 16.0
             st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
             
-       if st.button("➕ Add This Tile Selection", type="primary"):
-           if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
-               # Global/Safe list fallback initialization
-               if 'global_items_list' not in globals():
-                    global global_items_list
-                    global_items_list = []
+        if st.button("➕ Add This Tile Selection", type="primary"):
+            if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
+                if "items" not in st.session_state or not isinstance(st.session_state.items, list):
+                    st.session_state.items = []
                 
-                 new_item = {
+                new_item = {
                     "cid": int(cid),
                     "floor": str(floor_name),
                     "section": str(section_type),
@@ -262,8 +259,7 @@ elif menu.startswith("2️⃣"):
                     "sqft": 100.0,
                     "boxes": calculate_boxes(100.0, box_sqft)
                 }
-                global_items_list.append(new_item)
-                st.session_state.items = global_items_list  # sync
+                st.session_state.items.append(new_item)
                 st.success(f"Added {selected_tile} for {area_name} successfully!")
                 st.rerun()
             else:
@@ -371,7 +367,7 @@ elif menu.startswith("3️⃣"):
             st.info("No items added for this customer yet.")
 
 # -------------------------------------------------------------
-# 5. SALES DASHBOARD & LOGIN HISTORY
+# 5. SALES DASHBOARD & HISTORY
 # -------------------------------------------------------------
 elif menu.startswith("4️⃣"):
     st.header("📊 Sales Team Scorecard & Login History")
