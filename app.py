@@ -245,11 +245,13 @@ elif menu.startswith("2️⃣"):
                 box_sqft = 16.0
             st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
             
-        if st.button("➕ Add This Tile Selection", type="primary"):
+       if st.button("➕ Add This Tile Selection", type="primary"):
             if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
-                # Safe type ensuring for items list
-                if not isinstance(st.session_state.get("items"), list):
-                   st.session_state.items = []                
+                # Global/Safe list fallback initialization
+                if 'global_items_list' not in globals():
+                    global global_items_list
+                    global_items_list = []
+                
                 new_item = {
                     "cid": int(cid),
                     "floor": str(floor_name),
@@ -260,7 +262,8 @@ elif menu.startswith("2️⃣"):
                     "sqft": 100.0,
                     "boxes": calculate_boxes(100.0, box_sqft)
                 }
-                st.session_state.items.append(new_item)
+                global_items_list.append(new_item)
+                st.session_state.items = global_items_list  # sync
                 st.success(f"Added {selected_tile} for {area_name} successfully!")
                 st.rerun()
             else:
