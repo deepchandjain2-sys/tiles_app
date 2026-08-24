@@ -5,15 +5,13 @@ import urllib.parse
 import pandas as pd
 import streamlit as st
 from calculations import calculate_boxes, calculate_box_sqft
-from database import load_stock_from_upload
+from database import load_stock_from_disk, load_stock_from_upload, save_customers_to_disk, load_customers_from_disk
 
 st.set_page_config(
     page_title="Jay Granite & Tiles Hub", page_icon="🪨", layout="wide"
 )
 
 USERS_FILE = "users_db.json"
-CUSTOMERS_FILE = "customers_db.json"
-SALES_FILE = "sales_db.json"
 
 def load_users_from_disk():
     if os.path.exists(USERS_FILE):
@@ -41,24 +39,6 @@ def save_users_to_disk(users_list):
     except:
         pass
 
-def load_customers_from_disk():
-    if os.path.exists(CUSTOMERS_FILE):
-        try:
-            with open(CUSTOMERS_FILE, "r") as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    return data
-        except:
-            pass
-    return [{"cid": "CUST-001", "name": "Vansh", "phone": "964444419", "city": "Hiriyur"}]
-
-def save_customers_to_disk(cust_list):
-    try:
-        with open(CUSTOMERS_FILE, "w") as f:
-            json.dump(cust_list, f)
-    except:
-        pass
-
 # Initialize Session State safely
 if "registered_users" not in st.session_state or not isinstance(st.session_state.registered_users, list):
     st.session_state.registered_users = load_users_from_disk()
@@ -70,7 +50,8 @@ if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
 if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
-    st.session_state.customers = load_customers_from_disk()
+    loaded_cust = load_customers_from_disk()
+    st.session_state.customers = loaded_cust if loaded_cust else [{"cid": "CUST-001", "name": "Vansh", "phone": "964444419", "city": "Hiriyur"}]
 
 if "sales_history" not in st.session_state:
     st.session_state.sales_history = []
@@ -221,8 +202,13 @@ if not st.session_state.logged_in:
     st.info("👈 Please use the sidebar to **Login**, **Register Salesman**, or **Reset PIN** to access your application.")
     st.stop()
 
-# --- AUTO MASTER LOADER (बिना बार-बार अपलोड किए फाइल लोड करने के लिए) ---
-def get_master_dataframe():
+# --- DATABASE MASTER LOADER ---
+def get_master_df():
+    # database.py के load_stock_from_disk या upload का उपयोग
+    df = load_stock_from_disk()
+    if df is not None and not df.empty:
+        return df
+    
     for fname in ["ITEM MASTER.csv", "item_master.csv", "ITEM_MASTER.csv"]:
         if os.path.exists(fname):
             try:
@@ -272,7 +258,7 @@ if st.session_state.current_nav == "1 Customer Registration":
             st.warning("No customers registered yet.")
 
 elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
-    st.title("🪨 Tiles Selection (Floor-Wise)")
+    st.title("🪨 Tiles Selection (Floor & Area Wise)")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -280,17 +266,35 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
     else:
         st.warning("⚠️ No customer selected! Please select a customer from '1 Customer Registration'.")
 
-    df = get_master_dataframe()
+    df = get_master_df()
     if df is None:
-        uploaded_file = st.file_uploader("Upload Item Master File (Only if default file missing)", type=["csv", "xlsx", "xls"], key="master_uploader")
+        uploaded_file = st.file_uploader("Upload Item Master File", type=["csv", "xlsx", "xls"], key="master_uploader")
         if uploaded_file is not None:
             df = load_stock_from_upload(uploaded_file)
 
     if df is not None and not df.empty:
         st.markdown("---")
-        st.markdown("### 🏷️ Select Floor & Tiles")
+        st.markdown("### 🏷️ Select Floor, Area & Tiles")
         
-        floor_name = st.selectbox("Select Floor / Area", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking", "Other"])
+        floor_area_options = [
+            "Ground Floor - Living Room / Hall",
+            "Ground Floor - Kitchen",
+            "Ground Floor - Bathroom",
+            "Ground Floor - Bedroom",
+            "1st Floor - Living Room / Hall",
+            "1st Floor - Kitchen",
+            "1st Floor - Bathroom",
+            "1st Floor - Bedroom",
+            "2nd Floor - Living Room / Hall",
+            "2nd Floor - Kitchen",
+            "2nd Floor - Bathroom",
+            "2nd Floor - Bedroom",
+            "Staircase",
+            "Elevation / Parking",
+            "Other Area"
+        ]
+        floor_name = st.selectbox("Select Floor & Area", floor_area_options)
+        
         search_query = st.text_input("🔍 Search Tile / Granite Name or Code")
         
         if search_query.strip():
@@ -313,7 +317,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                 selection_item = {
                     "cid": st.session_state.current_cid,
                     "customer_name": active_cust.get('name') if active_cust else "Unknown",
-                    "floor": floor_name,
+                    "floor_area": floor_name,
                     "item": selected_item_label
                 }
                 st.session_state.my_selected_tiles.append(selection_item)
@@ -334,7 +338,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Measurements & Box Calculations")
+    st.title("📐 Measurements & Box Calculations (via calculations.py)")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -343,17 +347,37 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     st.markdown("### Enter Dimensions for Calculation")
     
     with st.form("measurement_calc_form"):
-        m_floor = st.selectbox("Floor / Area", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation", "Other"])
+        m_floor = st.selectbox("Floor & Area", [
+            "Ground Floor - Living Room / Hall",
+            "Ground Floor - Kitchen",
+            "Ground Floor - Bathroom",
+            "Ground Floor - Bedroom",
+            "1st Floor - Living Room / Hall",
+            "1st Floor - Kitchen",
+            "1st Floor - Bathroom",
+            "1st Floor - Bedroom",
+            "2nd Floor",
+            "Staircase",
+            "Elevation / Parking",
+            "Other"
+        ])
         
         col_m1, col_m2 = st.columns(2)
         with col_m1:
-            length = st.number_input("Length (Feet)", min_value=0.0, value=10.0, step=0.5)
+            con_factor = st.number_input("Con Factor (Length / Coverage)", min_value=0.1, value=10.0, step=0.5)
         with col_m2:
-            width = st.number_input("Width / Height (Feet)", min_value=0.0, value=10.0, step=0.5)
+            packing_unit = st.number_input("Packing Unit (Boxes / Coverage)", min_value=0.1, value=1.0, step=0.5)
             
-        # calculations.py के फंक्शन्स का उपयोग
-        calc_sqft = calculate_box_sqft(length, width) if 'calculate_box_sqft' in globals() else (length * width)
-        calc_boxes_val = calculate_boxes(calc_sqft) if 'calculate_boxes' in globals() else math.ceil(calc_sqft / 10)
+        # calculations.py के वास्तविक फंक्शन्स का उपयोग
+        try:
+            calc_sqft = calculate_box_sqft(con_factor, packing_unit)
+        except Exception:
+            calc_sqft = con_factor * packing_unit
+
+        try:
+            calc_boxes_val = calculate_boxes(calc_sqft, con_factor, packing_unit)
+        except Exception:
+            calc_boxes_val = math.ceil(calc_sqft / 10.0) if calc_sqft > 0 else 0
         
         st.info(f"📊 **Calculated Area:** {calc_sqft:.2f} Sq.Ft | 📦 **Required Boxes:** {calc_boxes_val}")
         
@@ -363,8 +387,8 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 "cid": st.session_state.current_cid,
                 "customer": active_cust.get('name') if active_cust else "Unknown",
                 "floor": m_floor,
-                "length": length,
-                "width": width,
+                "con_factor": con_factor,
+                "packing_unit": packing_unit,
                 "sqft": calc_sqft,
                 "boxes": calc_boxes_val
             }
