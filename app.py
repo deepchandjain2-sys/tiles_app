@@ -5,11 +5,10 @@ import math
 import urllib.parse
 from calculations import calculate_boxes, calculate_box_sqft
 from database import load_stock_from_upload, save_stock_to_disk, load_items_from_disk, save_items_to_disk
-from fpdf import FPDF
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Initialize session state
+# Initialize session state (Check disk stock automatically)
 if "stock_df" not in st.session_state:
     st.session_state.stock_df = load_stock_from_upload(None)
 
@@ -186,6 +185,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         
         st.subheader("📁 Upload Master (CSV / Excel)")
         uploaded_file = st.file_uploader("Upload Item Master File", type=["csv", "xlsx", "xls"], key="master_uploader")
+        
         if uploaded_file is not None:
             df = load_stock_from_upload(uploaded_file)
             if df is not None:
@@ -217,6 +217,12 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                     st.success(f"Successfully loaded {len(records)} items!")
                 except Exception as e:
                     st.error(f"Error processing records: {e}")
+
+        # Fallback check if stock is in disk database
+        if (st.session_state.stock_df is None or st.session_state.stock_df.empty):
+            disk_stock = load_stock_from_upload(None)
+            if disk_stock is not None and not disk_stock.empty:
+                st.session_state.stock_df = disk_stock
 
         stock_df = st.session_state.stock_df
         if stock_df is None or stock_df.empty:
@@ -313,7 +319,6 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                 st.info("No tiles selected yet for this customer.")
 
 # --- 3. MEASUREMENTS, PDF & WHATSAPP ---
-# --- 3. MEASUREMENTS, PDF & WHATSAPP ---
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     st.header("📐 Measurements, PDF & WhatsApp")
     
@@ -360,7 +365,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 
             st.markdown(f"### Total Material Required: **{total_boxes} Boxes**")
             
-            # सुरक्षित टेक्स्ट कोटेशन जनरेशन (जो बिना किसी एरर के तुरंत डाउनलोड होगी)
             summary_text = f"JAY GRANITE & TILES - QUOTATION\n" \
                            f"----------------------------------------\n" \
                            f"Customer Name: {current_cust['name']}\n" \
@@ -404,6 +408,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     st.success("Order Finalized Successfully!")
                     st.session_state.current_nav = "4 Sales Dashboard & History"
                     st.rerun()
+
 # --- 4. SALES DASHBOARD & HISTORY ---
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.header("📊 Professional Sales Dashboard & History")
