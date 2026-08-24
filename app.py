@@ -16,7 +16,7 @@ from database import (
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Persistent State Initialization
+# Safe State Initialization
 if "user" not in st.session_state:
     st.session_state.user = None
 if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
@@ -99,15 +99,17 @@ with st.sidebar:
                     if not name or name.lower() == "nan" or "item name" in name.lower():
                         continue
                     try:
-                        con_val = float(row[con_col]) if (con_col and pd.notna(row[con_col])) else 1.5
+                        con_val = abs(float(row[con_col])) if (con_col and pd.notna(row[con_col])) else 1.5
                     except:
                         con_val = 1.5
                     try:
-                        pack_val = float(row[pack_col]) if (pack_col and pd.notna(row[pack_col])) else 6.0
+                        pack_val = abs(float(row[pack_col])) if (pack_col and pd.notna(row[pack_col])) else 6.0
                     except:
                         pack_val = 6.0
                         
-                    box_sqft = calculate_box_sqft(con_val, pack_val)
+                    box_sqft = abs(calculate_box_sqft(con_val, pack_val))
+                    if box_sqft <= 0:
+                        box_sqft = 16.0
                         
                     records.append({
                         "ITEM_ID": str(row[id_col]).strip() if pd.notna(row[id_col]) else "NA",
@@ -188,7 +190,7 @@ if menu.startswith("1️⃣"):
         )
 
 # -------------------------------------------------------------
-# 3. TILES SELECTION (Area-Wise with Live Search Outside Form)
+# 3. TILES SELECTION (Area-Wise without Form Bug)
 # -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection (Area-Wise)")
@@ -212,56 +214,57 @@ elif menu.startswith("2️⃣"):
             
         tile_list = filtered_stock["ITEM_NAME"].tolist() if not filtered_stock.empty else ["No matching tiles found"]
         
-        with st.form("tile_selection_form"):
-            c_f1, c_f2 = st.columns(2)
-            with c_f1:
-                floor_name = st.selectbox("Floor Name", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Parking", "Other"])
-            with c_f2:
-                section_type = st.radio("Section Type", ["Floor Area", "Wall Area"], horizontal=True)
-                
-            if section_type == "Floor Area":
-                default_areas = ["Hall", "Kitchen", "Master Bedroom", "Common Bathroom", "Master Bathroom", "Common Bathroom 1", "Pooja Room", "Balcony", "Staircase", "Type Manually..."]
-                chosen_area = st.selectbox("Select Floor Area", default_areas)
-                if chosen_area == "Type Manually...":
-                    area_name = st.text_input("Enter Custom Floor Area Name")
-                else:
-                    area_name = chosen_area
-            else:
-                default_wall = ["Kitchen Wall", "Master Bathroom Wall", "Common Bathroom Wall", "Elevation Wall", "Type Manually..."]
-                chosen_wall = st.selectbox("Select Wall Area", default_wall)
-                if chosen_wall == "Type Manually...":
-                    area_name = st.text_input("Enter Custom Wall Area Name")
-                else:
-                    area_name = chosen_wall
-                    
-            selected_tile = st.selectbox(f"Select Tile ({len(filtered_stock)} available):", tile_list)
+        c_f1, c_f2 = st.columns(2)
+        with c_f1:
+            floor_name = st.selectbox("Floor Name", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Parking", "Other"])
+        with c_f2:
+            section_type = st.radio("Section Type", ["Floor Area", "Wall Area"], horizontal=True)
             
-            box_sqft = 16.0
-            if not filtered_stock.empty and selected_tile in filtered_stock["ITEM_NAME"].values:
-                t_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile].iloc[0]
-                box_sqft = float(t_obj["BOX_SQFT"])
-                st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
+        if section_type == "Floor Area":
+            default_areas = ["Hall", "Kitchen", "Master Bedroom", "Common Bathroom", "Master Bathroom", "Common Bathroom 1", "Pooja Room", "Balcony", "Staircase", "Type Manually..."]
+            chosen_area = st.selectbox("Select Floor Area", default_areas)
+            if chosen_area == "Type Manually...":
+                area_name = st.text_input("Enter Custom Floor Area Name")
+            else:
+                area_name = chosen_area
+        else:
+            default_wall = ["Kitchen Wall", "Master Bathroom Wall", "Common Bathroom Wall", "Elevation Wall", "Type Manually..."]
+            chosen_wall = st.selectbox("Select Wall Area", default_wall)
+            if chosen_wall == "Type Manually...":
+                area_name = st.text_input("Enter Custom Wall Area Name")
+            else:
+                area_name = chosen_wall
                 
-            submitted_tile = st.form_submit_button("➕ Add This Tile Selection", type="primary")
-            if submitted_tile:
-                if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
-                    if "items" not in st.session_state or not isinstance(st.session_state.items, list):
-                        st.session_state.items = []
-                        
-                    st.session_state.items.append({
-                        "cid": cid,
-                        "floor": str(floor_name),
-                        "section": str(section_type),
-                        "area": str(area_name).strip(),
-                        "tile": str(selected_tile),
-                        "box_sqft": float(box_sqft),
-                        "sqft": 100.0,
-                        "boxes": calculate_boxes(100.0, box_sqft)
-                    })
-                    st.success(f"Added {selected_tile} for {area_name} successfully!")
-                else:
-                    st.error("Please enter a valid Area Name and select a Tile.")
+        selected_tile = st.selectbox(f"Select Tile ({len(filtered_stock)} available):", tile_list)
+        
+        box_sqft = 16.0
+        if not filtered_stock.empty and selected_tile in filtered_stock["ITEM_NAME"].values:
+            t_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile].iloc[0]
+            box_sqft = abs(float(t_obj["BOX_SQFT"]))
+            if box_sqft <= 0:
+                box_sqft = 16.0
+            st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
+            
+        if st.button("➕ Add This Tile Selection", type="primary"):
+            if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
+                if "items" not in st.session_state or not isinstance(st.session_state.items, list):
+                    st.session_state.items = []
                     
+                st.session_state.items.append({
+                    "cid": cid,
+                    "floor": str(floor_name),
+                    "section": str(section_type),
+                    "area": str(area_name).strip(),
+                    "tile": str(selected_tile),
+                    "box_sqft": float(box_sqft),
+                    "sqft": 100.0,
+                    "boxes": calculate_boxes(100.0, box_sqft)
+                })
+                st.success(f"Added {selected_tile} for {area_name} successfully!")
+                st.rerun()
+            else:
+                st.error("Please enter a valid Area Name and select a Tile.")
+                
         st.subheader("📋 Selected Items for this Customer")
         curr_items = []
         if isinstance(st.session_state.items, list):
@@ -352,13 +355,7 @@ elif menu.startswith("3️⃣"):
                 pdf_bytes = pdf.output(dest='S')
                 st.success("Quotation Generated Successfully!")
                 
-                st.download_button(
-                    label="📥 Download PDF Quotation",
-                    data=bytes(pdf_bytes),
-                    file_name=f"Quotation_{c_obj['name']}.pdf",
-                    mime="application/pdf",
-                    type="primary"
-                )
+                st.download_button(label="📥 Download PDF Quotation", data=bytes(pdf_bytes), file_name=f"Quotation_{c_obj['name']}.pdf", mime="application/pdf", type="primary")
                 
                 wa_msg = f"Hello {c_obj['name']}, here is your material estimation quotation from JAY GRANITE & TILES. Total Boxes: {total_boxes}. Thank you!"
                 encoded_msg = urllib.parse.quote(wa_msg)
