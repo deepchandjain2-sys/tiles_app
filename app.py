@@ -10,7 +10,12 @@ from database import load_stock_from_upload, save_customer_to_csv
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Safe State Initialization
+# Force clear any corrupted/old session keys to stop TypeError permanently
+if "initialized_properly" not in st.session_state:
+    st.session_state.clear()
+    st.session_state.initialized_properly = True
+
+# Fresh Safe State Initialization
 if "user" not in st.session_state:
     st.session_state.user = None
 if "customers" not in st.session_state:
@@ -21,7 +26,6 @@ if "stock_df" not in st.session_state:
     st.session_state.stock_df = pd.DataFrame()
 if "login_history" not in st.session_state:
     st.session_state.login_history = []
-
 # -------------------------------------------------------------
 # 1. LOGIN & USER MANAGEMENT
 # -------------------------------------------------------------
