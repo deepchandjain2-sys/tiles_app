@@ -6,26 +6,29 @@ from fpdf import FPDF
 import urllib.parse
 
 from calculations import calculate_boxes, calculate_box_sqft
-from database import load_stock_from_upload, save_customer_to_csv
+from database import (
+    load_stock_from_upload, 
+    save_customers_to_disk, 
+    load_customers_from_disk,
+    save_stock_to_disk,
+    load_stock_from_disk
+)
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Force clear any corrupted/old session keys to stop TypeError permanently
-if "initialized_properly" not in st.session_state:
-    st.session_state.clear()
-    st.session_state.initialized_properly = True
-
-# Fresh Safe State Initialization
+# Persistent State Initialization with Disk Recovery
 if "user" not in st.session_state:
     st.session_state.user = None
 if "customers" not in st.session_state:
-    st.session_state.customers = []
+    st.session_state.customers = load_customers_from_disk()
 if "items" not in st.session_state:
     st.session_state.items = []
 if "stock_df" not in st.session_state:
-    st.session_state.stock_df = pd.DataFrame()
+    saved_stock = load_stock_from_disk()
+    st.session_state.stock_df = saved_stock if not saved_stock.empty else pd.DataFrame()
 if "login_history" not in st.session_state:
     st.session_state.login_history = []
+
 # -------------------------------------------------------------
 # 1. LOGIN & USER MANAGEMENT
 # -------------------------------------------------------------
@@ -114,7 +117,8 @@ with st.sidebar:
                         "BOX_SQFT": box_sqft
                     })
                 st.session_state.stock_df = pd.DataFrame(records)
-                st.success(f"Successfully loaded {len(records)} items!")
+                save_stock_to_disk(st.session_state.stock_df) # Save permanently to disk
+                st.success(f"Successfully loaded and saved {len(records)} items!")
             except Exception as e:
                 st.error(f"Error processing records: {e}")
 
@@ -166,7 +170,7 @@ if menu.startswith("1️⃣"):
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M")
                 }
                 st.session_state.customers.append(cust_dict)
-                save_customer_to_csv(st.session_state.customers)
+                save_customers_to_disk(st.session_state.customers) # Save permanently to disk
                 st.success(f"Customer registered successfully with ID #{new_id}!")
             else:
                 st.error("Please enter Customer Name and Mobile Number!")
