@@ -61,12 +61,12 @@ def save_customers_to_disk(cust_list):
       pass
 
 
-# Initialize session state from disk
+# Initialize session state safely
 if "stock_df" not in st.session_state:
   st.session_state.stock_df = load_stock_from_upload(None)
 
 if "my_selected_tiles" not in st.session_state:
-  st.session_state.my_selected_tiles = load_items_from_disk()
+  st.session_state.my_selected_tiles = []
 
 if "registered_users" not in st.session_state:
   st.session_state.registered_users = load_users_from_disk()
