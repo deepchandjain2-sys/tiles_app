@@ -111,7 +111,7 @@ with st.sidebar:
                         pack_val = 6.0
                         
                     box_sqft = abs(calculate_box_sqft(con_val, pack_val))
-                    if box_sqft <= 0:
+                    if box_sqft <= 0 or box_sqft > 50:
                         box_sqft = 16.0
                         
                     records.append({
@@ -193,7 +193,7 @@ if menu.startswith("1️⃣"):
         )
 
 # -------------------------------------------------------------
-# 3. TILES SELECTION (Search above Select Tile & Persistent Save)
+# 3. TILES SELECTION (Clean, No Box SqFt shown, Delete button per item)
 # -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection (Area-Wise)")
@@ -243,9 +243,9 @@ elif menu.startswith("2️⃣"):
         if not filtered_stock.empty and selected_tile in filtered_stock["ITEM_NAME"].values:
             t_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile].iloc[0]
             box_sqft = abs(float(t_obj["BOX_SQFT"]))
-            if box_sqft <= 0:
+            if box_sqft <= 0 or box_sqft > 50:
                 box_sqft = 16.0
-            st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
+            # Note: Box coverage info is hidden here as requested, used internally for calculations in section 3.
             
         if st.button("➕ Add This Tile Selection", type="primary"):
             if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
@@ -270,21 +270,26 @@ elif menu.startswith("2️⃣"):
                 st.error("Please enter a valid Area Name and select a Tile.")
                 
         st.subheader("📋 Selected Items for this Customer")
-        curr_items = []
+        
         safe_items = st.session_state.get("my_selected_tiles", [])
-        if isinstance(safe_items, list):
-            for i in safe_items:
-                if isinstance(i, dict) and i.get("cid") == cid:
-                    curr_items.append({
-                        "Floor": i.get("floor"),
-                        "Type": i.get("section"),
-                        "Area": i.get("area"),
-                        "Tile": i.get("tile"),
-                        "Box SqFt": i.get("box_sqft")
-                    })
-                    
-        if curr_items:
-            st.dataframe(pd.DataFrame(curr_items), use_container_width=True)
+        customer_items = [i for i in safe_items if isinstance(i, dict) and i.get("cid"] == cid] if False else [i for i in safe_items if isinstance(i, dict) and i.get("cid") == cid]
+        
+        if customer_items:
+            item_to_remove = None
+            for idx, i in enumerate(customer_items):
+                col_d1, col_d2 = st.columns([5, 1])
+                with col_d1:
+                    st.markdown(f"🔹 **{i.get('floor')} - {i.get('area')} ({i.get('section')})**: `{i.get('tile')}`")
+                with col_d2:
+                    if st.button("❌ Delete", key=f"del_sec2_{cid}_{idx}_{i.get('tile')}"):
+                        item_to_remove = i
+            
+            if item_to_remove:
+                st.session_state.my_selected_tiles = [item for item in st.session_state.my_selected_tiles if item != item_to_remove]
+                save_items_to_disk(st.session_state.my_selected_tiles)
+                st.success("Item deleted successfully!")
+                st.rerun()
+                
             if st.button("🗑️ Clear All Selections for Customer"):
                 st.session_state.my_selected_tiles = [i for i in st.session_state.get("my_selected_tiles", []) if not (isinstance(i, dict) and i.get("cid") == cid)]
                 save_items_to_disk(st.session_state.my_selected_tiles)
@@ -293,7 +298,7 @@ elif menu.startswith("2️⃣"):
             st.info("No tiles selected yet for this customer.")
 
 # -------------------------------------------------------------
-# 4. MEASUREMENTS, BOX CALCULATION, PDF & WHATSAPP (With Single Item Delete)
+# 4. MEASUREMENTS, BOX CALCULATION, PDF & WHATSAPP
 # -------------------------------------------------------------
 elif menu.startswith("3️⃣"):
     st.header("📐 Measurements, Box Calculation & WhatsApp PDF")
@@ -311,19 +316,20 @@ elif menu.startswith("3️⃣"):
         if items:
             st.markdown("### Enter Actual Area (SqFt) for Each Selection:")
             total_boxes = 0
-            
-            # Keep track of items to remove if delete button clicked
             item_to_delete = None
             
             for idx, it in enumerate(items):
+                if float(it.get('box_sqft', 16.0)) > 50:
+                    it['box_sqft'] = 16.0
+                    
                 col_m1, col_m2, col_m3 = st.columns([2, 1, 0.5])
                 with col_m1:
-                    st.markdown(f"**{it.get('floor')} - {it.get('area')} ({it.get('section')})**<br>Tile: `{it.get('tile')}` (Box Coverage: {it.get('box_sqft')} SqFt)", unsafe_allow_html=True)
+                    st.markdown(f"**{it.get('floor')} - {it.get('area')} ({it.get('section')})**<br>Tile: `{it.get('tile')}`", unsafe_allow_html=True)
                 with col_m2:
                     it['sqft'] = st.number_input("Area in SqFt", value=float(it.get('sqft', 100.0)), key=f"sqft_{cid}_{idx}_{it.get('tile')}")
                 with col_m3:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("❌", key=f"del_{cid}_{idx}_{it.get('tile')}", help="Delete this item"):
+                    if st.button("❌", key=f"del_sec3_{cid}_{idx}_{it.get('tile')}", help="Delete this item"):
                         item_to_delete = it
                 
                 it['boxes'] = calculate_boxes(it['sqft'], it['box_sqft'])
@@ -331,7 +337,6 @@ elif menu.startswith("3️⃣"):
                 st.caption(f"Required Boxes: **{it['boxes']} Boxes**")
                 st.divider()
                 
-            # Handle single item deletion
             if item_to_delete:
                 st.session_state.my_selected_tiles = [item for item in st.session_state.my_selected_tiles if item != item_to_delete]
                 save_items_to_disk(st.session_state.my_selected_tiles)
