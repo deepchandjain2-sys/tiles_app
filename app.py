@@ -247,7 +247,7 @@ elif menu.startswith("2️⃣"):
                 box_sqft = 16.0
             # Note: Box coverage info is hidden here as requested, used internally for calculations in section 3.
             
-      if st.button("➕ Add This Tile Selection", type="primary"):
+        if st.button("➕ Add This Tile Selection", type="primary"):
           if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
               if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
                   st.session_state.my_selected_tiles = []
