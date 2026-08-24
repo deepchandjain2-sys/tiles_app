@@ -84,6 +84,9 @@ if "current_cid" not in st.session_state:
 if "my_selected_tiles" not in st.session_state:
     st.session_state.my_selected_tiles = []
 
+if "measurements_list" not in st.session_state:
+    st.session_state.measurements_list = []
+
 # --- SIDEBAR ADVANCED LOGIN & NAVIGATION ---
 st.sidebar.title("🪨 Jay Granite & Tiles")
 
@@ -218,6 +221,18 @@ if not st.session_state.logged_in:
     st.info("👈 Please use the sidebar to **Login**, **Register Salesman**, or **Reset PIN** to access your application.")
     st.stop()
 
+# --- AUTO MASTER LOADER (बिना बार-बार अपलोड किए फाइल लोड करने के लिए) ---
+def get_master_dataframe():
+    for fname in ["ITEM MASTER.csv", "item_master.csv", "ITEM_MASTER.csv"]:
+        if os.path.exists(fname):
+            try:
+                df = load_stock_from_upload(fname)
+                if df is not None and not df.empty:
+                    return df
+            except:
+                pass
+    return None
+
 # --- MAIN APP SECTIONS ---
 if st.session_state.current_nav == "1 Customer Registration":
     st.title("👥 Customer Registration & Selection")
@@ -259,57 +274,38 @@ if st.session_state.current_nav == "1 Customer Registration":
 elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
     st.title("🪨 Tiles Selection (Floor-Wise)")
     
-    # वर्तमान एक्टिव कस्टमर की जानकारी निकालें
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
         st.success(f"👤 **Active Party / Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')} | 📍 **City:** {active_cust.get('city', 'Hiriyur')}")
     else:
         st.warning("⚠️ No customer selected! Please select a customer from '1 Customer Registration'.")
 
-    uploaded_file = st.file_uploader("Upload Item Master File", type=["csv", "xlsx", "xls"], key="master_uploader")
-    df = None
-    if uploaded_file is not None:
-        df = load_stock_from_upload(uploaded_file)
-        if df is not None:
-            st.success(f"Successfully loaded {len(df)} items from uploaded file!")
-    elif os.path.exists("ITEM MASTER.csv"):
-        df = load_stock_from_upload("ITEM MASTER.csv")
-        if df is not None:
-            st.info(f"Auto-loaded {len(df)} items from default master file!")
-    else:
-        st.warning("Please upload or ensure 'ITEM MASTER.csv' is present.")
+    df = get_master_dataframe()
+    if df is None:
+        uploaded_file = st.file_uploader("Upload Item Master File (Only if default file missing)", type=["csv", "xlsx", "xls"], key="master_uploader")
+        if uploaded_file is not None:
+            df = load_stock_from_upload(uploaded_file)
 
     if df is not None and not df.empty:
         st.markdown("---")
-        st.markdown("### 🏷️ Select Floor / Area & Tiles")
+        st.markdown("### 🏷️ Select Floor & Tiles")
         
-        # फ्लोर के विकल्प (Ground Floor, 1st Floor आदि)
         floor_name = st.selectbox("Select Floor / Area", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking", "Other"])
-        
-        # सर्च टाइल बॉक्स
         search_query = st.text_input("🔍 Search Tile / Granite Name or Code")
         
-        # सही कॉलम ढूंढने का तरीका ताकि 'nan' न आए
-        item_col = df.columns[0]
-        name_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
-        
         if search_query.strip():
-            # सुरक्षित सर्च
             mask = df.astype(str).apply(lambda row: row.str.contains(search_query, case=False, na=False).any(), axis=1)
             filtered_df = df[mask]
         else:
             filtered_df = df.head(100)
             
         if not filtered_df.empty:
-            # ऑप्शन लिस्ट बनाएं जिसमें सही नाम और कोड दिखे
             options_list = []
-            options_dict = {}
             for idx, row in filtered_df.iterrows():
                 code_val = str(row.iloc[0]).strip()
                 name_val = str(row.iloc[1]).strip() if len(df.columns) > 1 else ""
                 display_text = f"{code_val} - {name_val}" if name_val and name_val.lower() != 'nan' else code_val
                 options_list.append(display_text)
-                options_dict[display_text] = row
                 
             selected_item_label = st.selectbox("Choose Tile Item", options=options_list)
             
@@ -328,17 +324,60 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         if st.session_state.my_selected_tiles:
             st.markdown("---")
             st.markdown("### 📋 Current Selections for Active Customer")
-            # सिर्फ मौजूदा कस्टमर की चुनी हुई टाइल्स दिखाएं
             cust_selections = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
             if cust_selections:
                 sel_df = pd.DataFrame(cust_selections)
                 st.dataframe(sel_df, use_container_width=True)
             else:
                 st.info("No tiles selected for this customer yet.")
+    else:
+        st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Measurements, PDF & WhatsApp Quotation")
-    st.info("Your measurement calculation, PDF generation, and WhatsApp sharing tools are active here.")
+    st.title("📐 Measurements & Box Calculations")
+    
+    active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
+    if active_cust:
+        st.success(f"👤 **Active Party / Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')}")
+
+    st.markdown("### Enter Dimensions for Calculation")
+    
+    with st.form("measurement_calc_form"):
+        m_floor = st.selectbox("Floor / Area", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation", "Other"])
+        
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            length = st.number_input("Length (Feet)", min_value=0.0, value=10.0, step=0.5)
+        with col_m2:
+            width = st.number_input("Width / Height (Feet)", min_value=0.0, value=10.0, step=0.5)
+            
+        # calculations.py के फंक्शन्स का उपयोग
+        calc_sqft = calculate_box_sqft(length, width) if 'calculate_box_sqft' in globals() else (length * width)
+        calc_boxes_val = calculate_boxes(calc_sqft) if 'calculate_boxes' in globals() else math.ceil(calc_sqft / 10)
+        
+        st.info(f"📊 **Calculated Area:** {calc_sqft:.2f} Sq.Ft | 📦 **Required Boxes:** {calc_boxes_val}")
+        
+        add_meas = st.form_submit_button("Save Measurement & Calculation")
+        if add_meas:
+            m_item = {
+                "cid": st.session_state.current_cid,
+                "customer": active_cust.get('name') if active_cust else "Unknown",
+                "floor": m_floor,
+                "length": length,
+                "width": width,
+                "sqft": calc_sqft,
+                "boxes": calc_boxes_val
+            }
+            st.session_state.measurements_list.append(m_item)
+            st.success("Measurement and box calculation saved successfully!")
+
+    if st.session_state.measurements_list:
+        st.markdown("### 📋 Saved Measurements List")
+        m_df = pd.DataFrame([m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid])
+        if not m_df.empty:
+            st.dataframe(m_df, use_container_width=True)
+        else:
+            st.info("No measurements recorded for this customer yet.")
 
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.title("📊 Sales Dashboard & History")
