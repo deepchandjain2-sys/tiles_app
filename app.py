@@ -217,16 +217,16 @@ elif menu.startswith("2️⃣"):
         else:
             st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict)]
 
-        curr_items = []
-        for i in st.session_state.items:
-            if isinstance(i, dict) and i.get("cid") == cid:
-                curr_items.append({
-                    "floor": str(i.get("floor", "")),
-                    "section": str(i.get("section", "")),
-                    "area": str(i.get("area", "")),
-                    "tile": str(i.get("tile", "")),
-                    "box_sqft": float(i.get("box_sqft", 16.0))
-                })
+            curr_items = []
+            for i in st.session_state.items:
+                if isinstance(i, dict) and i.get("cid") == cid:
+                    curr_items.append({
+                        "floor": str(i.get("floor", "")),
+                        "section": str(i.get("section", "")),
+                        "area": str(i.get("area", "")),
+                        "tile": str(i.get("tile", "")),
+                        "box_sqft": float(i.get("box_sqft", 16.0))
+                    })
                 
         if curr_items:
             df_display = pd.DataFrame(curr_items)
