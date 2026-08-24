@@ -275,7 +275,6 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.markdown("---")
         st.markdown("### 🏷️ Select Floor, Building Area & Tiles")
         
-        # अलग-अलग फ्लोर और एरिया सिलेक्शन
         floor_options = ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking"]
         selected_floor = st.selectbox("Select Floor", floor_options)
         
@@ -337,77 +336,97 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Measurements & Box Calculations (via calculations.py)")
+    st.title("📐 Measurements & Box Calculations (Item-Wise)")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
         st.success(f"👤 **Active Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')}")
 
-    st.markdown("### 1. Select Floor & Area")
-    col_fl1, col_fl2 = st.columns(2)
-    with col_fl1:
-        m_floor = st.selectbox("Floor", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking"])
-    with col_fl2:
-        m_area = st.selectbox("Building Area / Room", ["Living Room / Hall", "Kitchen", "Master Bedroom", "Children Bedroom", "Common Bathroom", "Attached Bathroom", "Balcony", "Dining Area", "Other"])
+    cust_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
 
-    st.markdown("---")
-    st.markdown("### 2. Enter Customer Measurement (Length × Width)")
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        length = st.number_input("Length (Feet)", min_value=0.0, value=10.0, step=0.5)
-    with col_m2:
-        width = st.number_input("Width / Height (Feet)", min_value=0.0, value=10.0, step=0.5)
+    if not cust_tiles:
+        st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
+    else:
+        st.markdown("### 1. Select Item & Location from Customer Selections")
         
-    customer_sqft = length * width
-    st.write(f"📏 **Customer Required Area:** `{customer_sqft:.2f} Sq.Ft`")
+        tile_options = {f"{t.get('floor_area')} ➔ {t.get('item')}": t for t in cust_tiles}
+        selected_tile_label = st.selectbox("Choose Selected Tile / Area", options=list(tile_options.keys()))
+        selected_tile_data = tile_options[selected_tile_label]
+        
+        st.info(f"📌 **Selected Location & Item:** {selected_tile_label}")
 
-    st.markdown("---")
-    st.markdown("### 3. Tile Packing Details (CON FACTOR & PACKING UNIT)")
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        con_factor = st.number_input("CON FACTOR", min_value=0.01, value=1.5, step=0.01)
-    with col_p2:
-        packing_unit = st.number_input("PACKING UNIT", min_value=1.0, value=6.0, step=1.0)
+        st.markdown("---")
+        st.markdown("### 2. Enter Measurement (Length × Width)")
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            length = st.number_input("Length (Feet)", min_value=0.0, value=10.0, step=0.5)
+        with col_m2:
+            width = st.number_input("Width / Height (Feet)", min_value=0.0, value=10.0, step=0.5)
+            
+        customer_sqft = length * width
+        st.write(f"📏 **Customer Required Area:** `{customer_sqft:.2f} Sq.Ft`")
+
+        st.markdown("---")
+        st.markdown("### 3. Tile Packing Details (CON FACTOR & PACKING UNIT)")
         
-    # calculations.py के फंक्शन्स का सटीक उपयोग
-    box_sqft = calculate_box_sqft(con_factor, packing_unit)
-    total_boxes = calculate_boxes(customer_sqft, con_factor, packing_unit)
-    total_supplied_sqft = total_boxes * box_sqft
-    
-    st.markdown("---")
-    st.markdown("### 📊 Calculation Summary")
-    res_col1, res_col2, res_col3 = st.columns(3)
-    res_col1.metric("📦 1 Box Coverage", f"{box_sqft:.2f} Sq.Ft")
-    res_col2.metric("📦 Total Boxes Needed", f"{total_boxes} Boxes")
-    res_col3.metric("📐 Total Billing Area", f"{total_supplied_sqft:.2f} Sq.Ft")
-    
-    if st.button("💾 Save Measurement to Customer Bill"):
-        m_item = {
-            "cid": st.session_state.current_cid,
-            "floor_area": f"{m_floor} - {m_area}",
-            "length": length,
-            "width": width,
-            "cust_sqft": customer_sqft,
-            "con_factor": con_factor,
-            "packing_unit": int(packing_unit),
-            "box_sqft": box_sqft,
-            "total_boxes": total_boxes,
-            "total_sqft": total_supplied_sqft
-        }
-        if "measurements_list" not in st.session_state:
-            st.session_state.measurements_list = []
-        st.session_state.measurements_list.append(m_item)
-        st.success(f"Saved successfully: {total_boxes} Boxes ({total_supplied_sqft:.2f} Sq.Ft) for {m_floor} - {m_area}")
+        df_master = get_master_df()
+        default_cf = 1.5
+        default_pu = 6.0
+        
+        if df_master is not None and not df_master.empty:
+            item_name_str = str(selected_tile_data.get('item', ''))
+            matched_row = df_master[df_master.astype(str).apply(lambda row: row.str.contains(item_name_str.split('-')[0].strip(), case=False, na=False).any(), axis=1)]
+            if not matched_row.empty:
+                try:
+                    if len(matched_row.columns) > 6:
+                        default_cf = float(matched_row.iloc[0, 6])
+                    if len(matched_row.columns) > 4:
+                        default_pu = float(matched_row.iloc[0, 4])
+                except:
+                    pass
+
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            con_factor = st.number_input("CON FACTOR (1 Tile Sq.Ft)", min_value=0.01, value=float(default_cf), step=0.01)
+        with col_p2:
+            packing_unit = st.number_input("PACKING UNIT (Pcs/Box)", min_value=1.0, value=float(default_pu), step=1.0)
+            
+        box_sqft = calculate_box_sqft(con_factor, packing_unit)
+        total_boxes = calculate_boxes(customer_sqft, con_factor, packing_unit)
+        total_supplied_sqft = total_boxes * box_sqft
+        
+        st.markdown("---")
+        st.markdown("### 📊 Calculation Summary")
+        res_col1, res_col2, res_col3 = st.columns(3)
+        res_col1.metric("📦 1 Box Coverage", f"{box_sqft:.2f} Sq.Ft")
+        res_col2.metric("📦 Total Boxes Needed", f"{total_boxes} Boxes")
+        res_col3.metric("📐 Total Billing Area", f"{total_supplied_sqft:.2f} Sq.Ft")
+        
+        if st.button("💾 Save Measurement & Boxes to Bill"):
+            m_item = {
+                "cid": st.session_state.current_cid,
+                "floor_area": selected_tile_data.get('floor_area'),
+                "item": selected_tile_data.get('item'),
+                "length": length,
+                "width": width,
+                "cust_sqft": customer_sqft,
+                "boxes": total_boxes,
+                "total_sqft": total_supplied_sqft
+            }
+            if "measurements_list" not in st.session_state:
+                st.session_state.measurements_list = []
+            st.session_state.measurements_list.append(m_item)
+            st.success(f"Saved: {total_boxes} Boxes for {selected_tile_data.get('item')}")
 
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
         st.markdown("---")
-        st.markdown("### 📋 Customer Measurement Sheet")
+        st.markdown("### 📋 Saved Measurements & Boxes Sheet")
         cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
         if cust_m:
             m_df = pd.DataFrame(cust_m)
             st.dataframe(m_df, use_container_width=True)
         else:
-            st.info("No measurements recorded for this customer yet.")
+            st.info("No calculations saved for this customer yet.")
 
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.title("📊 Sales Dashboard & History")
