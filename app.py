@@ -271,7 +271,12 @@ elif menu.startswith("2️⃣"):
                 
         st.subheader("📋 Selected Items for this Customer")
         
-        customer_items = [i for i in safe_items if isinstance(i, dict) and i.get("cid") == cid]        
+        # Safe extraction of items for the current customer
+        if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
+            st.session_state.my_selected_tiles = []
+            
+        customer_items = [i for i in st.session_state.my_selected_tiles if isinstance(i, dict) and i.get("cid") == cid]
+        
         if customer_items:
             item_to_remove = None
             for idx, i in enumerate(customer_items):
@@ -289,7 +294,7 @@ elif menu.startswith("2️⃣"):
                 st.rerun()
                 
             if st.button("🗑️ Clear All Selections for Customer"):
-                st.session_state.my_selected_tiles = [i for i in st.session_state.get("my_selected_tiles", []) if not (isinstance(i, dict) and i.get("cid") == cid)]
+                st.session_state.my_selected_tiles = [i for i in st.session_state.my_selected_tiles if not (isinstance(i, dict) and i.get("cid") == cid)]
                 save_items_to_disk(st.session_state.my_selected_tiles)
                 st.rerun()
         else:
