@@ -1,25 +1,51 @@
 import pandas as pd
+import os
 
-def save_customer_to_csv(customers_list, filename="customers_history.csv"):
-    """
-    कस्टमर्स की लिस्ट को CSV फ़ाइल में सेव करता है।
-    """
-    if customers_list:
-        df = pd.DataFrame(customers_list)
-        df.to_csv(filename, index=False)
-        return True
-    return False
+CUST_CSV = "customers_saved.csv"
+STOCK_CSV = "stock_saved.csv"
+
+def save_customers_to_disk(customers_list):
+    """कस्टमर्स की लिस्ट को परमानेंट CSV में सेव करता है"""
+    try:
+        if customers_list:
+            df = pd.DataFrame(customers_list)
+            df.to_csv(CUST_CSV, index=False)
+    except Exception as e:
+        print(f"Error saving customers: {e}")
+
+def load_customers_from_disk():
+    """सेव किए गए कस्टमर्स को डिस्क से लोड करता है"""
+    try:
+        if os.path.exists(CUST_CSV):
+            df = pd.read_csv(CUST_CSV)
+            return df.to_dict('records')
+    except Exception as e:
+        print(f"Error loading customers: {e}")
+    return []
+
+def save_stock_to_disk(stock_df):
+    """अपलोड किए गए स्टॉक को डिस्क पर सेव करता है"""
+    try:
+        if stock_df is not None and not stock_df.empty:
+            stock_df.to_csv(STOCK_CSV, index=False)
+    except Exception as e:
+        print(f"Error saving stock: {e}")
+
+def load_stock_from_disk():
+    """सेव किए गए स्टॉक को डिस्क से लोड करता है"""
+    try:
+        if os.path.exists(STOCK_CSV):
+            return pd.read_csv(STOCK_CSV)
+    except Exception as e:
+        print(f"Error loading stock: {e}")
+    return pd.DataFrame()
 
 def load_stock_from_upload(uploaded_file):
-    """
-    अपलोड की गई BUSY आइटम मास्टर फ़ाइल (CSV/Excel) को रीड करके प्रोसेस करता है।
-    """
     try:
         if uploaded_file.name.endswith('.csv'):
             df = pd.read_csv(uploaded_file)
         else:
             df = pd.read_excel(uploaded_file)
-            
         df = df.dropna(how='all')
         return df
     except Exception as e:
