@@ -271,9 +271,7 @@ elif menu.startswith("2️⃣"):
                 
         st.subheader("📋 Selected Items for this Customer")
         
-        safe_items = st.session_state.get("my_selected_tiles", [])
-        customer_items = [i for i in safe_items if isinstance(i, dict) and i.get("cid"] == cid] if False else [i for i in safe_items if isinstance(i, dict) and i.get("cid") == cid]
-        
+        customer_items = [i for i in safe_items if isinstance(i, dict) and i.get("cid") == cid]        
         if customer_items:
             item_to_remove = None
             for idx, i in enumerate(customer_items):
