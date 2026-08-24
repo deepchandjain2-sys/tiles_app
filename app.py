@@ -273,6 +273,8 @@ elif menu.startswith("2️⃣"):
                 st.rerun()
             else:
                 st.error("Please enter a valid Area Name and select a Tile.")
+            else:
+                st.error("Please enter a valid Area Name and select a Tile.")
             
         customer_items = [i for i in st.session_state.my_selected_tiles if isinstance(i, dict) and i.get("cid") == cid]
         
