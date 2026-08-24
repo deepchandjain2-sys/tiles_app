@@ -5,6 +5,7 @@ import math
 import urllib.parse
 from calculations import calculate_boxes, calculate_box_sqft
 from database import load_stock_from_upload, save_stock_to_disk, load_items_from_disk, save_items_to_disk
+from fpdf import FPDF
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
@@ -21,9 +22,7 @@ if "customers" not in st.session_state:
 if "sales_history" not in st.session_state:
     st.session_state.sales_history = []
 
-# Persistent Users Database in Session State
 if "registered_users" not in st.session_state:
-    # Default Admin account pre-configured
     st.session_state.registered_users = {
         "admin": {"password": "123", "role": "Admin", "name": "Jayantilal"}
     }
@@ -34,7 +33,7 @@ if "logged_in" not in st.session_state:
 if "current_nav" not in st.session_state:
     st.session_state.current_nav = "1 Customer Registration"
 
-# --- AUTHENTICATION SCREEN (LOGIN / REGISTER / FORGOT PASSWORD) ---
+# --- AUTHENTICATION SCREEN ---
 if not st.session_state.logged_in:
     st.markdown("<h2 style='text-align: center;'>🏢 Jay Granite & Tiles Hub - Portal</h2>", unsafe_allow_html=True)
     
@@ -42,7 +41,6 @@ if not st.session_state.logged_in:
     with col_l2:
         auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Login", "📝 New User Register", "🔄 Forgot Password"])
         
-        # 1. Login Tab
         with auth_tab1:
             with st.form("login_form"):
                 l_user = st.text_input("User ID (Text / Number)", key="l_user")
@@ -64,7 +62,6 @@ if not st.session_state.logged_in:
                     else:
                         st.error("User ID not found! Please register first.")
                         
-        # 2. Register Tab
         with auth_tab2:
             with st.form("register_form"):
                 r_name = st.text_input("Full Name")
@@ -88,7 +85,6 @@ if not st.session_state.logged_in:
                     else:
                         st.error("Please fill all fields correctly.")
                         
-        # 3. Forgot Password Tab
         with auth_tab3:
             with st.form("forgot_form"):
                 f_user = st.text_input("Enter your User ID")
@@ -107,7 +103,7 @@ if not st.session_state.logged_in:
                         st.error("User ID does not exist.")
     st.stop()
 
-# --- SIDEBAR NAVIGATION (Flow Controlled) ---
+# --- SIDEBAR NAVIGATION ---
 st.sidebar.title("🏢 Jay Granite & Tiles")
 st.sidebar.markdown(f"👤 **User:** {st.session_state.get('username', 'User')} ({st.session_state.get('user_role', 'Staff')})")
 
@@ -363,6 +359,41 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 
             st.markdown(f"### Total Material Required: **{total_boxes} Boxes**")
             
+            # Generate Real PDF using FPDF
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 16)
+            pdf.cell(200, 10, txt="JAY GRANITE & TILES - QUOTATION", ln=True, align="C")
+            pdf.set_font("Arial", "", 12)
+            pdf.cell(200, 8, txt=f"Customer Name: {current_cust['name']}", ln=True)
+            pdf.cell(200, 8, txt=f"Phone: {current_cust.get('phone', '')}", ln=True)
+            pdf.cell(200, 8, txt=f"City: {current_cust['city']}", ln=True)
+            pdf.ln(5)
+            
+            pdf.set_font("Arial", "B", 10)
+            pdf.cell(40, 8, "Floor / Area", 1)
+            pdf.cell(40, 8, "Section", 1)
+            pdf.cell(70, 8, "Tile Name", 1)
+            pdf.cell(20, 8, "SqFt", 1)
+            pdf.cell(20, 8, "Boxes", 1)
+            pdf.ln()
+            
+            pdf.set_font("Arial", "", 10)
+            for it in items:
+                pdf.cell(40, 8, f"{it.get('floor')} - {it.get('area')}", 1)
+                pdf.cell(40, 8, str(it.get('section')), 1)
+                pdf.cell(70, 8, str(it.get('tile'))[:30], 1)
+                pdf.cell(20, 8, str(it.get('sqft')), 1)
+                pdf.cell(20, 8, str(it.get('boxes')), 1)
+                pdf.ln()
+                
+            pdf.ln(5)
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(200, 10, txt=f"Total Boxes Required: {total_boxes}", ln=True)
+            
+            pdf_bytes = pdf.output(dest='S').encode('latin1')
+
+            # WhatsApp message text
             summary_text = f"*JAY GRANITE & TILES - QUOTATION*\n\n" \
                            f"Customer: {current_cust['name']}\n" \
                            f"Phone: {current_cust.get('phone', '')}\n" \
@@ -374,10 +405,10 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             col_btn1, col_btn2, col_btn3 = st.columns(3)
             with col_btn1:
                 st.download_button(
-                    label="📄 Download Quotation (TXT)",
-                    data=summary_text,
-                    file_name=f"Quotation_{current_cust['name']}.txt",
-                    mime="text/plain",
+                    label="📄 Download Official PDF Quotation",
+                    data=pdf_bytes,
+                    file_name=f"Quotation_{current_cust['name']}.pdf",
+                    mime="application/pdf",
                     type="primary"
                 )
             with col_btn2:
