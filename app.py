@@ -253,20 +253,20 @@ elif menu.startswith("2️⃣"):
                   st.session_state.my_selected_tiles = []
                 
                 # मास्टर स्टॉक से इस सेलेक्टेड टाइल का Con Factor और Packing Unit निकालें
-                t_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile].iloc[0]
-                c_factor = float(t_obj.get("CON_FACTOR", 1.5))
-                p_unit = float(t_obj.get("PACKING_UNIT", 6.0))
+              t_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile].iloc[0]
+              c_factor = float(t_obj.get("CON_FACTOR", 1.5))
+              p_unit = float(t_obj.get("PACKING_UNIT", 6.0))
                 
-                new_item = {
-                    "cid": int(cid),
-                    "floor": str(floor_name),
-                    "section": str(section_type),
-                    "area": str(area_name).strip(),
-                    "tile": str(selected_tile),
-                    "con_factor": c_factor,
-                    "packing_unit": p_unit,
-                    "sqft": 100.0,
-                    "boxes": math.ceil(100.0 / (c_factor * p_unit)) if (c_factor * p_unit) > 0 else 0
+              new_item = {
+                  "cid": int(cid),
+                  "floor": str(floor_name),
+                  "section": str(section_type),
+                  "area": str(area_name).strip(),
+                  "tile": str(selected_tile),
+                  "con_factor": c_factor,
+                  "packing_unit": p_unit,
+                  "sqft": 100.0,
+                  "boxes": math.ceil(100.0 / (c_factor * p_unit)) if (c_factor * p_unit) > 0 else 0
                 }
                 st.session_state.my_selected_tiles.append(new_item)
                 save_items_to_disk(st.session_state.my_selected_tiles)
