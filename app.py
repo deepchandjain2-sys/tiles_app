@@ -7,15 +7,18 @@ import urllib.parse
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Persistent storage across reruns
+# Safe initialization & clearing corrupt states
 if "user" not in st.session_state:
     st.session_state.user = None
-if "customers" not in st.session_state:
+if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
     st.session_state.customers = []
-if "items" not in st.session_state:
+if "items" not in st.session_state or not isinstance(st.session_state.items, list):
     st.session_state.items = []
-if "stock_df" not in st.session_state:
+if "stock_df" not in st.session_state or not isinstance(st.session_state.stock_df, pd.DataFrame):
     st.session_state.stock_df = pd.DataFrame()
+
+# Clean up items to ensure they are dictionaries
+st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict)]
 
 # -------------------------------------------------------------
 # LOGIN & FORGOT PASSWORD SCREEN
@@ -211,14 +214,7 @@ elif menu.startswith("2️⃣"):
                     
         st.subheader("📋 Selected Items for this Customer")
         
-        # Strongly protected cleaning of session items to avoid any TypeError
-        clean_items = []
-        for i in st.session_state.items:
-            if isinstance(i, dict) and "cid" in i:
-                clean_items.append(i)
-        st.session_state.items = clean_items
-        
-        curr_items = [i for i in st.session_state.items if i.get("cid") == cid]
+        curr_items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
         if curr_items:
             df_display = pd.DataFrame([{
                 "Floor": i.get("floor"),
@@ -231,7 +227,7 @@ elif menu.startswith("2️⃣"):
             st.dataframe(df_display, use_container_width=True)
             
             if st.button("🗑️ Clear All Selected Items for Customer"):
-                st.session_state.items = [i for i in st.session_state.items if i.get("cid") != cid]
+                st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") != cid]
                 st.rerun()
         else:
             st.info("No tiles selected yet. Add items above.")
