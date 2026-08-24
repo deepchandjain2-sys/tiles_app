@@ -223,35 +223,48 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
             st.session_state.current_nav = "1 Customer Registration"
             st.rerun()
     else:
-        cid = st.session_state.get("current_cid", st.session_state.customers[0]["cid"])
-        current_cust = next((c for c in st.session_state.customers if c['cid'] == cid), {"name": "Unknown", "phone": "", "city": ""})
-        
-        st.markdown(f"### 👤 Active Customer: **{current_cust['name']}** | 📞 Phone: **{current_cust.get('phone', 'N/A')}** | 📍 City: **{current_cust.get('city', '')}**")
-        st.markdown("---")
-        
-        st.subheader("📁 Upload Master (CSV / Excel)")
-uploaded_file = st.file_uploader(
-    "Upload Item Master File",
-    type=["csv", "xlsx", "xls"],
-    key="master_uploader",
-)
+       cid = st.session_state.get(
+        "current_cid", st.session_state.customers[0]["cid"]
+    )
+    current_cust = next(
+        (
+            c
+            for c in st.session_state.customers
+            if c["cid"] == cid
+        ),
+        {"name": "Unknown", "phone": "", "city": ""},
+    )
 
-default_master_path = "ITEM MASTER.csv"
-df = None
+    st.markdown(
+        f"### 👤 Active Customer: **{current_cust['name']}** | 📞 Phone:"
+        f" **{current_cust.get('phone', 'N/A')}** | 📍 City:"
+        f" **{current_cust.get('city', 'Hiriyur')}**"
+    )
+    st.markdown("---")
 
-if uploaded_file is not None:
-  df = load_stock_from_upload(uploaded_file)
-  if df is not None:
-    st.success(f"Successfully loaded {len(df)} items from uploaded file!")
-elif os.path.exists(default_master_path):
-  try:
-    df = load_stock_from_upload(default_master_path)
-    if df is not None:
-      st.info(f"Auto-loaded {len(df)} items from default master file!")
-  except Exception as e:
-    st.error(f"Error reading default master file: {e}")
-else:
-  st.warning("Please upload or ensure 'ITEM MASTER.csv' is present.")
+    st.subheader("📁 Upload Master (CSV / Excel)")
+    uploaded_file = st.file_uploader(
+        "Upload Item Master File",
+        type=["csv", "xlsx", "xls"],
+        key="master_uploader",
+    )
+
+    default_master_path = "ITEM MASTER.csv"
+    df = None
+
+    if uploaded_file is not None:
+      df = load_stock_from_upload(uploaded_file)
+      if df is not None:
+        st.success(f"Successfully loaded {len(df)} items from uploaded file!")
+    elif os.path.exists(default_master_path):
+      try:
+        df = load_stock_from_upload(default_master_path)
+        if df is not None:
+          st.info(f"Auto-loaded {len(df)} items from default master file!")
+      except Exception as e:
+        st.error(f"Error reading default master file: {e}")
+    else:
+      st.warning("Please upload or ensure 'ITEM MASTER.csv' is present.")' is present.")
             if df is not None:
                 try:
                     records = []
