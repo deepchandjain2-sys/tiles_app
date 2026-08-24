@@ -7,18 +7,15 @@ import urllib.parse
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Safe initialization & clearing corrupt states
+# Safe initialization without corrupt state risks
 if "user" not in st.session_state:
     st.session_state.user = None
-if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
+if "customers" not in st.session_state:
     st.session_state.customers = []
-if "items" not in st.session_state or not isinstance(st.session_state.items, list):
+if "items" not in st.session_state:
     st.session_state.items = []
-if "stock_df" not in st.session_state or not isinstance(st.session_state.stock_df, pd.DataFrame):
+if "stock_df" not in st.session_state:
     st.session_state.stock_df = pd.DataFrame()
-
-# Clean up items to ensure they are dictionaries
-st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict)]
 
 # -------------------------------------------------------------
 # LOGIN & FORGOT PASSWORD SCREEN
@@ -214,20 +211,23 @@ elif menu.startswith("2️⃣"):
                     
         st.subheader("📋 Selected Items for this Customer")
         
-        curr_items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
+        curr_items = []
+        for i in st.session_state.items:
+            if isinstance(i, dict) and i.get("cid") == cid:
+                curr_items.append({
+                    "floor": str(i.get("floor", "")),
+                    "section": str(i.get("section", "")),
+                    "area": str(i.get("area", "")),
+                    "tile": str(i.get("tile", "")),
+                    "box_sqft": float(i.get("box_sqft", 16.0))
+                })
+                
         if curr_items:
-            df_display = pd.DataFrame([{
-                "Floor": i.get("floor"),
-                "Type": i.get("section"),
-                "Area": i.get("area"),
-                "Tile": i.get("tile"),
-                "Box SqFt": i.get("box_sqft")
-            } for i in curr_items])
-            
+            df_display = pd.DataFrame(curr_items)
             st.dataframe(df_display, use_container_width=True)
             
             if st.button("🗑️ Clear All Selected Items for Customer"):
-                st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") != cid]
+                st.session_state.items = [i for i in st.session_state.items if not (isinstance(i, dict) and i.get("cid") == cid)]
                 st.rerun()
         else:
             st.info("No tiles selected yet. Add items above.")
