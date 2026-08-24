@@ -246,13 +246,13 @@ elif menu.startswith("2️⃣"):
             st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
             
        if st.button("➕ Add This Tile Selection", type="primary"):
-            if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
-                # Global/Safe list fallback initialization
-                if 'global_items_list' not in globals():
+           if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
+               # Global/Safe list fallback initialization
+               if 'global_items_list' not in globals():
                     global global_items_list
                     global_items_list = []
                 
-                new_item = {
+                 new_item = {
                     "cid": int(cid),
                     "floor": str(floor_name),
                     "section": str(section_type),
