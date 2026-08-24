@@ -217,7 +217,9 @@ elif menu.startswith("2️⃣"):
         else:
             st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict)]
 
-        curr_items = [i for i in st.session_state.items if i.get("cid") == cid]
+        curr_items = []
+        for i in st.session_state.items:
+            if isinstance(i, dict) and i.get("cid") == cid:
                 curr_items.append({
                     "floor": str(i.get("floor", "")),
                     "section": str(i.get("section", "")),
