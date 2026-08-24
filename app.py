@@ -19,7 +19,9 @@ def load_users_from_disk():
     if os.path.exists(USERS_FILE):
         try:
             with open(USERS_FILE, "r") as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
         except:
             pass
     return [
@@ -43,7 +45,9 @@ def load_customers_from_disk():
     if os.path.exists(CUSTOMERS_FILE):
         try:
             with open(CUSTOMERS_FILE, "r") as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
         except:
             pass
     return [{"cid": "CUST-001", "name": "Vansh", "phone": "964444419", "city": "Hiriyur"}]
@@ -55,8 +59,8 @@ def save_customers_to_disk(cust_list):
     except:
         pass
 
-# Initialize Session State
-if "registered_users" not in st.session_state:
+# Initialize Session State safely
+if "registered_users" not in st.session_state or not isinstance(st.session_state.registered_users, list):
     st.session_state.registered_users = load_users_from_disk()
 
 if "logged_in" not in st.session_state:
@@ -65,7 +69,7 @@ if "logged_in" not in st.session_state:
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
-if "customers" not in st.session_state:
+if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
     st.session_state.customers = load_customers_from_disk()
 
 if "sales_history" not in st.session_state:
@@ -73,7 +77,7 @@ if "sales_history" not in st.session_state:
 
 if "current_cid" not in st.session_state:
     if st.session_state.customers:
-        st.session_state.current_cid = st.session_state.customers[0]["cid"]
+        st.session_state.current_cid = st.session_state.customers[0].get("cid", "CUST-001")
     else:
         st.session_state.current_cid = "CUST-001"
 
@@ -162,6 +166,9 @@ else:
 
         if st.sidebar.button("Register Account"):
             if new_name and new_phone and new_username and new_pin:
+                if not isinstance(st.session_state.registered_users, list):
+                    st.session_state.registered_users = [{"username": "admin", "pin": "1234", "name": "Deepchand Jain", "role": "Admin", "phone": "9999999999"}]
+
                 exists = False
                 for u in st.session_state.registered_users:
                     if isinstance(u, dict):
@@ -211,7 +218,7 @@ if not st.session_state.logged_in:
     st.info("👈 Please use the sidebar to **Login**, **Register Salesman**, or **Reset PIN** to access your application.")
     st.stop()
 
-# --- MAIN APP SECTIONS ---
+# --- MAIN APP SECTIONS (Original Full Features) ---
 if st.session_state.current_nav == "1 Customer Registration":
     st.title("👥 Customer Registration & Selection")
     col1, col2 = st.columns(2)
@@ -225,6 +232,8 @@ if st.session_state.current_nav == "1 Customer Registration":
 
             if submitted_c:
                 if c_name.strip() and c_phone.strip():
+                    if not isinstance(st.session_state.customers, list):
+                        st.session_state.customers = []
                     new_cid = f"CUST-{len(st.session_state.customers) + 1:03d}"
                     cust_obj = {"cid": new_cid, "name": c_name.strip(), "phone": c_phone.strip(), "city": c_city.strip()}
                     st.session_state.customers.append(cust_obj)
@@ -238,11 +247,12 @@ if st.session_state.current_nav == "1 Customer Registration":
     with col2:
         st.markdown("### Select Active Customer")
         if st.session_state.customers:
-            cust_options = {f"{c['name']} ({c['phone']} - {c['city']})": c['cid'] for c in st.session_state.customers}
-            current_label = next((k for k, v in cust_options.items() if v == st.session_state.current_cid), None)
-            selected_label = st.selectbox("Existing Customers", options=list(cust_options.keys()), index=list(cust_options.keys()).index(current_label) if current_label else 0)
-            if selected_label:
-                st.session_state.current_cid = cust_options[selected_label]
+            cust_options = {f"{c.get('name')} ({c.get('phone')} - {c.get('city', 'Hiriyur')})": c.get('cid') for c in st.session_state.customers if isinstance(c, dict)}
+            if cust_options:
+                current_label = next((k for k, v in cust_options.items() if v == st.session_state.current_cid), None)
+                selected_label = st.selectbox("Existing Customers", options=list(cust_options.keys()), index=list(cust_options.keys()).index(current_label) if current_label and current_label in cust_options else 0)
+                if selected_label:
+                    st.session_state.current_cid = cust_options[selected_label]
         else:
             st.warning("No customers registered yet.")
 
