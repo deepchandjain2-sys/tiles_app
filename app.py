@@ -3,9 +3,11 @@ import pandas as pd
 import math
 from datetime import datetime
 from fpdf import FPDF
+import urllib.parse
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
+# Persistent storage using session state
 if "user" not in st.session_state:
     st.session_state.user = None
 if "customers" not in st.session_state:
@@ -100,7 +102,7 @@ with st.sidebar:
         "4️⃣ Sales Dashboard"
     ])
 
-# Fallback dummy stock if none uploaded
+# Fallback stock if none uploaded
 if st.session_state.stock_df.empty:
     st.session_state.stock_df = pd.DataFrame([
         {"ITEM_ID": "1000", "ITEM_NAME": "1000 L 12X18 KK", "CON_FACTOR": 1.5, "PACKING_UNIT": 6, "BOX_SQFT": 9.0},
@@ -136,7 +138,7 @@ if menu.startswith("1️⃣"):
                 st.error("Please enter Name and Mobile number!")
 
 # -------------------------------------------------------------
-# 2. TILE SELECTION
+# 2. TILE SELECTION (AREA-WISE)
 # -------------------------------------------------------------
 elif menu.startswith("2️⃣"):
     st.header("🎨 Customer Tile Selection")
@@ -147,16 +149,17 @@ elif menu.startswith("2️⃣"):
         sel = st.selectbox("Choose Customer:", custs)
         cid = int(sel.split()[0].replace("#", ""))
         
-        with st.expander("➕ Add Tile for Room / Area", expanded=True):
+        with st.form("add_tile_form"):
+            st.markdown("### ➕ Add Tile Area-Wise (Room, Kitchen, Bathroom, etc.)")
             col_f, col_sec, col_area = st.columns(3)
             with col_f:
                 fl = st.selectbox("Floor Level", ["Ground Floor", "1st Floor", "2nd Floor", "Parking"])
             with col_sec:
                 sec = st.radio("Section Type", ["Floor", "Wall"], horizontal=True)
             with col_area:
-                area = st.selectbox("Area", ["Living Room", "Hall", "Kitchen", "Bedroom", "Master Bedroom", "Bathroom", "Balcony", "Parking"])
+                area = st.selectbox("Area / Room", ["Living Room", "Hall", "Kitchen", "Bedroom", "Master Bedroom", "Bathroom", "Balcony", "Parking", "Staircase", "Elevation"])
                 
-            search_query = st.text_input("🔍 Search Tile Code / Name:", "")
+            search_query = st.text_input("🔍 Search Tile Code / Name from Stock:", "")
             
             filtered_stock = st.session_state.stock_df.copy()
             if not filtered_stock.empty and search_query:
@@ -174,7 +177,8 @@ elif menu.startswith("2️⃣"):
                 box_sqft = float(tile_obj["BOX_SQFT"])
                 st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
             
-            if st.button("💾 Save Tile Selection", type="primary"):
+            submitted = st.form_submit_button("➕ Add This Area Tile", type="primary")
+            if submitted:
                 if selected_tile_name and selected_tile_name != "No matching tiles found":
                     st.session_state.items.append({
                         "cid": cid,
@@ -186,23 +190,25 @@ elif menu.startswith("2️⃣"):
                         "sqft": 100.0,
                         "boxes": math.ceil(100.0 / box_sqft)
                     })
-                    st.success(f"Added {selected_tile_name} for {area}!")
-                    st.rerun()
+                    st.success(f"Added {selected_tile_name} for {area} successfully!")
                 else:
                     st.error("Please select a valid tile.")
                     
-        st.subheader("📋 Selected Items")
+        st.subheader("📋 Selected Items for this Customer")
         curr_items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
         if curr_items:
             st.dataframe(pd.DataFrame(curr_items)[["floor", "section", "area", "tile", "box_sqft"]], use_container_width=True)
+            if st.button("🗑️ Clear All Selected Items for Customer"):
+                st.session_state.items = [i for i in st.session_state.items if i.get("cid") != cid]
+                st.rerun()
         else:
-            st.info("No tiles selected yet.")
+            st.info("No tiles selected yet. Add items above.")
 
 # -------------------------------------------------------------
-# 3. MEASUREMENTS & PDF
+# 3. MEASUREMENTS & WHATSAPP PDF QUOTATION
 # -------------------------------------------------------------
 elif menu.startswith("3️⃣"):
-    st.header("📐 Site Measurements & PDF Quotation")
+    st.header("📐 Site Measurements & WhatsApp PDF Quotation")
     if not st.session_state.customers:
         st.warning("No customers found.")
     else:
@@ -213,20 +219,29 @@ elif menu.startswith("3️⃣"):
         
         items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
         if items:
+            st.markdown("### Enter Total Area (SqFt) for Each Area:")
+            tot_b = 0
             for idx, it in enumerate(items):
-                st.markdown(f"**{it.get('floor')} - {it.get('area')} ({it.get('section')})** | Tile: `{it.get('tile')}` (Box: {it.get('box_sqft')} SqFt)")
-                it['sqft'] = st.number_input("Total Area (SqFt)", value=float(it.get('sqft', 100.0)), key=f"sq_{cid}_{idx}_{it.get('tile')}")
+                col_i1, col_i2 = st.columns([2, 1])
+                with col_i1:
+                    st.markdown(f"**{it.get('floor')} - {it.get('area')} ({it.get('section')})**<br>Tile: `{it.get('tile')}` (Box: {it.get('box_sqft')} SqFt)", unsafe_allow_html=True)
+                with col_i2:
+                    it['sqft'] = st.number_input("Area (SqFt)", value=float(it.get('sqft', 100.0)), key=f"sq_{cid}_{idx}_{it.get('tile')}")
+                
                 it['boxes'] = math.ceil(it['sqft'] / float(it.get('box_sqft', 16.0)))
-                st.caption(f"Required Boxes: **{it['boxes']} Boxes**")
+                tot_b += it['boxes']
+                st.caption(f"Required: **{it['boxes']} Boxes**")
                 st.divider()
                 
+            st.markdown(f"### Total Boxes Required Across All Areas: **{tot_b} Boxes**")
+            
             if st.button("📄 Generate PDF Quotation", type="primary"):
                 pdf = FPDF()
                 pdf.add_page()
                 pdf.set_font("Helvetica", "B", 16)
                 pdf.cell(0, 10, "JAY GRANITE & TILES", ln=True, align="C")
                 pdf.set_font("Helvetica", "", 10)
-                pdf.cell(0, 6, "Material Selection & Estimation Sheet", ln=True, align="C")
+                pdf.cell(0, 6, "Material Selection & Estimation Quotation", ln=True, align="C")
                 pdf.ln(5)
                 pdf.cell(100, 6, f"Customer: {c_obj['name']}", ln=False)
                 pdf.cell(90, 6, f"Mobile: {c_obj['mobile']}", ln=True)
@@ -235,27 +250,27 @@ elif menu.startswith("3️⃣"):
                 pdf.ln(5)
                 
                 pdf.set_font("Helvetica", "B", 9)
-                pdf.cell(40, 7, "Floor/Area", 1)
-                pdf.cell(20, 7, "Type", 1)
-                pdf.cell(60, 7, "Tile Name", 1)
-                pdf.cell(35, 7, "Area (SqFt)", 1, 0, "C")
-                pdf.cell(35, 7, "Req Boxes", 1, 1, "C")
+                pdf.cell(45, 7, "Floor / Area", 1)
+                pdf.cell(18, 7, "Type", 1)
+                pdf.cell(62, 7, "Tile Name", 1)
+                pdf.cell(32, 7, "SqFt", 1, 0, "C")
+                pdf.cell(33, 7, "Boxes", 1, 1, "C")
                 
                 pdf.set_font("Helvetica", "", 8)
-                tot_b = 0
                 for it in items:
-                    tot_b += it.get('boxes', 0)
-                    pdf.cell(40, 6, f"{it.get('floor')} - {it.get('area')}", 1)
-                    pdf.cell(20, 6, str(it.get('section')), 1)
-                    pdf.cell(60, 6, str(it.get('tile'))[:28], 1)
-                    pdf.cell(35, 6, f"{float(it.get('sqft', 0)):.1f}", 1, 0, "C")
-                    pdf.cell(35, 6, f"{it.get('boxes', 0)} Boxes", 1, 1, "C")
+                    pdf.cell(45, 6, f"{it.get('floor')} - {it.get('area')}", 1)
+                    pdf.cell(18, 6, str(it.get('section')), 1)
+                    pdf.cell(62, 6, str(it.get('tile'))[:28], 1)
+                    pdf.cell(32, 6, f"{float(it.get('sqft', 0)):.1f}", 1, 0, "C")
+                    pdf.cell(33, 6, f"{it.get('boxes', 0)} Boxes", 1, 1, "C")
                     
                 pdf.ln(5)
-                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_font("Helvetica", "B", 11)
                 pdf.cell(0, 6, f"Total Boxes Required: {tot_b} Boxes", ln=True)
                 
                 pdf_bytes = pdf.output(dest='S')
+                
+                st.success("PDF Generated Successfully!")
                 st.download_button(
                     label="📥 Download PDF Quotation",
                     data=bytes(pdf_bytes),
@@ -263,8 +278,14 @@ elif menu.startswith("3️⃣"):
                     mime="application/pdf",
                     type="primary"
                 )
+                
+                # WhatsApp Direct Message Integration
+                wa_msg = f"Hello {c_obj['name']}, here is your material estimation from JAY GRANITE & TILES. Total Boxes: {tot_b}. Thank you!"
+                encoded_msg = urllib.parse.quote(wa_msg)
+                wa_url = f"https://wa.me/91{c_obj['mobile']}?text={encoded_msg}"
+                st.markdown(f"### 📱 Send via WhatsApp:<br><a href='{wa_url}' target='_blank'><button style='background-color:#25D366; color:white; padding:10px 20px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;'>💬 Send WhatsApp Message to {c_obj['name']}</button></a>", unsafe_allow_html=True)
         else:
-            st.info("No items added for this customer yet.")
+            st.info("No items added for this customer yet. Go to 'Customer Tile Selection' to add items.")
 
 # -------------------------------------------------------------
 # 4. SALES DASHBOARD
