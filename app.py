@@ -266,17 +266,17 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
     else:
       st.warning("Please upload or ensure ITEM MASTER.csv is present.")
             if df is not None:
-                try:
-                    records = []
-                    for _, row in df.iterrows():
-                        name = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
-                        if not name or name.lower() == "nan" or "item name" in name.lower():
-                            continue
-                        try:
-                            con_val = abs(float(row.iloc[8])) if len(row) > 8 and pd.notna(row.iloc[8]) else 1.5
-                        except:
-                            con_val = 1.5
-                        try:
+      try:
+        records = []
+        for _, row in df.iterrows():
+          name = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
+          if not name or name.lower() == "nan" or "item name" in name.lower():
+            continue
+          try:
+            con_val = abs(float(row.iloc[8])) if len(row) > 8 and pd.notna(row.iloc[8]) else 1.5
+          except:
+            con_val = 1.5
+          # बाकी का आपका पुराना लॉजिक वैसे ही रहेगा            try:
                             pack_val = abs(float(row.iloc[9])) if len(row) > 9 and pd.notna(row.iloc[9]) else 6.0
                         except:
                             pack_val = 6.0
