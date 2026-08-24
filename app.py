@@ -248,9 +248,9 @@ elif menu.startswith("2️⃣"):
             # Note: Box coverage info is hidden here as requested, used internally for calculations in section 3.
             
       if st.button("➕ Add This Tile Selection", type="primary"):
-            if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
-                if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
-                    st.session_state.my_selected_tiles = []
+          if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
+              if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
+                  st.session_state.my_selected_tiles = []
                 
                 # मास्टर स्टॉक से इस सेलेक्टेड टाइल का Con Factor और Packing Unit निकालें
                 t_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile].iloc[0]
