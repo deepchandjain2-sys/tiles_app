@@ -211,9 +211,13 @@ elif menu.startswith("2️⃣"):
                     
         st.subheader("📋 Selected Items for this Customer")
         
-        curr_items = []
-        for i in st.session_state.items:
-            if isinstance(i, dict) and i.get("cid") == cid:
+       # Ensure items is always a clean list of dictionaries
+        if not isinstance(st.session_state.items, list):
+            st.session_state.items = []
+        else:
+            st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict)]
+
+        curr_items = [i for i in st.session_state.items if i.get("cid") == cid]
                 curr_items.append({
                     "floor": str(i.get("floor", "")),
                     "section": str(i.get("section", "")),
