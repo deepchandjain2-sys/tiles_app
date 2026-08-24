@@ -264,7 +264,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
       except Exception as e:
         st.error(f"Error reading default master file: {e}")
     else:
-      st.warning("Please upload or ensure 'ITEM MASTER.csv' is present.")' is present.")
+      st.warning("Please upload or ensure ITEM MASTER.csv is present.")
             if df is not None:
                 try:
                     records = []
