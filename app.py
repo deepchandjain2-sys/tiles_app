@@ -239,11 +239,12 @@ elif menu.startswith("2️⃣"):
                 box_sqft = float(t_obj["BOX_SQFT"])
                 st.info(f"📦 **Box Coverage:** {box_sqft} Sq.Ft / Box")
                 
-            submitted_tile = st.form_submit_button("➕ Add This Tile Selection", type="primary")
+           submitted_tile = st.form_submit_button("➕ Add This Tile Selection", type="primary")
             if submitted_tile:
                 if selected_tile and selected_tile != "No matching tiles found" and area_name.strip():
-                    if not isinstance(st.session_state.items, list):
+                    if "items" not in st.session_state or not isinstance(st.session_state.items, list):
                         st.session_state.items = []
+                    
                     st.session_state.items.append({
                         "cid": cid,
                         "floor": str(floor_name),
