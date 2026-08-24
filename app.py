@@ -7,7 +7,6 @@ import urllib.parse
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Persistent storage using session state
 if "user" not in st.session_state:
     st.session_state.user = None
 if "customers" not in st.session_state:
@@ -195,11 +194,17 @@ elif menu.startswith("2️⃣"):
                     st.error("Please select a valid tile.")
                     
         st.subheader("📋 Selected Items for this Customer")
+        # Safe filtering of items
         curr_items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") == cid]
         if curr_items:
-            st.dataframe(pd.DataFrame(curr_items)[["floor", "section", "area", "tile", "box_sqft"]], use_container_width=True)
+            df_display = pd.DataFrame(curr_items)
+            if not df_display.empty and all(col in df_display.columns for col in ["floor", "section", "area", "tile", "box_sqft"]):
+                st.dataframe(df_display[["floor", "section", "area", "tile", "box_sqft"]], use_container_width=True)
+            else:
+                st.write(curr_items)
+            
             if st.button("🗑️ Clear All Selected Items for Customer"):
-                st.session_state.items = [i for i in st.session_state.items if i.get("cid") != cid]
+                st.session_state.items = [i for i in st.session_state.items if isinstance(i, dict) and i.get("cid") != cid]
                 st.rerun()
         else:
             st.info("No tiles selected yet. Add items above.")
@@ -279,7 +284,6 @@ elif menu.startswith("3️⃣"):
                     type="primary"
                 )
                 
-                # WhatsApp Direct Message Integration
                 wa_msg = f"Hello {c_obj['name']}, here is your material estimation from JAY GRANITE & TILES. Total Boxes: {tot_b}. Thank you!"
                 encoded_msg = urllib.parse.quote(wa_msg)
                 wa_url = f"https://wa.me/91{c_obj['mobile']}?text={encoded_msg}"
