@@ -247,10 +247,15 @@ elif menu.startswith("2️⃣"):
                 box_sqft = 16.0
             # Note: Box coverage info is hidden here as requested, used internally for calculations in section 3.
             
-        if st.button("➕ Add This Tile Selection", type="primary"):
+      if st.button("➕ Add This Tile Selection", type="primary"):
             if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
                 if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
                     st.session_state.my_selected_tiles = []
+                
+                # मास्टर स्टॉक से इस सेलेक्टेड टाइल का Con Factor और Packing Unit निकालें
+                t_obj = filtered_stock[filtered_stock["ITEM_NAME"] == selected_tile].iloc[0]
+                c_factor = float(t_obj.get("CON_FACTOR", 1.5))
+                p_unit = float(t_obj.get("PACKING_UNIT", 6.0))
                 
                 new_item = {
                     "cid": int(cid),
@@ -258,17 +263,17 @@ elif menu.startswith("2️⃣"):
                     "section": str(section_type),
                     "area": str(area_name).strip(),
                     "tile": str(selected_tile),
-                    "box_sqft": float(box_sqft),
+                    "con_factor": c_factor,
+                    "packing_unit": p_unit,
                     "sqft": 100.0,
-                    "boxes": calculate_boxes(100.0, box_sqft)
+                    "boxes": math.ceil(100.0 / (c_factor * p_unit)) if (c_factor * p_unit) > 0 else 0
                 }
                 st.session_state.my_selected_tiles.append(new_item)
                 save_items_to_disk(st.session_state.my_selected_tiles)
                 st.success(f"Added {selected_tile} for {area_name} successfully!")
                 st.rerun()
             else:
-                st.error("Please enter a valid Area Name and select a Tile.")
-                
+                st.error("Please enter a valid Area Name and select a Tile.")             
         st.subheader("📋 Selected Items for this Customer")
         
         # Safe extraction of items for the current customer
