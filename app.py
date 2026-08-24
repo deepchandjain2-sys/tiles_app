@@ -3,28 +3,63 @@ import pandas as pd
 import os
 import math
 import urllib.parse
+import json
 from calculations import calculate_boxes, calculate_box_sqft
 from database import load_stock_from_upload, save_stock_to_disk, load_items_from_disk, save_items_to_disk
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub", page_icon="🏢", layout="wide")
 
-# Initialize session state (Check disk stock automatically)
+# Persistent JSON files for Users and Customers sync across devices/sessions
+USERS_FILE = "users_db.json"
+CUSTOMERS_FILE = "customers_db.json"
+
+def load_users_from_disk():
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return {"admin": {"password": "123", "role": "Admin", "name": "Jayantilal"}}
+
+def save_users_to_disk(users_dict):
+    try:
+        with open(USERS_FILE, "w") as f:
+            json.dump(users_dict, f)
+    except:
+        pass
+
+def load_customers_from_disk():
+    if os.path.exists(CUSTOMERS_FILE):
+        try:
+            with open(CUSTOMERS_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return []
+
+def save_customers_to_disk(cust_list):
+    try:
+        with open(CUSTOMERS_FILE, "w") as f:
+            json.dump(cust_list, f)
+    except:
+        pass
+
+# Initialize session state from disk
 if "stock_df" not in st.session_state:
     st.session_state.stock_df = load_stock_from_upload(None)
 
 if "my_selected_tiles" not in st.session_state:
     st.session_state.my_selected_tiles = load_items_from_disk()
 
+if "registered_users" not in st.session_state:
+    st.session_state.registered_users = load_users_from_disk()
+
 if "customers" not in st.session_state:
-    st.session_state.customers = []
+    st.session_state.customers = load_customers_from_disk()
 
 if "sales_history" not in st.session_state:
     st.session_state.sales_history = []
-
-if "registered_users" not in st.session_state:
-    st.session_state.registered_users = {
-        "admin": {"password": "123", "role": "Admin", "name": "Jayantilal"}
-    }
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -48,6 +83,8 @@ if not st.session_state.logged_in:
                 
                 if l_btn:
                     clean_user = l_user.strip().lower()
+                    # Refresh users from disk in case registered elsewhere
+                    st.session_state.registered_users = load_users_from_disk()
                     if clean_user in st.session_state.registered_users:
                         if st.session_state.registered_users[clean_user]["password"] == l_pass.strip():
                             st.session_state.logged_in = True
@@ -71,6 +108,7 @@ if not st.session_state.logged_in:
                 
                 if r_btn:
                     clean_r_user = r_user.strip().lower()
+                    st.session_state.registered_users = load_users_from_disk()
                     if clean_r_user and r_pass.strip() and r_name.strip():
                         if clean_r_user in st.session_state.registered_users:
                             st.warning("User ID already exists! Choose another ID.")
@@ -80,6 +118,7 @@ if not st.session_state.logged_in:
                                 "role": r_role,
                                 "name": r_name.strip()
                             }
+                            save_users_to_disk(st.session_state.registered_users)
                             st.success("Registration successful! Now go to Login tab and sign in.")
                     else:
                         st.error("Please fill all fields correctly.")
@@ -92,9 +131,11 @@ if not st.session_state.logged_in:
                 
                 if f_btn:
                     clean_f_user = f_user.strip().lower()
+                    st.session_state.registered_users = load_users_from_disk()
                     if clean_f_user in st.session_state.registered_users:
                         if f_new_pass.strip():
                             st.session_state.registered_users[clean_f_user]["password"] = f_new_pass.strip()
+                            save_users_to_disk(st.session_state.registered_users)
                             st.success("Password updated successfully! You can login now.")
                         else:
                             st.error("Please enter a new password.")
@@ -125,6 +166,9 @@ if st.sidebar.button("🚪 Logout"):
 if st.session_state.current_nav == "1 Customer Registration":
     st.header("👤 Customer Registration")
     
+    # Reload customers from disk to sync across devices
+    st.session_state.customers = load_customers_from_disk()
+    
     with st.form("customer_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -148,6 +192,7 @@ if st.session_state.current_nav == "1 Customer Registration":
                     "status": "Registered"
                 }
                 st.session_state.customers.append(cust_data)
+                save_customers_to_disk(st.session_state.customers)
                 st.session_state.current_cid = new_cid
                 st.success(f"Customer {cust_name} registered successfully!")
                 st.session_state.current_nav = "2 Tiles Selection (Area-Wise)"
@@ -171,6 +216,7 @@ if st.session_state.current_nav == "1 Customer Registration":
 elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
     st.header("🏠 Tiles Selection (Area-Wise)")
     
+    st.session_state.customers = load_customers_from_disk()
     if not st.session_state.customers:
         st.warning("Please register a customer first.")
         if st.button("Go to Customer Registration"):
@@ -218,7 +264,6 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                 except Exception as e:
                     st.error(f"Error processing records: {e}")
 
-        # Fallback check if stock is in disk database
         if (st.session_state.stock_df is None or st.session_state.stock_df.empty):
             disk_stock = load_stock_from_upload(None)
             if disk_stock is not None and not disk_stock.empty:
@@ -276,6 +321,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                     for c in st.session_state.customers:
                         if c['cid'] == cid:
                             c['status'] = 'Selected'
+                    save_customers_to_disk(st.session_state.customers)
                             
                     st.success(f"Added {selected_tile} for {area_name} successfully!")
                     st.rerun()
@@ -322,11 +368,12 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     st.header("📐 Measurements, PDF & WhatsApp")
     
+    st.session_state.customers = load_customers_from_disk()
     if not st.session_state.customers:
         st.warning("Please register a customer first.")
     else:
         cid = st.session_state.get("current_cid", st.session_state.customers[0]["cid"])
-        current_cust = next((c for c in st.session_state.customers if c['cid'] == cid), {"name": "Customer", "phone": "", "city": ""})
+        current_cust = next((c for c in st.session_state.customers if c['cid'] == cid), {"name": "Customer", "phone": ""})
         items = [i for i in st.session_state.get("my_selected_tiles", []) if isinstance(i, dict) and i.get("cid") == cid]
         
         if not items:
@@ -395,6 +442,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         if c['cid'] == cid:
                             c['status'] = 'Finalized'
                             c['total_boxes'] = total_boxes
+                    save_customers_to_disk(st.session_state.customers)
                     
                     history_record = {
                         "customer": current_cust['name'],
@@ -413,6 +461,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.header("📊 Professional Sales Dashboard & History")
     
+    st.session_state.customers = load_customers_from_disk()
     customers_df = pd.DataFrame(st.session_state.customers) if st.session_state.customers else pd.DataFrame(columns=["cid", "name", "phone", "city", "status", "salesman"])
     
     total_new_customers = len(st.session_state.customers)
@@ -442,7 +491,7 @@ elif st.session_state.current_nav == "4 Sales Dashboard & History":
     else:
         st.info("No salesman activity data available yet.")
         
-    st.markdown("---")
+        st.markdown("---")
     st.subheader("📜 Detailed Customer History")
     if not customers_df.empty:
         st.dataframe(customers_df[['cid', 'name', 'phone', 'city', 'salesman', 'status']], use_container_width=True)
