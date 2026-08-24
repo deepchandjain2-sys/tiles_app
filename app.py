@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import math
+import urllib.parse
 from calculations import calculate_boxes, calculate_box_sqft
 from database import load_stock_from_upload, save_stock_to_disk, load_items_from_disk, save_items_to_disk
 
@@ -121,7 +122,16 @@ elif menu == "2 Tiles Selection (Area-Wise)":
             with col_f2:
                 section_type = st.selectbox("Section Type", ["Floor Area", "Wall Area", "Skirting", "Border", "Highlight"])
             with col_f3:
-                area_name = st.text_input("Area Name (e.g. Hall, Kitchen)")
+                # Update 1: Area Name options + Manual typing support
+                predefined_areas = [
+                    "Hall", "Kitchen", "Master Bedroom", 
+                    "Common Bedroom Attach Bathroom", "Common Bathroom", "Parking"
+                ]
+                area_choice = st.selectbox("Select Area Name", predefined_areas + ["Other (Type Manually)"])
+                if area_choice == "Other (Type Manually)":
+                    area_name = st.text_input("Enter Custom Area Name")
+                else:
+                    area_name = area_choice
 
             search_query = st.text_input("🔍 Search Tile Code / Name from Stock:")
             filtered_stock = stock_df[stock_df["ITEM_NAME"].str.contains(search_query, case=False, na=False)] if search_query else stock_df
@@ -154,7 +164,7 @@ elif menu == "2 Tiles Selection (Area-Wise)":
                     st.success(f"Added {selected_tile} for {area_name} successfully!")
                     st.rerun()
                 else:
-                    st.error("Please enter a valid Area Name and select a Tile.")
+                    st.error("Please enter/select a valid Area Name and Tile.")
 
             st.markdown("---")
             st.subheader("📋 Selected Items for this Customer")
@@ -162,7 +172,7 @@ elif menu == "2 Tiles Selection (Area-Wise)":
             if "my_selected_tiles" not in st.session_state or not isinstance(st.session_state.my_selected_tiles, list):
                 st.session_state.my_selected_tiles = []
                 
-            customer_items = [i for i in st.session_state.my_selected_tiles if isinstance(i, dict) and i.get("cid") == cid]
+            customer_items = [i for i in st.session_state.my_selected_tiles if isinstance(i, dict) and i.get("cid"] == cid]
             
             if customer_items:
                 item_to_remove = None
@@ -195,6 +205,7 @@ elif menu == "3 Measurements, PDF & WhatsApp":
         st.warning("Please register a customer first.")
     else:
         cid = st.session_state.get("current_cid", st.session_state.customers[0]["cid"])
+        current_cust = next((c for c in st.session_state.customers if c['cid'] == cid), {"name": "Customer", "phone": ""})
         items = [i for i in st.session_state.get("my_selected_tiles", []) if isinstance(i, dict) and i.get("cid") == cid]
         
         if not items:
@@ -215,7 +226,7 @@ elif menu == "3 Measurements, PDF & WhatsApp":
                     if st.button("❌", key=f"del_sec3_{cid}_{idx}_{it.get('tile')}", help="Delete this item"):
                         item_to_delete = it
                 
-                # सटीक फॉर्मूला: Area / (Con Factor * Packing Unit)
+                # Correct Calculation Formula: Area / (Con Factor * Packing Unit)
                 cf = float(it.get('con_factor', 1.5))
                 pu = float(it.get('packing_unit', 6.0))
                 box_cov = cf * pu
@@ -233,8 +244,29 @@ elif menu == "3 Measurements, PDF & WhatsApp":
                 
             st.markdown(f"### Total Material Required: **{total_boxes} Boxes**")
             
-            if st.button("📄 Generate PDF Quotation & Save", type="primary"):
-                st.success("Quotation generated successfully and saved!")
+            # Update 2 & 3: Generate text/HTML quotation for direct view/download & WhatsApp sharing
+            summary_text = f"*JAY GRANITE & TILES - QUOTATION*\n\n" \
+                           f"Customer: {current_cust['name']}\n" \
+                           f"City: {current_cust['city']}\n\n"
+            for it in items:
+                summary_text += f"• {it.get('floor')} - {it.get('area')} ({it.get('section')}): {it.get('tile')} | Area: {it.get('sqft')} SqFt | Boxes: {it.get('boxes')}\n"
+            summary_text += f"\n*Total Boxes Required: {total_boxes}*"
+
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                # Update 2: Direct file download / open simulation
+                st.download_button(
+                    label="📄 Download / Open Quotation (TXT)",
+                    data=summary_text,
+                    file_name=f"Quotation_{current_cust['name']}.txt",
+                    mime="text/plain",
+                    type="primary"
+                )
+            with col_btn2:
+                # Update 3: WhatsApp Share Button
+                encoded_message = urllib.parse.quote(summary_text)
+                whatsapp_url = f"https://wa.me/?text={encoded_message}"
+                st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color:#25D366; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold; width:100%;">💬 Share on WhatsApp</button></a>', unsafe_allow_html=True)
 
 # --- 4. SALES DASHBOARD & HISTORY ---
 elif menu == "4 Sales Dashboard & History":
