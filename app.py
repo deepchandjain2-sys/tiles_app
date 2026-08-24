@@ -248,7 +248,7 @@ elif menu.startswith("2️⃣"):
         if st.button("➕ Add This Tile Selection", type="primary"):
             if selected_tile and selected_tile != "No matching tiles found" and str(area_name).strip():
                 # Safe type ensuring for items list
-            if not isinstance(st.session_state.get("items"), list):
+                if not isinstance(st.session_state.get("items"), list):
                    st.session_state.items = []                
                 new_item = {
                     "cid": int(cid),
