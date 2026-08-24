@@ -218,7 +218,7 @@ if not st.session_state.logged_in:
     st.info("👈 Please use the sidebar to **Login**, **Register Salesman**, or **Reset PIN** to access your application.")
     st.stop()
 
-# --- MAIN APP SECTIONS (Original Full Features) ---
+# --- MAIN APP SECTIONS ---
 if st.session_state.current_nav == "1 Customer Registration":
     st.title("👥 Customer Registration & Selection")
     col1, col2 = st.columns(2)
@@ -270,6 +270,45 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
             st.info(f"Auto-loaded {len(df)} items from default master file!")
     else:
         st.warning("Please upload or ensure 'ITEM MASTER.csv' is present.")
+
+    if df is not None and not df.empty:
+        st.markdown("---")
+        st.markdown("### 🏷️ Select Area & Tiles")
+        
+        area_name = st.selectbox("Select Area / Room", ["Living Room / Hall", "Kitchen", "Bathroom Wall", "Bathroom Floor", "Bedroom", "Balcony / Outdoor", "Elevation / Parking", "Other"])
+        search_query = st.text_input("🔍 Search Tile / Granite Name or Code")
+        
+        if search_query:
+            filtered_df = df[df.astype(str).apply(lambda row: row.str.contains(search_query, case=False).any(), axis=1)]
+        else:
+            filtered_df = df.head(50)
+            
+        if not filtered_df.empty:
+            item_options = filtered_df.iloc[:, 0].astype(str) + " - " + filtered_df.iloc[:, 1].astype(str) if len(filtered_df.columns) > 1 else filtered_df.iloc[:, 0].astype(str)
+            selected_item_label = st.selectbox("Choose Tile Item", options=item_options)
+            
+            col_q1, col_q2 = st.columns(2)
+            with col_q1:
+                req_sqft = st.number_input("Required Area (Sq.Ft)", min_value=0.0, value=100.0, step=10.0)
+            with col_q2:
+                notes = st.text_input("Notes (Optional)", value="")
+                
+            if st.button("➕ Add Tile to Customer Selection"):
+                selection_item = {
+                    "cid": st.session_state.current_cid,
+                    "area": area_name,
+                    "item": selected_item_label,
+                    "sqft": req_sqft,
+                    "notes": notes
+                }
+                st.session_state.my_selected_tiles.append(selection_item)
+                st.success(f"Added {selected_item_label} for {area_name} successfully!")
+        
+        if st.session_state.my_selected_tiles:
+            st.markdown("---")
+            st.markdown("### 📋 Current Selections for Active Customer")
+            sel_df = pd.DataFrame(st.session_state.my_selected_tiles)
+            st.dataframe(sel_df, use_container_width=True)
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     st.title("📐 Measurements, PDF & WhatsApp Quotation")
