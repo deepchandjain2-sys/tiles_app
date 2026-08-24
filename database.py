@@ -5,7 +5,6 @@ CUST_CSV = "customers_saved.csv"
 STOCK_CSV = "stock_saved.csv"
 
 def save_customers_to_disk(customers_list):
-    """कस्टमर्स की लिस्ट को परमानेंट CSV में सेव करता है"""
     try:
         if customers_list:
             df = pd.DataFrame(customers_list)
@@ -14,7 +13,6 @@ def save_customers_to_disk(customers_list):
         print(f"Error saving customers: {e}")
 
 def load_customers_from_disk():
-    """सेव किए गए कस्टमर्स को डिस्क से लोड करता है"""
     try:
         if os.path.exists(CUST_CSV):
             df = pd.read_csv(CUST_CSV)
@@ -24,7 +22,6 @@ def load_customers_from_disk():
     return []
 
 def save_stock_to_disk(stock_df):
-    """अपलोड किए गए स्टॉक को डिस्क पर सेव करता है"""
     try:
         if stock_df is not None and not stock_df.empty:
             stock_df.to_csv(STOCK_CSV, index=False)
@@ -32,7 +29,6 @@ def save_stock_to_disk(stock_df):
         print(f"Error saving stock: {e}")
 
 def load_stock_from_disk():
-    """सेव किए गए स्टॉक को डिस्क से लोड करता है"""
     try:
         if os.path.exists(STOCK_CSV):
             return pd.read_csv(STOCK_CSV)
