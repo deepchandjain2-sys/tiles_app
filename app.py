@@ -404,7 +404,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             col_btn1, col_btn2, col_btn3 = st.columns(3)
             with col_btn1:
                 st.download_button(
-                    label="📄 Download Official PDF Quotation",
+                    label="Download Official PDF Quotation",
                     data=pdf_bytes,
                     file_name=f"Quotation_{current_cust['name']}.pdf",
                     mime="application/pdf",
