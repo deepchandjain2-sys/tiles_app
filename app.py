@@ -76,6 +76,11 @@ elif menu == "2 Tiles Selection (Area-Wise)":
         st.warning("Please register a customer first in step 1.")
     else:
         cid = st.session_state.get("current_cid", st.session_state.customers[0]["cid"])
+        current_cust = next((c for c in st.session_state.customers if c['cid'] == cid), {"name": "Unknown", "phone": "", "city": ""})
+        
+        # Display Active Customer details at the top
+        st.markdown(f"### 👤 Active Customer: **{current_cust['name']}** | 📞 Phone: **{current_cust.get('phone', 'N/A')}** | 📍 City: **{current_cust.get('city', '')}**")
+        st.markdown("---")
         
         st.subheader("📁 Upload Master (CSV / Excel)")
         uploaded_file = st.file_uploader("Upload Item Master File", type=["csv", "xlsx", "xls"], key="master_uploader")
@@ -209,6 +214,7 @@ elif menu == "3 Measurements, PDF & WhatsApp":
         if not items:
             st.info("No items selected for this customer yet. Go to step 2.")
         else:
+            st.markdown(f"### 👤 Customer: **{current_cust['name']}** | 📞 Phone: **{current_cust.get('phone', 'N/A')}**")
             st.markdown("### Enter Actual Area (SqFt) for Each Selection:")
             total_boxes = 0
             item_to_delete = None
@@ -243,6 +249,7 @@ elif menu == "3 Measurements, PDF & WhatsApp":
             
             summary_text = f"*JAY GRANITE & TILES - QUOTATION*\n\n" \
                            f"Customer: {current_cust['name']}\n" \
+                           f"Phone: {current_cust.get('phone', '')}\n" \
                            f"City: {current_cust['city']}\n\n"
             for it in items:
                 summary_text += f"• {it.get('floor')} - {it.get('area')} ({it.get('section')}): {it.get('tile')} | Area: {it.get('sqft')} SqFt | Boxes: {it.get('boxes')}\n"
