@@ -3,15 +3,13 @@ import math
 def calculate_boxes(sqft, box_sqft):
     """
     सटीक बॉक्स गणना: (Total SqFt / Box Coverage) करके 
-    math.ceil से ऊपर की तरफ राउंड ऑफ करता है।
-    जैसे: 100 / 16 = 6.25 -> 7 Boxes (पूरे बक्से)
+    math.ceil से ऊपर की तरफ सही बक्से (Whole Boxes) निकालता है।
     """
     try:
         sqft_val = float(sqft)
         box_val = float(box_sqft)
         if box_val <= 0:
             return 0
-        # सीधे भाग देकर math.ceil करना ताकि दशमलव में सही बक्से आएं
         return math.ceil(sqft_val / box_val)
     except:
         return 0
