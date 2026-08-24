@@ -257,7 +257,15 @@ if st.session_state.current_nav == "1 Customer Registration":
             st.warning("No customers registered yet.")
 
 elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
-    st.title("🪨 Tiles Selection (Area-Wise)")
+    st.title("🪨 Tiles Selection (Floor-Wise)")
+    
+    # वर्तमान एक्टिव कस्टमर की जानकारी निकालें
+    active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
+    if active_cust:
+        st.success(f"👤 **Active Party / Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')} | 📍 **City:** {active_cust.get('city', 'Hiriyur')}")
+    else:
+        st.warning("⚠️ No customer selected! Please select a customer from '1 Customer Registration'.")
+
     uploaded_file = st.file_uploader("Upload Item Master File", type=["csv", "xlsx", "xls"], key="master_uploader")
     df = None
     if uploaded_file is not None:
@@ -273,42 +281,60 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
 
     if df is not None and not df.empty:
         st.markdown("---")
-        st.markdown("### 🏷️ Select Area & Tiles")
+        st.markdown("### 🏷️ Select Floor / Area & Tiles")
         
-        area_name = st.selectbox("Select Area / Room", ["Living Room / Hall", "Kitchen", "Bathroom Wall", "Bathroom Floor", "Bedroom", "Balcony / Outdoor", "Elevation / Parking", "Other"])
+        # फ्लोर के विकल्प (Ground Floor, 1st Floor आदि)
+        floor_name = st.selectbox("Select Floor / Area", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking", "Other"])
+        
+        # सर्च टाइल बॉक्स
         search_query = st.text_input("🔍 Search Tile / Granite Name or Code")
         
-        if search_query:
-            filtered_df = df[df.astype(str).apply(lambda row: row.str.contains(search_query, case=False).any(), axis=1)]
+        # सही कॉलम ढूंढने का तरीका ताकि 'nan' न आए
+        item_col = df.columns[0]
+        name_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+        
+        if search_query.strip():
+            # सुरक्षित सर्च
+            mask = df.astype(str).apply(lambda row: row.str.contains(search_query, case=False, na=False).any(), axis=1)
+            filtered_df = df[mask]
         else:
-            filtered_df = df.head(50)
+            filtered_df = df.head(100)
             
         if not filtered_df.empty:
-            item_options = filtered_df.iloc[:, 0].astype(str) + " - " + filtered_df.iloc[:, 1].astype(str) if len(filtered_df.columns) > 1 else filtered_df.iloc[:, 0].astype(str)
-            selected_item_label = st.selectbox("Choose Tile Item", options=item_options)
-            
-            col_q1, col_q2 = st.columns(2)
-            with col_q1:
-                req_sqft = st.number_input("Required Area (Sq.Ft)", min_value=0.0, value=100.0, step=10.0)
-            with col_q2:
-                notes = st.text_input("Notes (Optional)", value="")
+            # ऑप्शन लिस्ट बनाएं जिसमें सही नाम और कोड दिखे
+            options_list = []
+            options_dict = {}
+            for idx, row in filtered_df.iterrows():
+                code_val = str(row.iloc[0]).strip()
+                name_val = str(row.iloc[1]).strip() if len(df.columns) > 1 else ""
+                display_text = f"{code_val} - {name_val}" if name_val and name_val.lower() != 'nan' else code_val
+                options_list.append(display_text)
+                options_dict[display_text] = row
                 
+            selected_item_label = st.selectbox("Choose Tile Item", options=options_list)
+            
             if st.button("➕ Add Tile to Customer Selection"):
                 selection_item = {
                     "cid": st.session_state.current_cid,
-                    "area": area_name,
-                    "item": selected_item_label,
-                    "sqft": req_sqft,
-                    "notes": notes
+                    "customer_name": active_cust.get('name') if active_cust else "Unknown",
+                    "floor": floor_name,
+                    "item": selected_item_label
                 }
                 st.session_state.my_selected_tiles.append(selection_item)
-                st.success(f"Added {selected_item_label} for {area_name} successfully!")
+                st.success(f"Added {selected_item_label} for {floor_name} successfully!")
+        else:
+            st.info("No matching items found. Try a different search keyword.")
         
         if st.session_state.my_selected_tiles:
             st.markdown("---")
             st.markdown("### 📋 Current Selections for Active Customer")
-            sel_df = pd.DataFrame(st.session_state.my_selected_tiles)
-            st.dataframe(sel_df, use_container_width=True)
+            # सिर्फ मौजूदा कस्टमर की चुनी हुई टाइल्स दिखाएं
+            cust_selections = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
+            if cust_selections:
+                sel_df = pd.DataFrame(cust_selections)
+                st.dataframe(sel_df, use_container_width=True)
+            else:
+                st.info("No tiles selected for this customer yet.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     st.title("📐 Measurements, PDF & WhatsApp Quotation")
