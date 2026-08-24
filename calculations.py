@@ -1,28 +1,25 @@
 import math
 
-def calculate_boxes(sqft, box_sqft):
+def calculate_boxes(sqft, con_factor, packing_unit):
     """
     सटीक फॉर्मूला: 
-    Required Boxes = math.ceil( Manual Area / (Con Factor * Packing Unit) )
-    यहाँ box_sqft असल में (Con Factor * Packing Unit) है।
+    Boxes = math.ceil( Manual Area / (Con Factor * Packing Unit) )
     """
     try:
         sqft_val = float(sqft)
-        box_val = float(box_sqft)
-        if box_val <= 0:
+        cf = float(con_factor)
+        pu = float(packing_unit)
+        
+        box_coverage = cf * pu
+        if box_coverage <= 0:
             return 0
-        return math.ceil(sqft_val / box_val)
+            
+        return math.ceil(sqft_val / box_coverage)
     except:
         return 0
 
 def calculate_box_sqft(con_factor, packing_unit):
-    """
-    Con Factor * Packing Unit से प्रति बॉक्स कवरेज (SqFt) निकालता है।
-    """
     try:
-        cf = float(con_factor)
-        pu = float(packing_unit)
-        result = cf * pu
-        return round(result, 2) if result > 0 else 16.0
+        return float(con_factor) * float(packing_unit)
     except:
         return 16.0
