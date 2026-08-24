@@ -204,7 +204,6 @@ if not st.session_state.logged_in:
 
 # --- DATABASE MASTER LOADER ---
 def get_master_df():
-    # database.py के load_stock_from_disk या upload का उपयोग
     df = load_stock_from_disk()
     if df is not None and not df.empty:
         return df
@@ -274,26 +273,25 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
 
     if df is not None and not df.empty:
         st.markdown("---")
-        st.markdown("### 🏷️ Select Floor, Area & Tiles")
+        st.markdown("### 🏷️ Select Floor, Building Area & Tiles")
         
-        floor_area_options = [
-            "Ground Floor - Living Room / Hall",
-            "Ground Floor - Kitchen",
-            "Ground Floor - Bathroom",
-            "Ground Floor - Bedroom",
-            "1st Floor - Living Room / Hall",
-            "1st Floor - Kitchen",
-            "1st Floor - Bathroom",
-            "1st Floor - Bedroom",
-            "2nd Floor - Living Room / Hall",
-            "2nd Floor - Kitchen",
-            "2nd Floor - Bathroom",
-            "2nd Floor - Bedroom",
-            "Staircase",
-            "Elevation / Parking",
+        # अलग-अलग फ्लोर और एरिया सिलेक्शन
+        floor_options = ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking"]
+        selected_floor = st.selectbox("Select Floor", floor_options)
+        
+        area_options = [
+            "Living Room / Hall", 
+            "Kitchen", 
+            "Master Bedroom", 
+            "Children Bedroom", 
+            "Common Bathroom", 
+            "Attached Bathroom", 
+            "Balcony", 
+            "Verandah", 
+            "Dining Area", 
             "Other Area"
         ]
-        floor_name = st.selectbox("Select Floor & Area", floor_area_options)
+        selected_area = st.selectbox("Select Building Area / Room", area_options)
         
         search_query = st.text_input("🔍 Search Tile / Granite Name or Code")
         
@@ -314,14 +312,15 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
             selected_item_label = st.selectbox("Choose Tile Item", options=options_list)
             
             if st.button("➕ Add Tile to Customer Selection"):
+                combined_location = f"{selected_floor} - {selected_area}"
                 selection_item = {
                     "cid": st.session_state.current_cid,
                     "customer_name": active_cust.get('name') if active_cust else "Unknown",
-                    "floor_area": floor_name,
+                    "floor_area": combined_location,
                     "item": selected_item_label
                 }
                 st.session_state.my_selected_tiles.append(selection_item)
-                st.success(f"Added {selected_item_label} for {floor_name} successfully!")
+                st.success(f"Added {selected_item_label} for {combined_location} successfully!")
         else:
             st.info("No matching items found. Try a different search keyword.")
         
@@ -342,63 +341,70 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
-        st.success(f"👤 **Active Party / Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')}")
+        st.success(f"👤 **Active Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')}")
 
-    st.markdown("### Enter Dimensions for Calculation")
+    st.markdown("### 1. Select Floor & Area")
+    col_fl1, col_fl2 = st.columns(2)
+    with col_fl1:
+        m_floor = st.selectbox("Floor", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking"])
+    with col_fl2:
+        m_area = st.selectbox("Building Area / Room", ["Living Room / Hall", "Kitchen", "Master Bedroom", "Children Bedroom", "Common Bathroom", "Attached Bathroom", "Balcony", "Dining Area", "Other"])
+
+    st.markdown("---")
+    st.markdown("### 2. Enter Customer Measurement (Length × Width)")
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        length = st.number_input("Length (Feet)", min_value=0.0, value=10.0, step=0.5)
+    with col_m2:
+        width = st.number_input("Width / Height (Feet)", min_value=0.0, value=10.0, step=0.5)
+        
+    customer_sqft = length * width
+    st.write(f"📏 **Customer Required Area:** `{customer_sqft:.2f} Sq.Ft`")
+
+    st.markdown("---")
+    st.markdown("### 3. Tile Packing Details (CON FACTOR & PACKING UNIT)")
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        con_factor = st.number_input("CON FACTOR", min_value=0.01, value=1.5, step=0.01)
+    with col_p2:
+        packing_unit = st.number_input("PACKING UNIT", min_value=1.0, value=6.0, step=1.0)
+        
+    # calculations.py के फंक्शन्स का सटीक उपयोग
+    box_sqft = calculate_box_sqft(con_factor, packing_unit)
+    total_boxes = calculate_boxes(customer_sqft, con_factor, packing_unit)
+    total_supplied_sqft = total_boxes * box_sqft
     
-    with st.form("measurement_calc_form"):
-        m_floor = st.selectbox("Floor & Area", [
-            "Ground Floor - Living Room / Hall",
-            "Ground Floor - Kitchen",
-            "Ground Floor - Bathroom",
-            "Ground Floor - Bedroom",
-            "1st Floor - Living Room / Hall",
-            "1st Floor - Kitchen",
-            "1st Floor - Bathroom",
-            "1st Floor - Bedroom",
-            "2nd Floor",
-            "Staircase",
-            "Elevation / Parking",
-            "Other"
-        ])
-        
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            con_factor = st.number_input("Con Factor (Length / Coverage)", min_value=0.1, value=10.0, step=0.5)
-        with col_m2:
-            packing_unit = st.number_input("Packing Unit (Boxes / Coverage)", min_value=0.1, value=1.0, step=0.5)
-            
-        # calculations.py के वास्तविक फंक्शन्स का उपयोग
-        try:
-            calc_sqft = calculate_box_sqft(con_factor, packing_unit)
-        except Exception:
-            calc_sqft = con_factor * packing_unit
+    st.markdown("---")
+    st.markdown("### 📊 Calculation Summary")
+    res_col1, res_col2, res_col3 = st.columns(3)
+    res_col1.metric("📦 1 Box Coverage", f"{box_sqft:.2f} Sq.Ft")
+    res_col2.metric("📦 Total Boxes Needed", f"{total_boxes} Boxes")
+    res_col3.metric("📐 Total Billing Area", f"{total_supplied_sqft:.2f} Sq.Ft")
+    
+    if st.button("💾 Save Measurement to Customer Bill"):
+        m_item = {
+            "cid": st.session_state.current_cid,
+            "floor_area": f"{m_floor} - {m_area}",
+            "length": length,
+            "width": width,
+            "cust_sqft": customer_sqft,
+            "con_factor": con_factor,
+            "packing_unit": int(packing_unit),
+            "box_sqft": box_sqft,
+            "total_boxes": total_boxes,
+            "total_sqft": total_supplied_sqft
+        }
+        if "measurements_list" not in st.session_state:
+            st.session_state.measurements_list = []
+        st.session_state.measurements_list.append(m_item)
+        st.success(f"Saved successfully: {total_boxes} Boxes ({total_supplied_sqft:.2f} Sq.Ft) for {m_floor} - {m_area}")
 
-        try:
-            calc_boxes_val = calculate_boxes(calc_sqft, con_factor, packing_unit)
-        except Exception:
-            calc_boxes_val = math.ceil(calc_sqft / 10.0) if calc_sqft > 0 else 0
-        
-        st.info(f"📊 **Calculated Area:** {calc_sqft:.2f} Sq.Ft | 📦 **Required Boxes:** {calc_boxes_val}")
-        
-        add_meas = st.form_submit_button("Save Measurement & Calculation")
-        if add_meas:
-            m_item = {
-                "cid": st.session_state.current_cid,
-                "customer": active_cust.get('name') if active_cust else "Unknown",
-                "floor": m_floor,
-                "con_factor": con_factor,
-                "packing_unit": packing_unit,
-                "sqft": calc_sqft,
-                "boxes": calc_boxes_val
-            }
-            st.session_state.measurements_list.append(m_item)
-            st.success("Measurement and box calculation saved successfully!")
-
-    if st.session_state.measurements_list:
-        st.markdown("### 📋 Saved Measurements List")
-        m_df = pd.DataFrame([m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid])
-        if not m_df.empty:
+    if "measurements_list" in st.session_state and st.session_state.measurements_list:
+        st.markdown("---")
+        st.markdown("### 📋 Customer Measurement Sheet")
+        cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
+        if cust_m:
+            m_df = pd.DataFrame(cust_m)
             st.dataframe(m_df, use_container_width=True)
         else:
             st.info("No measurements recorded for this customer yet.")
