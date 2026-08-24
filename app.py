@@ -335,7 +335,7 @@ elif menu.startswith("3️⃣"):
                     if st.button("❌", key=f"del_sec3_{cid}_{idx}_{it.get('tile')}", help="Delete this item"):
                         item_to_delete = it
                 
-                it['boxes'] = calculate_boxes(it['sqft'], it['box_sqft'])
+                it['boxes'] = calculate_boxes(it['sqft'], it.get('con_factor', 1.5), it.get('packing_unit', 6))
                 total_boxes += it['boxes']
                 st.caption(f"Required Boxes: **{it['boxes']} Boxes**")
                 st.divider()
