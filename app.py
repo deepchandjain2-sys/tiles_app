@@ -19,6 +19,7 @@ st.set_page_config(
 USERS_FILE = "users_db.json"
 SELECTIONS_FILE = "customer_selections.json"
 MEASUREMENTS_FILE = "customer_measurements.json"
+SALES_FILE = "sales_history.json"
 
 def load_json_file(filename, default_val):
     if os.path.exists(filename):
@@ -77,8 +78,9 @@ if "customers" not in st.session_state or not isinstance(st.session_state.custom
     loaded_cust = load_customers_from_disk()
     st.session_state.customers = loaded_cust if loaded_cust else [{"cid": "CUST-001", "name": "Vansh", "phone": "964444419", "city": "Hiriyur"}]
 
+# Load persistent sales history
 if "sales_history" not in st.session_state:
-    st.session_state.sales_history = []
+    st.session_state.sales_history = load_json_file(SALES_FILE, [])
 
 if "current_cid" not in st.session_state:
     if st.session_state.customers:
@@ -555,7 +557,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             
             st.markdown("---")
             st.markdown("### 📤 Export Quotation (PDF & WhatsApp)")
-            col_pdf, col_wa = st.columns(2)
+            col_pdf, col_wa, col_complete = st.columns(3)
             with col_pdf:
                 if st.button("📥 Download PDF Quotation"):
                     try:
@@ -573,7 +575,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             with col_wa:
                 if active_cust and active_cust.get('phone'):
                     wa_phone = str(active_cust.get('phone')).strip()
-                    
                     summary_text = f"🪨 *JAY GRANITE & TILES HUB* 🪨\n"
                     summary_text += f"Quotation for: *{active_cust.get('name')}*\n\n"
                     for item in cust_m:
@@ -583,19 +584,48 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         summary_text += f"   *Sq.Ft:* {item.get('sqft')} | *Boxes:* {item.get('boxes')}\n\n"
                     summary_text += "Thank you for visiting Jay Granite & Tiles Hub! - 9742222219"
                     
-                    # मैसेज को Expander (हाइड) के अंदर रख दिया है ताकि स्क्रीन साफ़ रहे
                     with st.expander("💬 View / Copy WhatsApp Message"):
                         st.markdown(f"1️⃣ [Click here to open Customer Chat on WhatsApp](https://wa.me/{wa_phone})", unsafe_allow_html=True)
                         st.code(summary_text, language="text")
                         st.info("💡 ऊपर दिए गए टेक्स्ट को कॉपी करें और WhatsApp चैट में पेस्ट (Ctrl + V) कर दें!")
                 else:
                     st.warning("Customer phone number not available for WhatsApp.")
+            
+            with col_complete:
+                if st.button("✅ Complete Sale & Save to Dashboard"):
+                    sale_record = {
+                        "customer_name": active_cust.get('name') if active_cust else "Unknown",
+                        "phone": active_cust.get('phone') if active_cust else "",
+                        "city": active_cust.get('city', 'Hiriyur'),
+                        "items_count": len(cust_m),
+                        "total_sqft": sum([float(x.get('sqft', 0)) for x in cust_m]),
+                        "total_boxes": sum([int(x.get('boxes', 0)) for x in cust_m]),
+                        "salesman": st.session_state.current_user.get('name', 'Admin')
+                    }
+                    st.session_state.sales_history.append(sale_record)
+                    save_json_file(SALES_FILE, st.session_state.sales_history)
+                    st.success("🎉 Sale successfully completed and added to Sales Dashboard!")
         else:
             st.info("No quotation items saved for this customer yet.")
 
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.title("📊 Sales Dashboard & History")
-    st.info("Sales history and analytics view.")
+    st.markdown("### 📈 Completed Sales History & Analytics")
+    
+    if st.session_state.sales_history:
+        sales_df = pd.DataFrame(st.session_state.sales_history)
+        st.dataframe(sales_df, use_container_width=True)
+        
+        total_boxes_sold = sales_df['total_boxes'].sum() if 'total_boxes' in sales_df.columns else 0
+        total_sqft_sold = sales_df['total_sqft'].sum() if 'total_sqft' in sales_df.columns else 0
+        total_orders = len(sales_df)
+        
+        col_s1, col_s2, col_s3 = st.columns(3)
+        col_s1.metric("Total Orders Completed", total_orders)
+        col_s2.metric("Total Boxes Sold", total_boxes_sold)
+        col_s3.metric("Total Sq.Ft Sold", f"{total_sqft_sold:.2f}")
+    else:
+        st.info("No sales records found yet. Complete a sale from section '3 Measurements, PDF & WhatsApp' using the 'Complete Sale' button.")
 
 elif st.session_state.current_nav == "5 Salesman Progress Report":
     st.title("📈 Salesman Progress Report (Admin Panel)")
