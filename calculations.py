@@ -9,11 +9,11 @@ def calculate_box_sqft(con_factor, packing_unit):
         pu = float(packing_unit)
         return cf * pu
     except Exception:
-        return 9.0  # 12x18 या अन्य के लिए सुरक्षित डिफ़ॉल्ट
+        return 9.0
 
 def calculate_boxes(sqft, con_factor, packing_unit):
     """
-    आवश्यक बॉक्स = math.ceil(कुल स्क्वायर फीट / (Con Factor * Packing Unit))
+    सटीक फॉर्मूला: आवश्यक बॉक्स = Sq.Ft / (Con Factor * Packing Unit)
     """
     try:
         sqft_val = float(sqft)
@@ -24,6 +24,7 @@ def calculate_boxes(sqft, con_factor, packing_unit):
         if box_coverage <= 0:
             return 0
             
+        # सीधे फॉर्मूले के अनुसार सीलिंग (Math.ceil) करके सही बॉक्स निकालना
         return math.ceil(sqft_val / box_coverage)
     except Exception:
         return 0
