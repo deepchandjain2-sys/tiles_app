@@ -379,7 +379,6 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         floor_options = ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking"]
         selected_floor = st.selectbox("Select Floor", floor_options)
         
-        # 1. Category Selection (Floor Area vs Wall Area)
         area_category = st.radio("Select Area Type", ["Floor Area", "Wall Area"], horizontal=True)
         
         if area_category == "Floor Area":
@@ -624,7 +623,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     st.session_state.sales_history.append(sale_record)
                     save_json_file(SALES_FILE, st.session_state.sales_history)
                     
-                    st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid"] != st.session_state.current_cid]
+                    st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid") != st.session_state.current_cid]
                     save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
                     
                     st.session_state.measurements_list = [m for m in st.session_state.measurements_list if m.get("cid") != st.session_state.current_cid]
