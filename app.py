@@ -583,8 +583,10 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         summary_text += f"   *Sq.Ft:* {item.get('sqft')} | *Boxes:* {item.get('boxes')}\n\n"
                     summary_text += "Thank you for visiting Jay Granite & Tiles Hub! - 9742222219"
                     
-                    wa_msg = urllib.parse.quote(summary_text)
-                    st.markdown(f"📱 [Click to Send WhatsApp Quotation Message](https://wa.me/{wa_phone}?text={wa_msg})", unsafe_allow_html=True)
+                    st.markdown("#### 📱 Send via WhatsApp:")
+                    st.markdown(f"1️⃣ [Click here to open Customer Chat on WhatsApp](https://wa.me/{wa_phone})", unsafe_allow_html=True)
+                    st.code(summary_text, language="text")
+                    st.info("💡 ऊपर दिए गए टेक्स्ट को कॉपी (Copy) करें, और WhatsApp चैट में जाकर पेस्ट (Ctrl + V) कर दें!")
                 else:
                     st.warning("Customer phone number not available for WhatsApp.")
         else:
