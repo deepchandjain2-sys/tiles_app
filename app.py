@@ -76,7 +76,7 @@ if "current_user" not in st.session_state:
 
 if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
     loaded_cust = load_customers_from_disk()
-    st.session_state.customers = loaded_cust if loaded_cust else [{"cid": "CUST-001", "name": "Vansh", "phone": "964444419", "city": "Hiriyur"}]
+    st.session_state.customers = [c for c in loaded_cust if c.get('name') and str(c.get('name')).lower() != 'nan'] if loaded_cust else []
 
 if "sales_history" not in st.session_state:
     st.session_state.sales_history = load_json_file(SALES_FILE, [])
@@ -347,15 +347,26 @@ if st.session_state.current_nav == "1 Customer Registration":
 
     with col2:
         st.markdown("### Select Active Customer")
-        if st.session_state.customers:
-            cust_options = {f"{c.get('name')} ({c.get('phone')} - {c.get('city', 'Hiriyur')})": c.get('cid') for c in st.session_state.customers if isinstance(c, dict)}
+        
+        # अमान्य (nan वाले) कस्टमर्स को फिल्टर करना
+        valid_customers = [c for c in st.session_state.customers if isinstance(c, dict) and c.get('name') and str(c.get('name')).lower() != 'nan']
+        
+        if valid_customers:
+            cust_options = {f"{c.get('name')} ({c.get('phone')} - {c.get('city', 'Hiriyur')})": c.get('cid') for c in valid_customers}
             if cust_options:
                 current_label = next((k for k, v in cust_options.items() if v == st.session_state.current_cid), None)
                 selected_label = st.selectbox("Existing Customers", options=list(cust_options.keys()), index=list(cust_options.keys()).index(current_label) if current_label and current_label in cust_options else 0)
                 if selected_label:
                     st.session_state.current_cid = cust_options[selected_label]
+            
+            st.markdown("---")
+            if st.button("🗑️ Clear / Reset Invalid Customers List"):
+                st.session_state.customers = valid_customers
+                save_customers_to_disk(st.session_state.customers)
+                st.success("Invalid customer list cleaned successfully!")
+                st.rerun()
         else:
-            st.warning("No customers registered yet.")
+            st.warning("No valid customers registered yet.")
 
 elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
     st.title("🪨 Tiles Selection & Saved Items")
@@ -623,10 +634,10 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     st.session_state.sales_history.append(sale_record)
                     save_json_file(SALES_FILE, st.session_state.sales_history)
                     
-                    st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid") != st.session_state.current_cid]
+                    st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid"] != st.session_state.current_cid]
                     save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
                     
-                    st.session_state.measurements_list = [m for m in st.session_state.measurements_list if m.get("cid") != st.session_state.current_cid]
+                    st.session_state.measurements_list = [m for m in st.session_state.measurements_list if m.get("cid"] != st.session_state.current_cid]
                     save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
                     
                     st.success("🎉 Sale successfully completed, added to Dashboard, and cleared from current selection!")
@@ -646,7 +657,8 @@ elif st.session_state.current_nav == "4 Sales Dashboard & History":
         total_sqft_sold = sales_df['total_sqft'].sum() if 'total_sqft' in sales_df.columns else 0
         total_orders = len(sales_df)
         
-        col_s1, col_s2, col_s3 = st.columns(3)
+        col_s1, col_s2, col_s3 = sub_cols = st.columns(3) if 'st' in globals() else (None, None, None)
+        # Using standard streamlit columns safely
         col_s1.metric("Total Orders Completed", total_orders)
         col_s2.metric("Total Boxes Sold", total_boxes_sold)
         col_s3.metric("Total Sq.Ft Sold", f"{total_sqft_sold:.2f}")
