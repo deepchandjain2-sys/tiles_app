@@ -17,6 +17,26 @@ st.set_page_config(
 )
 
 USERS_FILE = "users_db.json"
+SELECTIONS_FILE = "customer_selections.json"
+MEASUREMENTS_FILE = "customer_measurements.json"
+
+def load_json_file(filename, default_val):
+    if os.path.exists(filename):
+        try:
+            with open(filename, "r") as f:
+                data = json.load(f)
+                if isinstance(data, type(default_val)):
+                    return data
+        except:
+            pass
+    return default_val
+
+def save_json_file(filename, data):
+    try:
+        with open(filename, "w") as f:
+            json.dump(data, f)
+    except:
+        pass
 
 def load_users_from_disk():
     if os.path.exists(USERS_FILE):
@@ -44,6 +64,7 @@ def save_users_to_disk(users_list):
     except:
         pass
 
+# Initialize Session State & Persistent Storage
 if "registered_users" not in st.session_state or not isinstance(st.session_state.registered_users, list):
     st.session_state.registered_users = load_users_from_disk()
 
@@ -66,11 +87,12 @@ if "current_cid" not in st.session_state:
     else:
         st.session_state.current_cid = "CUST-001"
 
+# Load saved selections & measurements from disk
 if "my_selected_tiles" not in st.session_state:
-    st.session_state.my_selected_tiles = []
+    st.session_state.my_selected_tiles = load_json_file(SELECTIONS_FILE, [])
 
 if "measurements_list" not in st.session_state:
-    st.session_state.measurements_list = []
+    st.session_state.measurements_list = load_json_file(MEASUREMENTS_FILE, [])
 
 # --- SIDEBAR LOGIN & NAVIGATION ---
 st.sidebar.title("🪨 Jay Granite & Tiles")
@@ -302,7 +324,7 @@ if st.session_state.current_nav == "1 Customer Registration":
             st.warning("No customers registered yet.")
 
 elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
-    st.title("🪨 Tiles Selection (Floor & Area Wise)")
+    st.title("🪨 Tiles Selection & Saved Items")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -364,21 +386,33 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                     "item": selected_item_label
                 }
                 st.session_state.my_selected_tiles.append(selection_item)
+                save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
                 st.success(f"Added {selected_item_label} for {combined_location} successfully!")
+                st.rerun()
         else:
             st.info("No matching items found. Try a different search keyword.")
         
-        if st.session_state.my_selected_tiles:
-            st.markdown("---")
-            st.markdown("### 📋 Current Selections for Active Customer")
-            cust_selections = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
-            if cust_selections:
-                sel_df = pd.DataFrame(cust_selections)
-                st.dataframe(sel_df, use_container_width=True)
-            else:
-                st.info("No tiles selected for this customer yet.")
+        # --- SAVED SELECTIONS WITH DELETE BUTTON ---
+        st.markdown("---")
+        st.markdown("### 📋 Saved Selections for Active Customer")
+        cust_selections = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
+        if cust_selections:
+            for s_idx, sel_item in enumerate(cust_selections):
+                col_d1, col_d2, col_d3 = st.columns([2, 3, 1])
+                with col_d1:
+                    st.write(f"📍 **{sel_item.get('floor_area')}**")
+                with col_d2:
+                    st.write(f"🪨 {sel_item.get('item')}")
+                with col_d3:
+                    if st.button("🗑️ Delete", key=f"del_sel_{s_idx}_{sel_item.get('cid')}"):
+                        st.session_state.my_selected_tiles.remove(sel_item)
+                        save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
+                        st.success("Item removed successfully!")
+                        st.rerun()
+        else:
+            st.info("No tiles selected for this customer yet.")
     else:
-        st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
+        st.warning("⚠️ Item master data not found. Please check your Google Sheet / CSV.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     st.title("📐 Direct Square Feet & Exact Box Calculation")
@@ -393,7 +427,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
     else:
         st.markdown("### 📋 Customer Selected Items List")
-        st.info("💡 बिना किसी एक्स्ट्रा परसेंटेज (0% wastage) के सटीक स्क्वायर फीट और बॉक्स की गणना की जा रही है।")
+        st.info("💡 यहाँ आपके द्वारा सेव किए गए सारे आइटम्स दिख रहे हैं। स्क्वायर फीट दर्ज करके बॉक्स निकालें और सेव करें।")
 
         for idx, t_data in enumerate(cust_tiles):
             item_name = str(t_data.get('item', ''))
@@ -420,7 +454,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 con_factor = 4.0
                 packing_unit = 4.0
 
-            # 1 बॉक्स का कवरेज = Con Factor * Packing Unit
             box_coverage = con_factor * packing_unit
 
             with st.expander(f"📍 Area: {floor_area} ➔ Item: {item_name}", expanded=(idx == 0)):
@@ -432,7 +465,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 with col_i2:
                     customer_sqft = st.number_input("Enter Sq.Ft", min_value=0.0, value=100.0, step=5.0, key=f"sqft_{idx}_{t_data.get('cid')}")
                 
-                # सटीक फॉर्मूला (बिना किसी 3% अतिरिक्त के): Required Boxes = Math.Ceil(Sq.Ft / Box Coverage)
                 total_boxes = math.ceil(customer_sqft / box_coverage) if box_coverage > 0 else 0
                 
                 st.markdown(f"📦 **1 Box Coverage:** `{box_coverage:.2f} Sq.Ft` | 🔥 **Required Boxes:** `{total_boxes} Boxes` | 📐 **Input Sq.Ft:** `{customer_sqft:.2f} Sq.Ft`")
@@ -449,6 +481,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     if "measurements_list" not in st.session_state:
                         st.session_state.measurements_list = []
                     st.session_state.measurements_list.append(m_item)
+                    save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
                     st.success(f"Saved: {total_boxes} Boxes for {item_name} ({customer_sqft} Sq.Ft)")
 
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
@@ -456,8 +489,19 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         st.markdown("### 📋 Final Saved Quotation Summary")
         cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
         if cust_m:
-            m_df = pd.DataFrame(cust_m)
-            st.dataframe(m_df, use_container_width=True)
+            # --- SAVED QUOTATION SUMMARY WITH DELETE BUTTON ---
+            for m_idx, m_row in enumerate(cust_m):
+                col_m1, col_m2, col_m3 = st.columns([4, 2, 1])
+                with col_m1:
+                    st.write(f"📍 {m_row.get('area_design')} | {m_row.get('item_name')}")
+                with col_m2:
+                    st.write(f"📐 {m_row.get('sqft')} Sq.Ft | 📦 **{m_row.get('boxes')} Boxes**")
+                with col_m3:
+                    if st.button("🗑️ Remove", key=f"del_quot_{m_idx}_{m_row.get('cid')}"):
+                        st.session_state.measurements_list.remove(m_row)
+                        save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
+                        st.success("Quotation item removed!")
+                        st.rerun()
             
             st.markdown("---")
             st.markdown("### 📤 Export Quotation (PDF & WhatsApp)")
