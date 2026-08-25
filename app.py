@@ -87,7 +87,6 @@ if "current_cid" not in st.session_state:
     else:
         st.session_state.current_cid = "CUST-001"
 
-# Load saved selections & measurements from disk
 if "my_selected_tiles" not in st.session_state:
     st.session_state.my_selected_tiles = load_json_file(SELECTIONS_FILE, [])
 
@@ -244,41 +243,76 @@ def get_master_df():
                 pass
     return None
 
-# --- PDF GENERATOR FUNCTION ---
+# --- COLOURFUL PDF GENERATOR FUNCTION ---
 def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
     pdf.add_page()
+    
+    # Header Background Color (Deep Blue)
+    pdf.set_fill_color(31, 78, 121)
+    pdf.rect(0, 0, 210, 25, 'F')
+    
+    # Header Title (White Text)
     pdf.set_font("Arial", "B", 16)
-    
-    # Header
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(7)
     pdf.cell(200, 10, txt="JAY GRANITE & TILES HUB", ln=True, align="C")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(200, 6, txt="Hiriyur, Karnataka | Phone: 9999999999", ln=True, align="C")
-    pdf.ln(10)
     
-    # Customer Details
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(200, 8, txt=f"Customer Name: {customer_info.get('name', '')}", ln=True)
-    pdf.cell(200, 8, txt=f"Phone: {customer_info.get('phone', '')} | City: {customer_info.get('city', 'Hiriyur')}", ln=True)
+    # Subheader
+    pdf.set_font("Arial", "", 10)
+    pdf.set_y(28)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(200, 6, txt="Hiriyur, Karnataka | Phone: 9999999999", ln=True, align="C")
     pdf.ln(5)
     
-    # Table Header
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(60, 8, "Design / Area", 1)
-    pdf.cell(80, 8, "Item Name", 1)
-    pdf.cell(25, 8, "Sq.Ft", 1, align="C")
-    pdf.cell(25, 8, "Boxes", 1, align="C", ln=True)
+    # Customer Details Box (Light Grey Background with Blue Border)
+    pdf.set_fill_color(240, 244, 248)
+    pdf.set_draw_color(31, 78, 121)
+    pdf.rect(10, 38, 190, 20, 'DF')
     
-    # Table Rows
+    pdf.set_font("Arial", "B", 11)
+    pdf.set_text_color(31, 78, 121)
+    pdf.set_xy(15, 41)
+    pdf.cell(100, 6, txt=f"Customer Name: {customer_info.get('name', '')}", ln=False)
+    
     pdf.set_font("Arial", "", 10)
+    pdf.set_text_color(50, 50, 50)
+    pdf.set_xy(15, 49)
+    pdf.cell(180, 6, txt=f"Phone: {customer_info.get('phone', '')}   |   City: {customer_info.get('city', 'Hiriyur')}", ln=True)
+    pdf.ln(15)
+    
+    # Table Header (Colored Background)
+    pdf.set_fill_color(31, 78, 121)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "B", 10)
+    
+    pdf.cell(60, 8, "Design / Area", 1, 0, 'C', True)
+    pdf.cell(80, 8, "Item Name", 1, 0, 'C', True)
+    pdf.cell(25, 8, "Sq.Ft", 1, 0, 'C', True)
+    pdf.cell(25, 8, "Boxes", 1, 1, 'C', True)
+    
+    # Table Rows (Alternating Colors)
+    pdf.set_font("Arial", "", 10)
+    pdf.set_text_color(20, 20, 20)
+    
+    fill = False
     for item in items_list:
-        pdf.cell(60, 8, str(item.get('area_design', ''))[:30], 1)
-        pdf.cell(80, 8, str(item.get('item_name', ''))[:40], 1)
-        pdf.cell(25, 8, str(item.get('sqft', '')), 1, align="C")
-        pdf.cell(25, 8, str(item.get('boxes', '')), 1, align="C", ln=True)
+        if fill:
+            pdf.set_fill_color(245, 245, 245)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+            
+        pdf.cell(60, 8, str(item.get('area_design', ''))[:30], 1, 0, 'L', True)
+        pdf.cell(80, 8, str(item.get('item_name', ''))[:40], 1, 0, 'L', True)
+        pdf.cell(25, 8, str(item.get('sqft', '')), 1, 0, 'C', True)
+        pdf.cell(25, 8, str(item.get('boxes', '')), 1, 1, 'C', True)
+        fill = not fill
         
-    pdf.ln(10)
-    pdf.set_font("Arial", "I", 9)
+    pdf.ln(15)
+    
+    # Footer Note
+    pdf.set_font("Arial", "I", 10)
+    pdf.set_text_color(31, 78, 121)
     pdf.cell(200, 6, txt="Thank you for visiting Jay Granite & Tiles Hub!", ln=True, align="C")
     
     pdf_output_path = "quotation.pdf"
@@ -489,7 +523,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         st.markdown("### 📋 Final Saved Quotation Summary")
         cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
         if cust_m:
-            # --- SAVED QUOTATION SUMMARY WITH DELETE BUTTON ---
             for m_idx, m_row in enumerate(cust_m):
                 col_m1, col_m2, col_m3 = st.columns([4, 2, 1])
                 with col_m1:
@@ -512,12 +545,12 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         pdf_file = generate_pdf_quotation(active_cust, cust_m)
                         with open(pdf_file, "rb") as f:
                             st.download_button(
-                                label="📥 Click Here to Download PDF File",
+                                label="📥 Click Here to Download Colourful PDF",
                                 data=f,
                                 file_name=f"Quotation_{active_cust.get('name', 'Customer')}.pdf",
                                 mime="application/pdf"
                             )
-                        st.success("PDF generated successfully! Click above to download.")
+                        st.success("Colourful PDF generated successfully! Click above to download.")
                     except Exception as e:
                         st.error(f"Error generating PDF: {e}")
             with col_wa:
