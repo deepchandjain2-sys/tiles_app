@@ -379,19 +379,39 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         floor_options = ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Staircase", "Elevation / Parking"]
         selected_floor = st.selectbox("Select Floor", floor_options)
         
-        area_options = [
-            "Living Room / Hall", 
-            "Kitchen", 
-            "Master Bedroom", 
-            "Children Bedroom", 
-            "Common Bathroom", 
-            "Attached Bathroom", 
-            "Balcony", 
-            "Verandah", 
-            "Dining Area", 
-            "Other Area"
-        ]
-        selected_area = st.selectbox("Select Building Area / Room", area_options)
+        # 1. Category Selection (Floor Area vs Wall Area)
+        area_category = st.radio("Select Area Type", ["Floor Area", "Wall Area"], horizontal=True)
+        
+        if area_category == "Floor Area":
+            default_areas = [
+                "Living Room / Hall", 
+                "Kitchen", 
+                "Master Bedroom", 
+                "Children Bedroom", 
+                "Common Bathroom", 
+                "Attached Bathroom", 
+                "Balcony", 
+                "Verandah", 
+                "Dining Area", 
+                "Other Area"
+            ]
+        else:
+            default_areas = [
+                "Pooja Wall",
+                "Kitchen Wall",
+                "Bathroom Wall",
+                "Living Room Wall",
+                "Elevation Wall",
+                "Other Wall"
+            ]
+            
+        area_choice = st.selectbox("Select Building Area / Room", default_areas + ["➕ Add Custom Area (Manually)"])
+        
+        if area_choice == "➕ Add Custom Area (Manually)":
+            custom_area_name = st.text_input("Enter Custom Area Name (e.g., Guest Room Floor, Washbasin Wall)")
+            selected_area = custom_area_name.strip() if custom_area_name.strip() else "Custom Area"
+        else:
+            selected_area = area_choice
         
         search_query = st.text_input("🔍 Search Tile / Granite Name or Code")
         
@@ -604,8 +624,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     st.session_state.sales_history.append(sale_record)
                     save_json_file(SALES_FILE, st.session_state.sales_history)
                     
-                    # Sale complete hone par is customer ke selections aur measurements saaf kar dein
-                    st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid") != st.session_state.current_cid]
+                    st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid"] != st.session_state.current_cid]
                     save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
                     
                     st.session_state.measurements_list = [m for m in st.session_state.measurements_list if m.get("cid") != st.session_state.current_cid]
