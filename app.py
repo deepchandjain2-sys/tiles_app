@@ -16,6 +16,25 @@ st.set_page_config(
     page_title="Jay Granite & Tiles Hub", page_icon="🪨", layout="wide"
 )
 
+# Custom Styling to make UI attractive & modern
+st.markdown("""
+    <style>
+    .main-header {
+        font-size: 26px;
+        font-weight: 700;
+        color: #1f4e79;
+        margin-bottom: 15px;
+    }
+    .card-box {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #e1e4e8;
+        margin-bottom: 15px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 USERS_FILE = "users_db.json"
 SELECTIONS_FILE = "customer_selections.json"
 MEASUREMENTS_FILE = "customer_measurements.json"
@@ -321,69 +340,67 @@ def generate_pdf_quotation(customer_info, items_list):
 
 # --- APP SECTIONS ---
 if st.session_state.current_nav == "1 Customer Registration":
-    st.title("👥 Customer Registration & Selection")
+    st.markdown('<div class="main-header">👥 Customer Registration & Selection</div>', unsafe_allow_html=True)
+    
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("### Register New Customer")
-        with st.form("new_cust_form"):
-            c_name = st.text_input("Customer Name")
-            c_phone = st.text_input("Phone Number")
-            c_city = st.text_input("City / Location", value="Hiriyur")
-            submitted_c = st.form_submit_button("Save Customer")
+        with st.container():
+            st.markdown("### 📝 Register New Customer")
+            with st.form("new_cust_form"):
+                c_name = st.text_input("Customer Name")
+                c_phone = st.text_input("Phone Number")
+                c_city = st.text_input("City / Location", value="Hiriyur")
+                submitted_c = st.form_submit_button("💾 Save Customer")
 
-            if submitted_c:
-                if c_name.strip() and c_phone.strip():
-                    if not isinstance(st.session_state.customers, list):
-                        st.session_state.customers = []
-                    new_cid = f"CUST-{len(st.session_state.customers) + 1:03d}"
-                    cust_obj = {"cid": new_cid, "name": c_name.strip(), "phone": c_phone.strip(), "city": c_city.strip()}
-                    st.session_state.customers.append(cust_obj)
-                    save_customers_to_disk(st.session_state.customers)
-                    st.session_state.current_cid = new_cid
-                    st.success(f"Customer {c_name} registered successfully!")
-                    st.rerun()
-                else:
-                    st.error("Please provide both Name and Phone number.")
+                if submitted_c:
+                    if c_name.strip() and c_phone.strip():
+                        if not isinstance(st.session_state.customers, list):
+                            st.session_state.customers = []
+                        new_cid = f"CUST-{len(st.session_state.customers) + 1:03d}"
+                        cust_obj = {"cid": new_cid, "name": c_name.strip(), "phone": c_phone.strip(), "city": c_city.strip()}
+                        st.session_state.customers.append(cust_obj)
+                        save_customers_to_disk(st.session_state.customers)
+                        st.session_state.current_cid = new_cid
+                        st.success(f"Customer {c_name} registered successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Please provide both Name and Phone number.")
 
     with col2:
-        st.markdown("### Select & Manage Customers")
-        
-        if st.session_state.customers:
-            cust_options = {f"{c.get('name')} ({c.get('phone')} - {c.get('city', 'Hiriyur')})": c.get('cid') for c in st.session_state.customers if isinstance(c, dict) and c.get('name')}
-            if cust_options:
-                current_label = next((k for k, v in cust_options.items() if v == st.session_state.current_cid), None)
-                selected_label = st.selectbox("Existing Customers", options=list(cust_options.keys()), index=list(cust_options.keys()).index(current_label) if current_label and current_label in cust_options else 0)
-                if selected_label:
-                    st.session_state.current_cid = cust_options[selected_label]
-            
-            st.markdown("---")
-            # --- Individual Customer Delete Button ---
-            if st.button("🗑️ Delete Selected Customer"):
-                target_cid = st.session_state.current_cid
-                # Remove customer from list
-                st.session_state.customers = [c for c in st.session_state.customers if c.get('cid') != target_cid]
-                save_customers_to_disk(st.session_state.customers)
+        with st.container():
+            st.markdown("### 🗂️ Select & Manage Customers")
+            if st.session_state.customers:
+                cust_options = {f"{c.get('name')} ({c.get('phone')} - {c.get('city', 'Hiriyur')})": c.get('cid') for c in st.session_state.customers if isinstance(c, dict) and c.get('name')}
+                if cust_options:
+                    current_label = next((k for k, v in cust_options.items() if v == st.session_state.current_cid), None)
+                    selected_label = st.selectbox("Existing Customers", options=list(cust_options.keys()), index=list(cust_options.keys()).index(current_label) if current_label and current_label in cust_options else 0)
+                    if selected_label:
+                        st.session_state.current_cid = cust_options[selected_label]
                 
-                # Also clean up their selections & measurements
-                st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get('cid') != target_cid]
-                save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
-                
-                st.session_state.measurements_list = [m for m in st.session_state.measurements_list if m.get('cid') != target_cid]
-                save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
-                
-                # Reset current_cid to first available customer if any
-                if st.session_state.customers:
-                    st.session_state.current_cid = st.session_state.customers[0].get('cid')
-                else:
-                    st.session_state.current_cid = ""
+                st.markdown("---")
+                if st.button("🗑️ Delete Selected Customer"):
+                    target_cid = st.session_state.current_cid
+                    st.session_state.customers = [c for c in st.session_state.customers if c.get('cid') != target_cid]
+                    save_customers_to_disk(st.session_state.customers)
                     
-                st.success("Selected customer deleted successfully!")
-                st.rerun()
-        else:
-            st.warning("No customers registered yet.")
+                    st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get('cid') != target_cid]
+                    save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
+                    
+                    st.session_state.measurements_list = [m for m in st.session_state.measurements_list if m.get('cid') != target_cid]
+                    save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
+                    
+                    if st.session_state.customers:
+                        st.session_state.current_cid = st.session_state.customers[0].get('cid')
+                    else:
+                        st.session_state.current_cid = ""
+                        
+                    st.success("Selected customer deleted successfully!")
+                    st.rerun()
+            else:
+                st.info("No customers registered yet. Please register a customer on the left.")
 
 elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
-    st.title("🪨 Tiles Selection & Saved Items")
+    st.markdown('<div class="main-header">🪨 Tiles Selection & Saved Items</div>', unsafe_allow_html=True)
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -510,7 +527,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.warning("⚠️ Item master data not found. Please check your Google Sheet / CSV.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Direct Square Feet & Exact Box Calculation")
+    st.markdown('<div class="main-header">📐 Direct Square Feet & Exact Box Calculation</div>', unsafe_allow_html=True)
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -660,7 +677,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             st.info("No quotation items saved for this customer yet.")
 
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
-    st.title("📊 Sales Dashboard & History")
+    st.markdown('<div class="main-header">📊 Sales Dashboard & History</div>', unsafe_allow_html=True)
     st.markdown("### 📈 Completed Sales History & Analytics")
     
     if st.session_state.sales_history:
@@ -679,7 +696,7 @@ elif st.session_state.current_nav == "4 Sales Dashboard & History":
         st.info("No sales records found yet. Complete a sale from section '3 Measurements, PDF & WhatsApp' using the 'Complete Sale' button.")
 
 elif st.session_state.current_nav == "5 Salesman Progress Report":
-    st.title("📈 Salesman Progress Report (Admin Panel)")
+    st.markdown('<div class="main-header">📈 Salesman Progress Report (Admin Panel)</div>', unsafe_allow_html=True)
     st.markdown("Here you can track performance and sales generated by each salesman.")
     if st.session_state.sales_history:
         st.write(st.session_state.sales_history)
