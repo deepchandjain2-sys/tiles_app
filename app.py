@@ -606,7 +606,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             item_name = clean_item_name(raw_item_name)
             floor_area = t_data.get('floor_area')
             
-            # --- Dynamic Size Conversion Factors (Including 4x6 = 23.25 or 23.5) ---
+            # --- Dynamic Size Conversion Factors (Including 4x6 = 23.25) ---
             con_factor = 8.0
             packing_unit = 2.0
             
@@ -723,19 +723,21 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             with col_wa:
                 if active_cust and active_cust.get('phone'):
                     wa_phone = str(active_cust.get('phone')).strip()
-                    summary_text = f"🪨 *JAY GRANITE & TILES HUB* 🪨\n"
-                    summary_text += f"Quotation for: *{active_cust.get('name')}*\n\n"
+                    
+                    # --- Simplified Stock Check WhatsApp Message (Only Customer Name, Item Name, Required Boxes & Blank for Reply) ---
+                    stock_msg = f"🪨 *STOCK CHECK REQUEST* 🪨\n"
+                    stock_msg += f"Customer: *{active_cust.get('name')}*\n\n"
                     for item in cust_m:
                         c_name = clean_item_name(item.get('item_name'))
-                        summary_text += f"📍 *Area:* {item.get('area_design')}\n"
-                        summary_text += f"   *Item:* {c_name}\n"
-                        summary_text += f"   *Sq.Ft:* {item.get('sqft')} | *Boxes:* {item.get('boxes')}\n\n"
-                    summary_text += "Thank you for visiting Jay Granite & Tiles Hub! - 9742222219"
+                        stock_msg += f"• *Item:* {c_name}\n"
+                        stock_msg += f"  *Req Boxes:* {item.get('boxes')}\n"
+                        stock_msg += f"  *Physical Stock:* [______]\n\n"
+                    stock_msg += "👉 Please reply with available physical stock count."
                     
-                    with st.expander("💬 View / Copy WhatsApp Message"):
-                        st.markdown(f"1️⃣ [Click here to open Customer Chat on WhatsApp](https://wa.me/{wa_phone})", unsafe_allow_html=True)
-                        st.code(summary_text, language="text")
-                        st.info("💡 ऊपर दिए गए टेक्स्ट को कॉपी करें और WhatsApp चैट में पेस्ट (Ctrl + V) कर दें!")
+                    with st.expander("💬 View / Copy Stock Check WhatsApp Message"):
+                        st.markdown(f"1️⃣ [Click here to open Manager Chat on WhatsApp](https://wa.me/{wa_phone})", unsafe_allow_html=True)
+                        st.code(stock_msg, language="text")
+                        st.info("💡 ऊपर दिए गए छोटे मैसेज को कॉपी करें और WhatsApp में मैनेजर को भेज दें। वे सीधे रिप्लाई में स्टॉक लिखकर भेज सकेंगे!")
                 else:
                     st.warning("Customer phone number not available for WhatsApp.")
             
