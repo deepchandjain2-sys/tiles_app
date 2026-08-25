@@ -1,11 +1,15 @@
 import json
 import os
 import math
-import urllib.parse
 import pandas as pd
 import streamlit as st
 from calculations import calculate_boxes, calculate_box_sqft
-from database import load_stock_from_disk, load_stock_from_upload, save_customers_to_disk, load_customers_from_disk
+from database import (
+    load_stock_from_disk, 
+    load_stock_from_upload, 
+    save_customers_to_disk, 
+    load_customers_from_disk
+)
 
 st.set_page_config(
     page_title="Jay Granite & Tiles Hub", page_icon="🪨", layout="wide"
@@ -39,7 +43,7 @@ def save_users_to_disk(users_list):
     except:
         pass
 
-# Initialize Session State safely
+# Initialize Session State
 if "registered_users" not in st.session_state or not isinstance(st.session_state.registered_users, list):
     st.session_state.registered_users = load_users_from_disk()
 
@@ -68,7 +72,7 @@ if "my_selected_tiles" not in st.session_state:
 if "measurements_list" not in st.session_state:
     st.session_state.measurements_list = []
 
-# --- SIDEBAR ADVANCED LOGIN & NAVIGATION ---
+# --- SIDEBAR LOGIN & NAVIGATION ---
 st.sidebar.title("🪨 Jay Granite & Tiles")
 
 if st.session_state.logged_in:
@@ -202,7 +206,7 @@ if not st.session_state.logged_in:
     st.info("👈 Please use the sidebar to **Login**, **Register Salesman**, or **Reset PIN** to access your application.")
     st.stop()
 
-# --- DATABASE MASTER LOADER ---
+# --- MASTER LOADER ---
 def get_master_df():
     df = load_stock_from_disk()
     if df is not None and not df.empty:
@@ -218,7 +222,7 @@ def get_master_df():
                 pass
     return None
 
-# --- MAIN APP SECTIONS ---
+# --- APP SECTIONS ---
 if st.session_state.current_nav == "1 Customer Registration":
     st.title("👥 Customer Registration & Selection")
     col1, col2 = st.columns(2)
@@ -336,7 +340,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Measurements & Box Calculations (Item-Wise)")
+    st.title("📐 Measurements & Box Calculations (All Selected Items)")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -347,121 +351,62 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     if not cust_tiles:
         st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
     else:
-        st.markdown("### 1. Select Item & Location from Customer Selections")
-        
-        tile_options = {f"{t.get('floor_area')} ➔ {t.get('item')}": t for t in cust_tiles}
-        selected_tile_label = st.selectbox("Choose Selected Tile / Area", options=list(tile_options.keys()))
-        selected_tile_data = tile_options[selected_tile_label]
-        
-        st.info(f"📌 **Selected Location & Item:** {selected_tile_label}")
+        st.markdown("### 📋 Customer Selected Items List")
+        st.info("💡 नीचे आपके द्वारा चुने गए सभी आइटम्स दिख रहे हैं। हर आइटम के सामने उसकी माप और Con Factor / Packing Unit दर्ज करें।")
 
-        st.markdown("---")
-        st.markdown("### 2. Enter Measurement (Length × Width)")
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            length = st.number_input("Length (Feet)", min_value=0.0, value=10.0, step=0.5)
-        with col_m2:
-            width = st.number_input("Width / Height (Feet)", min_value=0.0, value=10.0, step=0.5)
+        for idx, t_data in enumerate(cust_tiles):
+            item_name = t_data.get('item')
+            floor_area = t_data.get('floor_area')
             
-        customer_sqft = length * width
-        st.write(f"📏 **Customer Required Area:** `{customer_sqft:.2f} Sq.Ft`")
-
-        st.markdown("---")
-        st.markdown("### 3. Tile Packing Details (Auto-fetched from Master Data)")
-        
-        # मास्टर डेटा से चुनी गई टाइल का Con Factor और Packing Unit स्वतः ढूँढना
-        df_master = get_master_df()
-        default_cf = 1.5
-        default_pu = 6.0
-        
-        if df_master is not None and not df_master.empty:
-            item_full_text = str(selected_tile_data.get('item', ''))
-            item_code = item_full_text.split('-')[0].strip() # कोड या नाम का पहला हिस्सा लें
-            
-            # मास्टर डेटा में आइटम कोड/नाम से रो मैच करें
-            matched_row = df_master[df_master.astype(str).apply(lambda row: row.str.contains(item_code, case=False, na=False).any(), axis=1)]
-            if not matched_row.empty:
-                try:
-                    # आपकी गूगल शीट के अनुसार: Packing Unit और Con Factor के कॉलम इंडेक्स
-                    # कॉलम G या H के आसपास Con Factor और Packing Unit हो सकते हैं
-                    row_vals = matched_row.iloc[0].values
-                    for val in row_vals:
-                        try:
-                            f_val = float(val)
-                            # यदि वैल्यू रीज़नेबल कॉन फैक्टर या पैकिंग यूनिट है
-                            if 0.1 <= f_val <= 100:
-                                pass
-                        except:
-                            pass
+            with st.expander(f"📍 [{floor_area}] ➔ 🪨 {item_name}", expanded=(idx == 0)):
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    length = st.number_input("Length (Feet)", min_value=0.0, value=10.0, step=0.5, key=f"len_{idx}_{t_data.get('cid')}")
+                with col_m2:
+                    width = st.number_input("Width / Height (Feet)", min_value=0.0, value=10.0, step=0.5, key=f"wid_{idx}_{t_data.get('cid')}")
                     
-                    # आपकी शीट के लेआउट के अनुसार सुरक्षित कॉलम मैपिंग (जैसे Con Factor और Packing Unit)
-                    if len(matched_row.columns) >= 8:
-                        # सामान्यतः कॉलम G/H में होते हैं
-                        for col_idx in range(len(matched_row.columns)):
-                            col_name_header = str(matched_row.columns[col_idx]).upper()
-                            cell_val = matched_row.iloc[0, col_idx]
-                            if "CON" in col_name_header:
-                                default_cf = float(cell_val)
-                            elif "PACK" in col_name_header or "UNIT" in col_name_header:
-                                default_pu = float(cell_val)
-                    
-                    # अगर हेडर से न मिले तो फिक्स पोजीशन इंडेक्स ट्राई करें (जैसे कॉलम index 4 और 6)
-                    if default_cf == 1.5 and len(matched_row.columns) > 6:
-                        try:
-                            default_cf = float(matched_row.iloc[0, 6]) # Con Factor column index
-                        except:
-                            pass
-                    if default_pu == 6.0 and len(matched_row.columns) > 4:
-                        try:
-                            default_pu = float(matched_row.iloc[0, 4]) # Packing Unit column index
-                        except:
-                            pass
-                except Exception as e:
-                    pass
-
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            con_factor = st.number_input("CON FACTOR (1 Tile Sq.Ft)", min_value=0.01, value=float(default_cf), step=0.01)
-        with col_p2:
-            packing_unit = st.number_input("PACKING UNIT (Pcs/Box)", min_value=1.0, value=float(default_pu), step=1.0)
-            
-        # calculations.py के फंक्शन्स का सटीक उपयोग
-        box_sqft = calculate_box_sqft(con_factor, packing_unit)
-        total_boxes = calculate_boxes(customer_sqft, con_factor, packing_unit)
-        total_supplied_sqft = total_boxes * box_sqft
-        
-        st.markdown("---")
-        st.markdown("### 📊 Calculation Summary")
-        res_col1, res_col2, res_col3 = st.columns(3)
-        res_col1.metric("📦 1 Box Coverage", f"{box_sqft:.2f} Sq.Ft")
-        res_col2.metric("📦 Total Boxes Needed", f"{total_boxes} Boxes")
-        res_col3.metric("📐 Total Billing Area", f"{total_supplied_sqft:.2f} Sq.Ft")
-        
-        if st.button("💾 Save Measurement & Boxes to Bill"):
-            m_item = {
-                "cid": st.session_state.current_cid,
-                "floor_area": selected_tile_data.get('floor_area'),
-                "item": selected_tile_data.get('item'),
-                "length": length,
-                "width": width,
-                "cust_sqft": customer_sqft,
-                "boxes": total_boxes,
-                "total_sqft": total_supplied_sqft
-            }
-            if "measurements_list" not in st.session_state:
-                st.session_state.measurements_list = []
-            st.session_state.measurements_list.append(m_item)
-            st.success(f"Saved: {total_boxes} Boxes for {selected_tile_data.get('item')}")
+                customer_sqft = length * width
+                
+                col_p1, col_p2 = st.columns(2)
+                with col_p1:
+                    con_factor = st.number_input("CON FACTOR (1 Tile Sq.Ft)", min_value=0.01, value=8.0, step=0.5, key=f"cf_{idx}_{t_data.get('cid')}")
+                with col_p2:
+                    packing_unit = st.number_input("PACKING UNIT (Pcs/Box)", min_value=1.0, value=2.0, step=1.0, key=f"pu_{idx}_{t_data.get('cid')}")
+                
+                box_sqft = calculate_box_sqft(con_factor, packing_unit)
+                total_boxes = calculate_boxes(customer_sqft, con_factor, packing_unit)
+                total_supplied_sqft = total_boxes * box_sqft
+                
+                st.markdown(f"**📊 कैलकुलेशन रिजल्ट:** एरिया: `{customer_sqft:.2f} Sq.Ft` | 1 बॉक्स कवरेज: `{box_sqft:.2f} Sq.Ft` | **आवश्यक बॉक्स: `{total_boxes} Boxes`** (कुल एरिया: `{total_supplied_sqft:.2f} Sq.Ft`)")
+                
+                if st.button(f"💾 Save Calculation for {item_name}", key=f"save_btn_{idx}_{t_data.get('cid')}"):
+                    m_item = {
+                        "cid": st.session_state.current_cid,
+                        "floor_area": floor_area,
+                        "item": item_name,
+                        "length": length,
+                        "width": width,
+                        "cust_sqft": customer_sqft,
+                        "con_factor": con_factor,
+                        "packing_unit": int(packing_unit),
+                        "boxes": total_boxes,
+                        "total_sqft": total_supplied_sqft
+                    }
+                    if "measurements_list" not in st.session_state:
+                        st.session_state.measurements_list = []
+                    st.session_state.measurements_list.append(m_item)
+                    st.success(f"Successfully saved {total_boxes} boxes for {item_name}!")
 
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
         st.markdown("---")
-        st.markdown("### 📋 Saved Measurements & Boxes Sheet")
+        st.markdown("### 📋 Final Saved Measurements & Boxes Summary")
         cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
         if cust_m:
             m_df = pd.DataFrame(cust_m)
             st.dataframe(m_df, use_container_width=True)
         else:
             st.info("No calculations saved for this customer yet.")
+
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.title("📊 Sales Dashboard & History")
     st.info("Sales history and analytics view.")
