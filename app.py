@@ -2,6 +2,7 @@ import json
 import os
 import math
 import urllib.parse
+import io
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
@@ -340,11 +341,9 @@ def generate_pdf_quotation(customer_info, items_list):
 
 # --- HORIZONTAL (LANDSCAPE) PROGRESS REPORT PDF GENERATOR ---
 def generate_horizontal_progress_pdf(sales_data):
-    # orientation='L' means Landscape (Horizontal)
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
     
-    # Header Background Banner
     pdf.set_fill_color(31, 78, 121)
     pdf.rect(0, 0, 297, 25, 'F')
     
@@ -359,7 +358,6 @@ def generate_horizontal_progress_pdf(sales_data):
     pdf.cell(297, 6, txt="Hiriyur, Karnataka | Phone: 9742222219 | Horizontal Landscape Report", ln=True, align="C")
     pdf.ln(5)
     
-    # Table Header
     pdf.set_fill_color(31, 78, 121)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", "B", 10)
@@ -678,8 +676,8 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         st.rerun()
             
             st.markdown("---")
-            st.markdown("### 📤 Export Quotation (PDF & WhatsApp)")
-            col_pdf, col_wa, col_complete = st.columns(3)
+            st.markdown("### 📤 Export Quotation, Excel & WhatsApp")
+            col_pdf, col_excel, col_wa, col_complete = st.columns(4)
             with col_pdf:
                 if st.button("📥 Download PDF Quotation"):
                     try:
@@ -694,6 +692,31 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         st.success("Colourful PDF generated successfully! Click above to download.")
                     except Exception as e:
                         st.error(f"Error generating PDF: {e}")
+            with col_excel:
+                # --- Excel Export for Manager Stock Verification ---
+                excel_data = []
+                for item in cust_m:
+                    excel_data.append({
+                        "Customer Name": active_cust.get('name', ''),
+                        "Area / Design": item.get('area_design', ''),
+                        "Item Name": clean_item_name(item.get('item_name', '')),
+                        "Required Sq.Ft": item.get('sqft', 0),
+                        "Required Boxes": item.get('boxes', 0),
+                        "Physical Stock Available (Fill Here)": "" # Editable column for manager
+                    })
+                df_excel = pd.DataFrame(excel_data)
+                
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_excel.to_excel(writer, index=False, sheet_name='Stock Verification')
+                excel_bytes = output.getvalue()
+                
+                st.download_button(
+                    label="📊 Download Stock Excel for Manager",
+                    data=excel_bytes,
+                    file_name=f"Stock_Check_{active_cust.get('name', 'Customer')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
             with col_wa:
                 if active_cust and active_cust.get('phone'):
                     wa_phone = str(active_cust.get('phone')).strip()
