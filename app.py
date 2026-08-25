@@ -64,7 +64,6 @@ def save_users_to_disk(users_list):
     except:
         pass
 
-# Initialize Session State & Persistent Storage
 if "registered_users" not in st.session_state or not isinstance(st.session_state.registered_users, list):
     st.session_state.registered_users = load_users_from_disk()
 
@@ -243,29 +242,32 @@ def get_master_df():
                 pass
     return None
 
-# --- COLOURFUL PDF GENERATOR FUNCTION (UPDATED PHONE NUMBER) ---
+def clean_item_name(raw_name):
+    name_str = str(raw_name).strip()
+    if name_str.lower().startswith("nan -"):
+        name_str = name_str[5:].strip()
+    elif name_str.lower().startswith("nan"):
+        name_str = name_str[3:].strip()
+    return name_str
+
 def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
     pdf.add_page()
     
-    # Header Background Color (Deep Blue)
     pdf.set_fill_color(31, 78, 121)
     pdf.rect(0, 0, 210, 25, 'F')
     
-    # Header Title (White Text)
     pdf.set_font("Arial", "B", 16)
     pdf.set_text_color(255, 255, 255)
     pdf.set_y(7)
     pdf.cell(200, 10, txt="JAY GRANITE & TILES HUB", ln=True, align="C")
     
-    # Subheader with updated phone number
     pdf.set_font("Arial", "", 10)
     pdf.set_y(28)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(200, 6, txt="Hiriyur, Karnataka | Phone: 9742222219", ln=True, align="C")
     pdf.ln(5)
     
-    # Customer Details Box
     pdf.set_fill_color(240, 244, 248)
     pdf.set_draw_color(31, 78, 121)
     pdf.rect(10, 38, 190, 20, 'DF')
@@ -281,7 +283,6 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.cell(180, 6, txt=f"Phone: {customer_info.get('phone', '')}   |   City: {customer_info.get('city', 'Hiriyur')}", ln=True)
     pdf.ln(15)
     
-    # Table Header
     pdf.set_fill_color(31, 78, 121)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", "B", 10)
@@ -291,7 +292,6 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.cell(25, 8, "Sq.Ft", 1, 0, 'C', True)
     pdf.cell(25, 8, "Boxes", 1, 1, 'C', True)
     
-    # Table Rows
     pdf.set_font("Arial", "", 10)
     pdf.set_text_color(20, 20, 20)
     
@@ -302,15 +302,14 @@ def generate_pdf_quotation(customer_info, items_list):
         else:
             pdf.set_fill_color(255, 255, 255)
             
+        cleaned_name = clean_item_name(item.get('item_name', ''))
         pdf.cell(60, 8, str(item.get('area_design', ''))[:30], 1, 0, 'L', True)
-        pdf.cell(80, 8, str(item.get('item_name', ''))[:40], 1, 0, 'L', True)
+        pdf.cell(80, 8, cleaned_name[:40], 1, 0, 'L', True)
         pdf.cell(25, 8, str(item.get('sqft', '')), 1, 0, 'C', True)
         pdf.cell(25, 8, str(item.get('boxes', '')), 1, 1, 'C', True)
         fill = not fill
         
     pdf.ln(15)
-    
-    # Footer Note
     pdf.set_font("Arial", "I", 10)
     pdf.set_text_color(31, 78, 121)
     pdf.cell(200, 6, txt="Thank you for visiting Jay Granite & Tiles Hub!", ln=True, align="C")
@@ -406,27 +405,43 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
             for idx, row in filtered_df.iterrows():
                 code_val = str(row.iloc[0]).strip()
                 name_val = str(row.iloc[1]).strip() if len(df.columns) > 1 else ""
-                display_text = f"{code_val} - {name_val}" if name_val and name_val.lower() != 'nan' else code_val
+                
+                if code_val.lower() == 'nan':
+                    code_val = ""
+                if name_val.lower() == 'nan':
+                    name_val = ""
+                    
+                if code_val and name_val:
+                    display_text = f"{code_val} - {name_val}"
+                elif code_val:
+                    display_text = code_val
+                elif name_val:
+                    display_text = name_val
+                else:
+                    continue
+                    
                 options_list.append(display_text)
                 
-            selected_item_label = st.selectbox("Choose Tile Item", options=options_list)
-            
-            if st.button("➕ Add Tile to Customer Selection"):
-                combined_location = f"{selected_floor} - {selected_area}"
-                selection_item = {
-                    "cid": st.session_state.current_cid,
-                    "customer_name": active_cust.get('name') if active_cust else "Unknown",
-                    "floor_area": combined_location,
-                    "item": selected_item_label
-                }
-                st.session_state.my_selected_tiles.append(selection_item)
-                save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
-                st.success(f"Added {selected_item_label} for {combined_location} successfully!")
-                st.rerun()
+            if options_list:
+                selected_item_label = st.selectbox("Choose Tile Item", options=options_list)
+                
+                if st.button("➕ Add Tile to Customer Selection"):
+                    combined_location = f"{selected_floor} - {selected_area}"
+                    selection_item = {
+                        "cid": st.session_state.current_cid,
+                        "customer_name": active_cust.get('name') if active_cust else "Unknown",
+                        "floor_area": combined_location,
+                        "item": selected_item_label
+                    }
+                    st.session_state.my_selected_tiles.append(selection_item)
+                    save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
+                    st.success(f"Added {selected_item_label} for {combined_location} successfully!")
+                    st.rerun()
+            else:
+                st.warning("No valid items found in master.")
         else:
             st.info("No matching items found. Try a different search keyword.")
         
-        # --- SAVED SELECTIONS WITH DELETE BUTTON ---
         st.markdown("---")
         st.markdown("### 📋 Saved Selections for Active Customer")
         cust_selections = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
@@ -436,7 +451,8 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
                 with col_d1:
                     st.write(f"📍 **{sel_item.get('floor_area')}**")
                 with col_d2:
-                    st.write(f"🪨 {sel_item.get('item')}")
+                    cleaned_item_name = clean_item_name(sel_item.get('item'))
+                    st.write(f"🪨 {cleaned_item_name}")
                 with col_d3:
                     if st.button("🗑️ Delete", key=f"del_sel_{s_idx}_{sel_item.get('cid')}"):
                         st.session_state.my_selected_tiles.remove(sel_item)
@@ -464,10 +480,10 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         st.info("💡 यहाँ आपके द्वारा सेव किए गए सारे आइटम्स दिख रहे हैं। स्क्वायर फीट दर्ज करके बॉक्स निकालें और सेव करें।")
 
         for idx, t_data in enumerate(cust_tiles):
-            item_name = str(t_data.get('item', ''))
+            raw_item_name = str(t_data.get('item', ''))
+            item_name = clean_item_name(raw_item_name)
             floor_area = t_data.get('floor_area')
             
-            # साइज के अनुसार सटीक Con Factor और Packing Unit
             con_factor = 8.0
             packing_unit = 2.0
             
@@ -521,12 +537,13 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
         st.markdown("---")
         st.markdown("### 📋 Final Saved Quotation Summary")
-        cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
+        cust_m = [m for m in st.session_state.measurements_list if m.get("cid"] == st.session_state.current_cid]
         if cust_m:
             for m_idx, m_row in enumerate(cust_m):
                 col_m1, col_m2, col_m3 = st.columns([4, 2, 1])
                 with col_m1:
-                    st.write(f"📍 {m_row.get('area_design')} | {m_row.get('item_name')}")
+                    cleaned_name = clean_item_name(m_row.get('item_name'))
+                    st.write(f"📍 {m_row.get('area_design')} | {cleaned_name}")
                 with col_m2:
                     st.write(f"📐 {m_row.get('sqft')} Sq.Ft | 📦 **{m_row.get('boxes')} Boxes**")
                 with col_m3:
@@ -555,12 +572,20 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         st.error(f"Error generating PDF: {e}")
             with col_wa:
                 if active_cust and active_cust.get('phone'):
-                    wa_phone = active_cust.get('phone')
-                    summary_text = f"Quotation for {active_cust.get('name')}:\n"
+                    wa_phone = str(active_cust.get('phone')).strip()
+                    
+                    # फॉर्मेट तैयार करना ताकि WhatsApp पर सीधा सुंदर मैसेज जाए
+                    summary_text = f"🪨 *JAY GRANITE & TILES HUB* 🪨\n"
+                    summary_text += f"Quotation for: *{active_cust.get('name')}*\n\n"
                     for item in cust_m:
-                        summary_text += f"- {item.get('area_design')} | {item.get('item_name')} | {item.get('sqft')} Sq.Ft | {item.get('boxes')} Boxes\n"
+                        c_name = clean_item_name(item.get('item_name'))
+                        summary_text += f"📍 *Area:* {item.get('area_design')}\n"
+                        summary_text += f"   *Item:* {c_name}\n"
+                        summary_text += f"   *Sq.Ft:* {item.get('sqft')} | *Boxes:* {item.get('boxes')}\n\n"
+                    summary_text += "Thank you for visiting Jay Granite & Tiles Hub! - 9742222219"
+                    
                     wa_msg = urllib.parse.quote(summary_text)
-                    st.markdown(f"📱 [Click to Send WhatsApp Quotation](https://wa.me/{wa_phone}?text={wa_msg})", unsafe_allow_html=True)
+                    st.markdown(f"📱 [Click to Send WhatsApp Quotation Message](https://wa.me/{wa_phone}?text={wa_msg})", unsafe_allow_html=True)
                 else:
                     st.warning("Customer phone number not available for WhatsApp.")
         else:
