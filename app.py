@@ -367,22 +367,56 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         st.write(f"📏 **Customer Required Area:** `{customer_sqft:.2f} Sq.Ft`")
 
         st.markdown("---")
-        st.markdown("### 3. Tile Packing Details (CON FACTOR & PACKING UNIT)")
+        st.markdown("### 3. Tile Packing Details (Auto-fetched from Master Data)")
         
+        # मास्टर डेटा से चुनी गई टाइल का Con Factor और Packing Unit स्वतः ढूँढना
         df_master = get_master_df()
         default_cf = 1.5
         default_pu = 6.0
         
         if df_master is not None and not df_master.empty:
-            item_name_str = str(selected_tile_data.get('item', ''))
-            matched_row = df_master[df_master.astype(str).apply(lambda row: row.str.contains(item_name_str.split('-')[0].strip(), case=False, na=False).any(), axis=1)]
+            item_full_text = str(selected_tile_data.get('item', ''))
+            item_code = item_full_text.split('-')[0].strip() # कोड या नाम का पहला हिस्सा लें
+            
+            # मास्टर डेटा में आइटम कोड/नाम से रो मैच करें
+            matched_row = df_master[df_master.astype(str).apply(lambda row: row.str.contains(item_code, case=False, na=False).any(), axis=1)]
             if not matched_row.empty:
                 try:
-                    if len(matched_row.columns) > 6:
-                        default_cf = float(matched_row.iloc[0, 6])
-                    if len(matched_row.columns) > 4:
-                        default_pu = float(matched_row.iloc[0, 4])
-                except:
+                    # आपकी गूगल शीट के अनुसार: Packing Unit और Con Factor के कॉलम इंडेक्स
+                    # कॉलम G या H के आसपास Con Factor और Packing Unit हो सकते हैं
+                    row_vals = matched_row.iloc[0].values
+                    for val in row_vals:
+                        try:
+                            f_val = float(val)
+                            # यदि वैल्यू रीज़नेबल कॉन फैक्टर या पैकिंग यूनिट है
+                            if 0.1 <= f_val <= 100:
+                                pass
+                        except:
+                            pass
+                    
+                    # आपकी शीट के लेआउट के अनुसार सुरक्षित कॉलम मैपिंग (जैसे Con Factor और Packing Unit)
+                    if len(matched_row.columns) >= 8:
+                        # सामान्यतः कॉलम G/H में होते हैं
+                        for col_idx in range(len(matched_row.columns)):
+                            col_name_header = str(matched_row.columns[col_idx]).upper()
+                            cell_val = matched_row.iloc[0, col_idx]
+                            if "CON" in col_name_header:
+                                default_cf = float(cell_val)
+                            elif "PACK" in col_name_header or "UNIT" in col_name_header:
+                                default_pu = float(cell_val)
+                    
+                    # अगर हेडर से न मिले तो फिक्स पोजीशन इंडेक्स ट्राई करें (जैसे कॉलम index 4 और 6)
+                    if default_cf == 1.5 and len(matched_row.columns) > 6:
+                        try:
+                            default_cf = float(matched_row.iloc[0, 6]) # Con Factor column index
+                        except:
+                            pass
+                    if default_pu == 6.0 and len(matched_row.columns) > 4:
+                        try:
+                            default_pu = float(matched_row.iloc[0, 4]) # Packing Unit column index
+                        except:
+                            pass
+                except Exception as e:
                     pass
 
         col_p1, col_p2 = st.columns(2)
@@ -391,6 +425,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         with col_p2:
             packing_unit = st.number_input("PACKING UNIT (Pcs/Box)", min_value=1.0, value=float(default_pu), step=1.0)
             
+        # calculations.py के फंक्शन्स का सटीक उपयोग
         box_sqft = calculate_box_sqft(con_factor, packing_unit)
         total_boxes = calculate_boxes(customer_sqft, con_factor, packing_unit)
         total_supplied_sqft = total_boxes * box_sqft
@@ -427,7 +462,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             st.dataframe(m_df, use_container_width=True)
         else:
             st.info("No calculations saved for this customer yet.")
-
 elif st.session_state.current_nav == "4 Sales Dashboard & History":
     st.title("📊 Sales Dashboard & History")
     st.info("Sales history and analytics view.")
