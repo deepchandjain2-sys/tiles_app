@@ -1,6 +1,7 @@
 import json
 import os
 import math
+import urllib.parse
 import pandas as pd
 import streamlit as st
 from calculations import calculate_boxes, calculate_box_sqft
@@ -241,7 +242,7 @@ if st.session_state.current_nav == "1 Customer Registration":
                     new_cid = f"CUST-{len(st.session_state.customers) + 1:03d}"
                     cust_obj = {"cid": new_cid, "name": c_name.strip(), "phone": c_phone.strip(), "city": c_city.strip()}
                     st.session_state.customers.append(cust_obj)
-                    save_customers_to_disk(st.session_state.customers)
+                    save_users_to_disk(st.session_state.customers) # keeping syntax
                     st.session_state.current_cid = new_cid
                     st.success(f"Customer {c_name} registered successfully!")
                     st.rerun()
@@ -346,13 +347,13 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     if active_cust:
         st.success(f"👤 **Active Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')} | 📍 **City:** {active_cust.get('city', 'Hiriyur')}")
 
-    cust_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid"] == st.session_state.current_cid]
+    cust_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
 
     if not cust_tiles:
         st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
     else:
-        st.markdown("### 📋 Customer Selected Items List (Measurements & Boxes)")
-        st.info("💡 यहाँ Con Factor और Packing Unit बैकएंड में मास्टर शीट से स्वतः काम कर रहे हैं। आपको सिर्फ लंबाई और चौड़ाई दर्ज करनी है।")
+        st.markdown("### 📋 Customer Selected Items List (One by One)")
+        st.info("💡 Con Factor और Packing Unit बैकएंड में मास्टर शीट से काम कर रहे हैं। यहाँ सिर्फ लंबाई और चौड़ाई दर्ज करें।")
 
         df_master = get_master_df()
 
@@ -360,7 +361,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             item_name = str(t_data.get('item', ''))
             floor_area = t_data.get('floor_area')
             
-            # डिफ़ॉल्ट बैकएंड वैल्यू
+            # डिफ़ॉल्ट बैकएंड वैल्यू (जैसे 2x4 साइज के लिए Con Factor 8 और Packing Unit 2)
             backend_cf = 8.0  
             backend_pu = 2.0  
             
@@ -374,7 +375,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 backend_cf = 1.73
                 backend_pu = 5.0
 
-            # मास्टर शीट से बैकएंड में वैल्यू मैच करने की कोशिश
+            # मास्टर शीट से बैकएंड में वैल्यू मैच करना
             if df_master is not None and not df_master.empty:
                 item_code = item_name.split('-')[0].strip()
                 matched_row = df_master[df_master.astype(str).apply(lambda row: row.str.contains(item_code, case=False, na=False).any(), axis=1)]
@@ -399,12 +400,12 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     
                 customer_sqft = length * width
                 
-                # बैकएंड कैलकुलेशन (स्क्रीन पर कॉन फैक्टर/पैकिंग यूनिट नहीं दिखेगा)
+                # सटीक बैकएंड कैलकुलेशन
                 box_sqft = calculate_box_sqft(backend_cf, backend_pu)
                 total_boxes = calculate_boxes(customer_sqft, backend_cf, backend_pu)
                 total_supplied_sqft = total_boxes * box_sqft
                 
-                st.markdown(f"**📊 कैलकुलेशन रिजल्ट:** रिक्वायर्ड एरिया: `{customer_sqft:.2f} Sq.Ft` | 1 बॉक्स कवरेज: `{box_sqft:.2f} Sq.Ft` | 🔥 **आवश्यक बॉक्स: `{total_boxes} Boxes`** (कुल बिलिंग एरिया: `{total_supplied_sqft:.2f} Sq.Ft`)")
+                st.markdown(f"**📊 कैलकुलेशन रिजल्ट:** एरिया: `{customer_sqft:.2f} Sq.Ft` | 🔥 **आवश्यक बॉक्स: `{total_boxes} Boxes`** (कुल बिलिंग एरिया: `{total_supplied_sqft:.2f} Sq.Ft`)")
                 
                 if st.button(f"💾 Save Measurement for {item_name}", key=f"save_btn_{idx}_{t_data.get('cid')}"):
                     m_item = {
@@ -425,7 +426,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
         st.markdown("---")
         st.markdown("### 📋 Final Saved Measurements & Quotation Summary")
-        cust_m = [m for m in st.session_state.measurements_list if m.get("cid"] == st.session_state.current_cid]
+        cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
         if cust_m:
             m_df = pd.DataFrame(cust_m)
             st.dataframe(m_df, use_container_width=True)
@@ -445,3 +446,15 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     st.warning("Customer phone number not available for WhatsApp.")
         else:
             st.info("No calculations saved for this customer yet.")
+
+elif st.session_state.current_nav == "4 Sales Dashboard & History":
+    st.title("📊 Sales Dashboard & History")
+    st.info("Sales history and analytics view.")
+
+elif st.session_state.current_nav == "5 Salesman Progress Report":
+    st.title("📈 Salesman Progress Report (Admin Panel)")
+    st.markdown("Here you can track performance and sales generated by each salesman.")
+    if st.session_state.sales_history:
+        st.write(st.session_state.sales_history)
+    else:
+        st.info("No sales records found yet.")
