@@ -2,18 +2,18 @@ import math
 
 def calculate_box_sqft(con_factor, packing_unit):
     """
-    1 बॉक्स का कुल क्षेत्रफल (Sq.Ft) निकालता है: Con Factor * Packing Unit
+    1 बॉक्स का कुल क्षेत्रफल (Sq.Ft) = Con Factor * Packing Unit
     """
     try:
         cf = float(con_factor)
         pu = float(packing_unit)
         return cf * pu
     except Exception:
-        return 16.0
+        return 9.0  # 12x18 या अन्य के लिए सुरक्षित डिफ़ॉल्ट
 
 def calculate_boxes(sqft, con_factor, packing_unit):
     """
-    ग्राहक के कुल क्षेत्रफल और बॉक्स कवरेज के आधार पर आवश्यक बॉक्स (सीलिंग के साथ) निकालता है।
+    आवश्यक बॉक्स = math.ceil(कुल स्क्वायर फीट / (Con Factor * Packing Unit))
     """
     try:
         sqft_val = float(sqft)
