@@ -442,18 +442,18 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     st.session_state.measurements_list.append(m_item)
                     st.success(f"Successfully saved {total_boxes} boxes for {item_name}!")
 
- elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-      st.title("📐 Measurements & Box Calculations (Item-Wise)")
+  elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
+    st.title("📐 Measurements & Box Calculations (Item-Wise)")
     
-      active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
-      if active_cust:
-          st.success(f"👤 **Active Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')}")
+    active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
+    if active_cust:
+        st.success(f"👤 **Active Customer:** {active_cust.get('name')} | 📞 **Phone:** {active_cust.get('phone')}")
 
-      cust_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
+    cust_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid") == st.session_state.current_cid]
 
-      if not cust_tiles:
+    if not cust_tiles:
         st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
-      else:
+    else:
         st.markdown("### 📋 Customer Selected Items List")
         st.info("💡 मास्टर शीट से हर आइटम का सही Con Factor और Packing Unit स्वतः (Auto) ले लिया गया है। आप चाहें तो इसे बदल भी सकते हैं।")
 
