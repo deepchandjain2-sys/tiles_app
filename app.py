@@ -4,6 +4,7 @@ import math
 import urllib.parse
 import pandas as pd
 import streamlit as st
+from fpdf import FPDF
 from database import (
     load_stock_from_disk, 
     load_stock_from_upload, 
@@ -221,6 +222,47 @@ def get_master_df():
                 pass
     return None
 
+# --- PDF GENERATOR FUNCTION ---
+def generate_pdf_quotation(customer_info, items_list):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    
+    # Header
+    pdf.cell(200, 10, txt="JAY GRANITE & TILES HUB", ln=True, align="C")
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(200, 6, txt="Hiriyur, Karnataka | Phone: 9999999999", ln=True, align="C")
+    pdf.ln(10)
+    
+    # Customer Details
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 8, txt=f"Customer Name: {customer_info.get('name', '')}", ln=True)
+    pdf.cell(200, 8, txt=f"Phone: {customer_info.get('phone', '')} | City: {customer_info.get('city', 'Hiriyur')}", ln=True)
+    pdf.ln(5)
+    
+    # Table Header
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(60, 8, "Design / Area", 1)
+    pdf.cell(80, 8, "Item Name", 1)
+    pdf.cell(25, 8, "Sq.Ft", 1, align="C")
+    pdf.cell(25, 8, "Boxes", 1, align="C", ln=True)
+    
+    # Table Rows
+    pdf.set_font("Arial", "", 10)
+    for item in items_list:
+        pdf.cell(60, 8, str(item.get('area_design', ''))[:30], 1)
+        pdf.cell(80, 8, str(item.get('item_name', ''))[:40], 1)
+        pdf.cell(25, 8, str(item.get('sqft', '')), 1, align="C")
+        pdf.cell(25, 8, str(item.get('boxes', '')), 1, align="C", ln=True)
+        
+    pdf.ln(10)
+    pdf.set_font("Arial", "I", 9)
+    pdf.cell(200, 6, txt="Thank you for visiting Jay Granite & Tiles Hub!", ln=True, align="C")
+    
+    pdf_output_path = "quotation.pdf"
+    pdf.output(pdf_output_path)
+    return pdf_output_path
+
 # --- APP SECTIONS ---
 if st.session_state.current_nav == "1 Customer Registration":
     st.title("👥 Customer Registration & Selection")
@@ -339,7 +381,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Direct Square Feet & Accurate Box Calculation")
+    st.title("📐 Direct Square Feet & Exact Box Calculation")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -351,13 +393,13 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
     else:
         st.markdown("### 📋 Customer Selected Items List")
-        st.info("💡 हर आइटम के नाम और साइज के अनुसार सटीक Con Factor और Packing Unit सेट किए गए हैं।")
+        st.info("💡 बिना किसी एक्स्ट्रा परसेंटेज (0% wastage) के सटीक स्क्वायर फीट और बॉक्स की गणना की जा रही है।")
 
         for idx, t_data in enumerate(cust_tiles):
             item_name = str(t_data.get('item', ''))
             floor_area = t_data.get('floor_area')
             
-            # डिफ़ॉल्ट मान (जैसे 2x4 के लिए)
+            # साइज के अनुसार सटीक Con Factor और Packing Unit
             con_factor = 8.0
             packing_unit = 2.0
             
@@ -390,11 +432,10 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 with col_i2:
                     customer_sqft = st.number_input("Enter Sq.Ft", min_value=0.0, value=100.0, step=5.0, key=f"sqft_{idx}_{t_data.get('cid')}")
                 
-                # सटीक फॉर्मूला: Required Boxes = Math.Ceil(Sq.Ft / Box Coverage)
+                # सटीक फॉर्मूला (बिना किसी 3% अतिरिक्त के): Required Boxes = Math.Ceil(Sq.Ft / Box Coverage)
                 total_boxes = math.ceil(customer_sqft / box_coverage) if box_coverage > 0 else 0
-                total_supplied_sqft = total_boxes * box_coverage
                 
-                st.markdown(f"📦 **1 Box Coverage:** `{box_coverage:.2f} Sq.Ft` | 🔥 **Required Boxes:** `{total_boxes} Boxes` | 📐 **Billing Area:** `{total_supplied_sqft:.2f} Sq.Ft`")
+                st.markdown(f"📦 **1 Box Coverage:** `{box_coverage:.2f} Sq.Ft` | 🔥 **Required Boxes:** `{total_boxes} Boxes` | 📐 **Input Sq.Ft:** `{customer_sqft:.2f} Sq.Ft`")
                 
                 if st.button(f"💾 Save Item Quotation", key=f"save_btn_{idx}_{t_data.get('cid')}"):
                     m_item = {
@@ -403,7 +444,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         "item_name": item_name,
                         "sqft": customer_sqft,
                         "boxes": total_boxes,
-                        "total_sqft": total_supplied_sqft
+                        "total_sqft": customer_sqft
                     }
                     if "measurements_list" not in st.session_state:
                         st.session_state.measurements_list = []
@@ -423,7 +464,18 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             col_pdf, col_wa = st.columns(2)
             with col_pdf:
                 if st.button("📥 Download PDF Quotation"):
-                    st.success("PDF Quotation generated successfully!")
+                    try:
+                        pdf_file = generate_pdf_quotation(active_cust, cust_m)
+                        with open(pdf_file, "rb") as f:
+                            st.download_button(
+                                label="📥 Click Here to Download PDF File",
+                                data=f,
+                                file_name=f"Quotation_{active_cust.get('name', 'Customer')}.pdf",
+                                mime="application/pdf"
+                            )
+                        st.success("PDF generated successfully! Click above to download.")
+                    except Exception as e:
+                        st.error(f"Error generating PDF: {e}")
             with col_wa:
                 if active_cust and active_cust.get('phone'):
                     wa_phone = active_cust.get('phone')
