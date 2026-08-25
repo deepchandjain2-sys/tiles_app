@@ -76,7 +76,11 @@ if "current_user" not in st.session_state:
 
 if "customers" not in st.session_state or not isinstance(st.session_state.customers, list):
     loaded_cust = load_customers_from_disk()
-    st.session_state.customers = [c for c in loaded_cust if c.get('name') and str(c.get('name')).lower() != 'nan'] if loaded_cust else []
+    # Sirf wahi customer rakhna jinka name valid ho aur phone/city nan na ho
+    st.session_state.customers = [
+        c for c in loaded_cust 
+        if isinstance(c, dict) and c.get('name') and str(c.get('name')).lower() != 'nan' and str(c.get('phone', '')).lower() != 'nan'
+    ] if loaded_cust else []
 
 if "sales_history" not in st.session_state:
     st.session_state.sales_history = load_json_file(SALES_FILE, [])
@@ -347,7 +351,12 @@ if st.session_state.current_nav == "1 Customer Registration":
 
     with col2:
         st.markdown("### Select Active Customer")
-        valid_customers = [c for c in st.session_state.customers if isinstance(c, dict) and c.get('name') and str(c.get('name')).lower() != 'nan']
+        
+        # Sirf valid customers ko filter karein
+        valid_customers = [
+            c for c in st.session_state.customers 
+            if isinstance(c, dict) and c.get('name') and str(c.get('name')).lower() != 'nan' and str(c.get('phone', '')).lower() != 'nan'
+        ]
         
         if valid_customers:
             cust_options = {f"{c.get('name')} ({c.get('phone')} - {c.get('city', 'Hiriyur')})": c.get('cid') for c in valid_customers}
@@ -358,13 +367,20 @@ if st.session_state.current_nav == "1 Customer Registration":
                     st.session_state.current_cid = cust_options[selected_label]
             
             st.markdown("---")
-            if st.button("🗑️ Clear / Reset Invalid Customers List"):
+            if st.button("🔄 Factory Reset / Clear Invalid Customers"):
                 st.session_state.customers = valid_customers
                 save_customers_to_disk(st.session_state.customers)
-                st.success("Invalid customer list cleaned successfully!")
+                if valid_customers:
+                    st.session_state.current_cid = valid_customers[0].get("cid")
+                st.success("All invalid customers permanently cleared from disk and memory!")
                 st.rerun()
         else:
             st.warning("No valid customers registered yet.")
+            if st.button("🔄 Reset Customer Database"):
+                st.session_state.customers = []
+                save_customers_to_disk([])
+                st.success("Customer database reset successfully!")
+                st.rerun()
 
 elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
     st.title("🪨 Tiles Selection & Saved Items")
