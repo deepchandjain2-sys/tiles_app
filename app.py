@@ -4,7 +4,6 @@ import math
 import urllib.parse
 import pandas as pd
 import streamlit as st
-from calculations import calculate_boxes, calculate_box_sqft
 from database import (
     load_stock_from_disk, 
     load_stock_from_upload, 
@@ -340,7 +339,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Direct Square Feet & Accurate Box Calculation")
+    st.title("📐 Direct Square Feet & Direct Box Calculation")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -351,52 +350,35 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     if not cust_tiles:
         st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
     else:
-        st.markdown("### 📋 Customer Selected Items List (Item-Wise Calculation)")
-        st.info("💡 मास्टर शीट से हर आइटम का सही Con Factor और Packing Unit स्वतः (Auto-fetch) उठाया जा रहा है।")
-
-        df_master = get_master_df()
+        st.markdown("### 📋 Customer Selected Items List")
+        st.info("💡 हर आइटम की साइज (जैसे 12x18 के लिए CF=1.5, PU=6 -> कवरेज 9 Sq.Ft) के आधार पर सटीक बॉक्स निकल रहे हैं।")
 
         for idx, t_data in enumerate(cust_tiles):
             item_name = str(t_data.get('item', ''))
             floor_area = t_data.get('floor_area')
             
-            # डिफ़ॉल्ट बैकएंड वैल्यू
-            backend_cf = 1.5  
-            backend_pu = 6.0  
+            # साइज के हिसाब से सीधे Con Factor और Packing Unit सेट करना
+            con_factor = 1.5
+            packing_unit = 6.0
             
-            # नाम या साइज के आधार पर सटीक डिफ़ॉल्ट मान
             u_name = item_name.upper()
             if "12X18" in u_name:
-                backend_cf = 1.5
-                backend_pu = 6.0
+                con_factor = 1.5
+                packing_unit = 6.0
             elif "2X4" in u_name or "2 X 4" in u_name:
-                backend_cf = 8.0
-                backend_pu = 2.0
-            elif "16X16" in u_name:
-                backend_cf = 1.73
-                backend_pu = 5.0
+                con_factor = 8.0
+                packing_unit = 2.0
             elif "2X2" in u_name or "2 X 2" in u_name:
-                backend_cf = 4.0
-                backend_pu = 4.0
+                con_factor = 4.0
+                packing_unit = 4.0
+            elif "16X16" in u_name:
+                con_factor = 1.73
+                packing_unit = 5.0
 
-            # मास्टर शीट से उस आइटम की सही वैल्यू ढूंढना
-            if df_master is not None and not df_master.empty:
-                item_code = item_name.split('-')[0].strip()
-                matched_row = df_master[df_master.astype(str).apply(lambda row: row.str.contains(item_code, case=False, na=False).any(), axis=1)]
-                if not matched_row.empty:
-                    try:
-                        for col_idx, col_name in enumerate(matched_row.columns):
-                            c_header = str(col_name).upper()
-                            val = matched_row.iloc[0, col_idx]
-                            if "CON" in c_header:
-                                backend_cf = float(val)
-                            elif "PACK" in c_header or "UNIT" in c_header:
-                                backend_pu = float(val)
-                    except:
-                        pass
+            # 1 बॉक्स का कवरेज = Con Factor * Packing Unit
+            box_coverage = con_factor * packing_unit
 
             with st.expander(f"📍 Area: {floor_area} ➔ Item: {item_name}", expanded=(idx == 0)):
-                # फॉर्मेट: एरिया/डिजाइन, आइटम नाम, सीधे स्क्वायर फीट इनपुट
                 col_i1, col_i2 = st.columns([2, 1])
                 with col_i1:
                     st.markdown(f"**Item:** {item_name}")
@@ -404,12 +386,11 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 with col_i2:
                     customer_sqft = st.number_input("Enter Sq.Ft", min_value=0.0, value=100.0, step=5.0, key=f"sqft_{idx}_{t_data.get('cid')}")
                 
-                # सटीक फॉर्मूला: 1 Box Coverage = CF * PU, Boxes = ceil(SqFt / BoxCoverage)
-                box_sqft = calculate_box_sqft(backend_cf, backend_pu)
-                total_boxes = calculate_boxes(customer_sqft, backend_cf, backend_pu)
-                total_supplied_sqft = total_boxes * box_sqft
+                # सटीक फॉर्मूला: Required Boxes = Math.Ceil(Sq.Ft / Box Coverage)
+                total_boxes = math.ceil(customer_sqft / box_coverage) if box_coverage > 0 else 0
+                total_supplied_sqft = total_boxes * box_coverage
                 
-                st.markdown(f"📦 **1 Box Coverage:** `{box_sqft:.2f} Sq.Ft` | 🔥 **Required Boxes:** `{total_boxes} Boxes` | 📐 **Billing Area:** `{total_supplied_sqft:.2f} Sq.Ft`")
+                st.markdown(f"📦 **1 Box Coverage:** `{box_coverage:.2f} Sq.Ft` | 🔥 **Required Boxes:** `{total_boxes} Boxes` | 📐 **Billing Area:** `{total_supplied_sqft:.2f} Sq.Ft`")
                 
                 if st.button(f"💾 Save Item Quotation", key=f"save_btn_{idx}_{t_data.get('cid')}"):
                     m_item = {
