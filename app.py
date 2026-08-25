@@ -53,7 +53,7 @@ def load_users_from_disk():
             "pin": "1234",
             "name": "Deepchand Jain",
             "role": "Admin",
-            "phone": "9999999999"
+            "phone": "9742222219"
         }
     ]
 
@@ -176,7 +176,7 @@ else:
         if st.sidebar.button("Register Account"):
             if new_name and new_phone and new_username and new_pin:
                 if not isinstance(st.session_state.registered_users, list):
-                    st.session_state.registered_users = [{"username": "admin", "pin": "1234", "name": "Deepchand Jain", "role": "Admin", "phone": "9999999999"}]
+                    st.session_state.registered_users = [{"username": "admin", "pin": "1234", "name": "Deepchand Jain", "role": "Admin", "phone": "9742222219"}]
 
                 exists = False
                 for u in st.session_state.registered_users:
@@ -243,7 +243,7 @@ def get_master_df():
                 pass
     return None
 
-# --- COLOURFUL PDF GENERATOR FUNCTION ---
+# --- COLOURFUL PDF GENERATOR FUNCTION (UPDATED PHONE NUMBER) ---
 def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
     pdf.add_page()
@@ -258,14 +258,14 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.set_y(7)
     pdf.cell(200, 10, txt="JAY GRANITE & TILES HUB", ln=True, align="C")
     
-    # Subheader
+    # Subheader with updated phone number
     pdf.set_font("Arial", "", 10)
     pdf.set_y(28)
     pdf.set_text_color(100, 100, 100)
-    pdf.cell(200, 6, txt="Hiriyur, Karnataka | Phone: 9999999999", ln=True, align="C")
+    pdf.cell(200, 6, txt="Hiriyur, Karnataka | Phone: 9742222219", ln=True, align="C")
     pdf.ln(5)
     
-    # Customer Details Box (Light Grey Background with Blue Border)
+    # Customer Details Box
     pdf.set_fill_color(240, 244, 248)
     pdf.set_draw_color(31, 78, 121)
     pdf.rect(10, 38, 190, 20, 'DF')
@@ -281,7 +281,7 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.cell(180, 6, txt=f"Phone: {customer_info.get('phone', '')}   |   City: {customer_info.get('city', 'Hiriyur')}", ln=True)
     pdf.ln(15)
     
-    # Table Header (Colored Background)
+    # Table Header
     pdf.set_fill_color(31, 78, 121)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", "B", 10)
@@ -291,7 +291,7 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.cell(25, 8, "Sq.Ft", 1, 0, 'C', True)
     pdf.cell(25, 8, "Boxes", 1, 1, 'C', True)
     
-    # Table Rows (Alternating Colors)
+    # Table Rows
     pdf.set_font("Arial", "", 10)
     pdf.set_text_color(20, 20, 20)
     
