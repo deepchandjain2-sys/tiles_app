@@ -606,11 +606,15 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             item_name = clean_item_name(raw_item_name)
             floor_area = t_data.get('floor_area')
             
+            # --- Dynamic Size Conversion Factors (Including 4x6 = 23.25 or 23.5) ---
             con_factor = 8.0
             packing_unit = 2.0
             
             u_name = item_name.upper()
-            if "2X4" in u_name or "2 X 4" in u_name:
+            if "4X6" in u_name or "4 X 6" in u_name or "4X 6" in u_name:
+                con_factor = 23.25
+                packing_unit = 1.0
+            elif "2X4" in u_name or "2 X 4" in u_name:
                 con_factor = 8.0
                 packing_unit = 2.0
             elif "12X18" in u_name:
@@ -693,7 +697,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     except Exception as e:
                         st.error(f"Error generating PDF: {e}")
             with col_excel:
-                # --- Excel Export for Manager Stock Verification ---
                 excel_data = []
                 for item in cust_m:
                     excel_data.append({
@@ -702,7 +705,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         "Item Name": clean_item_name(item.get('item_name', '')),
                         "Required Sq.Ft": item.get('sqft', 0),
                         "Required Boxes": item.get('boxes', 0),
-                        "Physical Stock Available (Fill Here)": "" # Editable column for manager
+                        "Physical Stock Available (Fill Here)": ""
                     })
                 df_excel = pd.DataFrame(excel_data)
                 
