@@ -537,7 +537,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
         st.markdown("---")
         st.markdown("### 📋 Final Saved Quotation Summary")
-        cust_m = [m for m in st.session_state.measurements_list if m.get("cid"] == st.session_state.current_cid]
+        cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
         if cust_m:
             for m_idx, m_row in enumerate(cust_m):
                 col_m1, col_m2, col_m3 = st.columns([4, 2, 1])
@@ -574,7 +574,6 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 if active_cust and active_cust.get('phone'):
                     wa_phone = str(active_cust.get('phone')).strip()
                     
-                    # फॉर्मेट तैयार करना ताकि WhatsApp पर सीधा सुंदर मैसेज जाए
                     summary_text = f"🪨 *JAY GRANITE & TILES HUB* 🪨\n"
                     summary_text += f"Quotation for: *{active_cust.get('name')}*\n\n"
                     for item in cust_m:
