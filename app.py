@@ -78,7 +78,6 @@ if "customers" not in st.session_state or not isinstance(st.session_state.custom
     loaded_cust = load_customers_from_disk()
     st.session_state.customers = loaded_cust if loaded_cust else [{"cid": "CUST-001", "name": "Vansh", "phone": "964444419", "city": "Hiriyur"}]
 
-# Load persistent sales history
 if "sales_history" not in st.session_state:
     st.session_state.sales_history = load_json_file(SALES_FILE, [])
 
@@ -604,7 +603,16 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                     }
                     st.session_state.sales_history.append(sale_record)
                     save_json_file(SALES_FILE, st.session_state.sales_history)
-                    st.success("🎉 Sale successfully completed and added to Sales Dashboard!")
+                    
+                    # Sale complete hone par is customer ke selections aur measurements saaf kar dein
+                    st.session_state.my_selected_tiles = [s for s in st.session_state.my_selected_tiles if s.get("cid") != st.session_state.current_cid]
+                    save_json_file(SELECTIONS_FILE, st.session_state.my_selected_tiles)
+                    
+                    st.session_state.measurements_list = [m for m in st.session_state.measurements_list if m.get("cid") != st.session_state.current_cid]
+                    save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
+                    
+                    st.success("🎉 Sale successfully completed, added to Dashboard, and cleared from current selection!")
+                    st.rerun()
         else:
             st.info("No quotation items saved for this customer yet.")
 
