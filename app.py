@@ -339,7 +339,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Direct Square Feet & Master-Fetched Box Calculation")
+    st.title("📐 Direct Square Feet & Accurate Box Calculation")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -351,53 +351,32 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
         st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
     else:
         st.markdown("### 📋 Customer Selected Items List")
-        st.info("💡 हर आइटम का सही Con Factor और Packing Unit मास्टर शीट (Item Master) से सीधे उठाया जा रहा है।")
-
-        df_master = get_master_df()
+        st.info("💡 हर आइटम के नाम और साइज के अनुसार सटीक Con Factor और Packing Unit सेट किए गए हैं।")
 
         for idx, t_data in enumerate(cust_tiles):
             item_name = str(t_data.get('item', ''))
             floor_area = t_data.get('floor_area')
             
-            # डिफ़ॉल्ट मान (यदि मास्टर शीट में कॉलम न मिले)
-            con_factor = 1.5
-            packing_unit = 6.0
-
-            # मास्टर शीट से उस आइटम की रो (Row) ढूंढना और Con Factor / Packing Unit निकालना
-            if df_master is not None and not df_master.empty:
-                item_code = item_name.split('-')[0].strip()
-                matched_rows = df_master[df_master.astype(str).apply(lambda row: row.str.contains(item_code, case=False, na=False).any(), axis=1)]
-                if not matched_rows.empty:
-                    try:
-                        r_data = matched_rows.iloc[0]
-                        for c_idx, c_name in enumerate(matched_rows.columns):
-                            head_str = str(c_name).upper()
-                            val_str = str(r_data.iloc[c_idx])
-                            if "CON" in head_str:
-                                con_factor = float(val_str)
-                            elif "PACK" in head_str or "UNIT" in head_str:
-                                packing_unit = float(val_str)
-                    except:
-                        pass
-
-            # यदि मास्टर शीट से वैल्यू न मिले या डिफ़ॉल्ट रह जाए तो नाम/साइज के आधार पर सुरक्षित फॉールबैक नियम
+            # डिफ़ॉल्ट मान (जैसे 2x4 के लिए)
+            con_factor = 8.0
+            packing_unit = 2.0
+            
             u_name = item_name.upper()
-            if con_factor == 1.5 and packing_unit == 6.0:
-                if "2X1" in u_name or "2 X 1" in u_name or "1002" in u_name:
-                    con_factor = 2.0
-                    packing_unit = 6.0
-                elif "2X4" in u_name or "2 X 4" in u_name:
-                    con_factor = 8.0
-                    packing_unit = 2.0
-                elif "12X18" in u_name:
-                    con_factor = 1.5
-                    packing_unit = 6.0
-                elif "2X2" in u_name or "2 X 2" in u_name:
-                    con_factor = 4.0
-                    packing_unit = 4.0
-                elif "16X16" in u_name:
-                    con_factor = 1.73
-                    packing_unit = 5.0
+            if "2X4" in u_name or "2 X 4" in u_name:
+                con_factor = 8.0
+                packing_unit = 2.0
+            elif "12X18" in u_name:
+                con_factor = 1.5
+                packing_unit = 6.0
+            elif "16X16" in u_name:
+                con_factor = 1.73
+                packing_unit = 5.0
+            elif "2X1" in u_name or "2 X 1" in u_name or "1002" in u_name:
+                con_factor = 2.0
+                packing_unit = 6.0
+            elif "2X2" in u_name or "2 X 2" in u_name:
+                con_factor = 4.0
+                packing_unit = 4.0
 
             # 1 बॉक्स का कवरेज = Con Factor * Packing Unit
             box_coverage = con_factor * packing_unit
@@ -407,7 +386,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 with col_i1:
                     st.markdown(f"**Item:** {item_name}")
                     st.markdown(f"**Design Area:** {floor_area}")
-                    st.caption(f"🔧 [Backend Data] Con Factor: {con_factor} | Packing Unit: {packing_unit}")
+                    st.caption(f"🔧 [Size Config] Con Factor: {con_factor} | Packing Unit: {packing_unit}")
                 with col_i2:
                     customer_sqft = st.number_input("Enter Sq.Ft", min_value=0.0, value=100.0, step=5.0, key=f"sqft_{idx}_{t_data.get('cid')}")
                 
@@ -434,7 +413,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
         st.markdown("---")
         st.markdown("### 📋 Final Saved Quotation Summary")
-        cust_m = [m for m in st.session_state.measurements_list if m.get("cid") == st.session_state.current_cid]
+        cust_m = [m for m in st.session_state.measurements_list if m.get("cid"] == st.session_state.current_cid]
         if cust_m:
             m_df = pd.DataFrame(cust_m)
             st.dataframe(m_df, use_container_width=True)
