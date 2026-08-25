@@ -44,7 +44,6 @@ def save_users_to_disk(users_list):
     except:
         pass
 
-# Initialize Session State
 if "registered_users" not in st.session_state or not isinstance(st.session_state.registered_users, list):
     st.session_state.registered_users = load_users_from_disk()
 
@@ -242,7 +241,7 @@ if st.session_state.current_nav == "1 Customer Registration":
                     new_cid = f"CUST-{len(st.session_state.customers) + 1:03d}"
                     cust_obj = {"cid": new_cid, "name": c_name.strip(), "phone": c_phone.strip(), "city": c_city.strip()}
                     st.session_state.customers.append(cust_obj)
-                    save_users_to_disk(st.session_state.customers) # keeping syntax
+                    save_customers_to_disk(st.session_state.customers)
                     st.session_state.current_cid = new_cid
                     st.success(f"Customer {c_name} registered successfully!")
                     st.rerun()
@@ -341,7 +340,7 @@ elif st.session_state.current_nav == "2 Tiles Selection (Area-Wise)":
         st.warning("⚠️ Item master data not found. Please place 'ITEM MASTER.csv' in your app folder.")
 
 elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
-    st.title("📐 Measurements, PDF & WhatsApp Quotation")
+    st.title("📐 Direct Square Feet & Box Calculation")
     
     active_cust = next((c for c in st.session_state.customers if c.get("cid") == st.session_state.current_cid), None)
     if active_cust:
@@ -352,8 +351,8 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
     if not cust_tiles:
         st.warning("⚠️ आपने अभी तक '2 Tiles Selection (Area-Wise)' में इस कस्टमर के लिए कोई टाइल नहीं चुनी है। कृपया पहले टाइल्स चुनें!")
     else:
-        st.markdown("### 📋 Customer Selected Items List (One by One)")
-        st.info("💡 Con Factor और Packing Unit बैकएंड में मास्टर शीट से काम कर रहे हैं। यहाँ सिर्फ लंबाई और चौड़ाई दर्ज करें।")
+        st.markdown("### 📋 Customer Selected Items List (Direct Sq.Ft Entry)")
+        st.info("💡 मास्टर शीट से हर आइटम का Con Factor और Packing Unit बैकएंड में स्वतः काम कर रहा है। सीधे Sq.Ft दर्ज करें।")
 
         df_master = get_master_df()
 
@@ -361,9 +360,9 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
             item_name = str(t_data.get('item', ''))
             floor_area = t_data.get('floor_area')
             
-            # डिफ़ॉल्ट बैकएंड वैल्यू (जैसे 2x4 साइज के लिए Con Factor 8 और Packing Unit 2)
-            backend_cf = 8.0  
-            backend_pu = 2.0  
+            # डिफ़ॉल्ट बैकएंड वैल्यू (जैसे 2x4 के लिए Con Factor 8, Packing Unit 2 -> 1 बॉक्स = 16 sqft)
+            backend_cf = 1.5
+            backend_pu = 6.0
             
             if "2X4" in item_name.upper() or "2 X 4" in item_name.upper():
                 backend_cf = 8.0
@@ -375,7 +374,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                 backend_cf = 1.73
                 backend_pu = 5.0
 
-            # मास्टर शीट से बैकएंड में वैल्यू मैच करना
+            # मास्टर शीट से बैकएंड में कॉलम स्कैन करके सही वैल्यू उठाना
             if df_master is not None and not df_master.empty:
                 item_code = item_name.split('-')[0].strip()
                 matched_row = df_master[df_master.astype(str).apply(lambda row: row.str.contains(item_code, case=False, na=False).any(), axis=1)]
@@ -392,28 +391,21 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         pass
 
             with st.expander(f"📍 [{floor_area}] ➔ 🪨 {item_name}", expanded=(idx == 0)):
-                col_m1, col_m2 = st.columns(2)
-                with col_m1:
-                    length = st.number_input("Length (Feet)", min_value=0.0, value=10.0, step=0.5, key=f"len_{idx}_{t_data.get('cid')}")
-                with col_m2:
-                    width = st.number_input("Width / Height (Feet)", min_value=0.0, value=10.0, step=0.5, key=f"wid_{idx}_{t_data.get('cid')}")
-                    
-                customer_sqft = length * width
+                # डायरेक्ट स्क्वायर फीट इनपुट (लेंथ-विड्थ की जरूरत नहीं)
+                customer_sqft = st.number_input("Enter Total Required Area (Sq.Ft)", min_value=0.0, value=100.0, step=10.0, key=f"sqft_{idx}_{t_data.get('cid')}")
                 
-                # सटीक बैकएंड कैलकुलेशन
+                # calculations.py के फंक्शन्स से सटीक बॉक्स निकालना
                 box_sqft = calculate_box_sqft(backend_cf, backend_pu)
                 total_boxes = calculate_boxes(customer_sqft, backend_cf, backend_pu)
                 total_supplied_sqft = total_boxes * box_sqft
                 
-                st.markdown(f"**📊 कैलकुलेशन रिजल्ट:** एरिया: `{customer_sqft:.2f} Sq.Ft` | 🔥 **आवश्यक बॉक्स: `{total_boxes} Boxes`** (कुल बिलिंग एरिया: `{total_supplied_sqft:.2f} Sq.Ft`)")
+                st.markdown(f"**📊 रिजल्ट:** इनपुट एरिया: `{customer_sqft:.2f} Sq.Ft` | 1 बॉक्स कवरेज: `{box_sqft:.2f} Sq.Ft` | 🔥 **आवश्यक बॉक्स: `{total_boxes} Boxes`** (कुल बिलिंग एरिया: `{total_supplied_sqft:.2f} Sq.Ft`)")
                 
-                if st.button(f"💾 Save Measurement for {item_name}", key=f"save_btn_{idx}_{t_data.get('cid')}"):
+                if st.button(f"💾 Save Calculation for {item_name}", key=f"save_btn_{idx}_{t_data.get('cid')}"):
                     m_item = {
                         "cid": st.session_state.current_cid,
                         "floor_area": floor_area,
                         "item": item_name,
-                        "length": length,
-                        "width": width,
                         "cust_sqft": customer_sqft,
                         "boxes": total_boxes,
                         "total_sqft": total_supplied_sqft
