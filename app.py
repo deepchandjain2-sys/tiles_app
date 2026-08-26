@@ -658,7 +658,7 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         st.session_state.measurements_list = []
                     st.session_state.measurements_list.append(m_item)
                     save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
-                    st.success(f"Saved: {total_boxes} Boxes for {item_name} ({customer_sqft} Sq.Ft)")
+                    st.success(f"Saved: {total_boxes} Boxes for {item_name} ({customer_sqft} Sq.Ft)")st.rerun()
 
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
         st.markdown("---")
