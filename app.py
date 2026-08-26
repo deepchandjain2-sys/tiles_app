@@ -47,7 +47,7 @@ def clean_item_name(name):
   return str(name).split(" - Size:")[0].strip()
 
 
-# Initialize Session States
+# Initialize Session States for Users and Measurements
 if "users_db" not in st.session_state:
   loaded_users = load_json_file(USERS_FILE, default={})
   if not loaded_users:
@@ -72,28 +72,72 @@ if "measurements_list" not in st.session_state:
   )
 
 
-# --- AUTHENTICATION FLOW ---
+# --- AUTHENTICATION FLOW (Login, Register, Forgot Password) ---
 if not st.session_state.logged_in:
   st.title("🧱 Jay Granite & Tiles Hub")
-  st.subheader("🔑 Login / Access Portal")
+  auth_mode = st.radio(
+      "Choose Action", ["Login", "Register", "Forgot Password"], horizontal=True
+  )
 
-  with st.form("login_form"):
-    u_name = st.text_input("Username").strip().lower()
-    u_pass = st.text_input("Password", type="password")
-    submit_login = st.form_submit_button("Login")
+  if auth_mode == "Login":
+    st.subheader("🔑 Login to your account")
+    with st.form("login_form"):
+      username = st.text_input("Username").strip().lower()
+      password = st.text_input("Password", type="password")
+      submit_button = st.form_submit_button(label="Login")
 
-    if submit_login:
-      if (
-          u_name in st.session_state.users_db
-          and st.session_state.users_db[u_name]["password"] == u_pass
-      ):
-        st.session_state.logged_in = True
-        st.session_state.username = u_name
-        st.session_state.role = st.session_state.users_db[u_name]["role"]
-        st.success("Login Successful!")
-        st.rerun()
-      else:
-        st.error("Invalid Username or Password")
+      if submit_button:
+        if (
+            username in st.session_state.users_db
+            and st.session_state.users_db[username]["password"] == password
+        ):
+          st.session_state.logged_in = True
+          st.session_state.username = username
+          st.session_state.role = st.session_state.users_db[username]["role"]
+          st.success("Login Successful!")
+          st.rerun()
+        else:
+          st.error("Invalid Username or Password")
+
+  elif auth_mode == "Register":
+    st.subheader("📝 Register New User")
+    with st.form("register_form"):
+      reg_username = st.text_input("Choose Username").strip().lower()
+      reg_password = st.text_input("Choose Password", type="password")
+      reg_role = st.selectbox("Select Role", ["Salesman", "Admin"])
+      reg_location = st.selectbox(
+          "Select Location Access", ["Hiriyur", "Davangere", "Both"]
+      )
+      reg_submit = st.form_submit_button(label="Register")
+
+      if reg_submit:
+        if reg_username in st.session_state.users_db:
+          st.error("Username already exists!")
+        elif reg_username == "":
+          st.error("Username cannot be empty.")
+        else:
+          st.session_state.users_db[reg_username] = {
+              "password": reg_password,
+              "role": reg_role,
+              "location": reg_location,
+          }
+          save_json_file(USERS_FILE, st.session_state.users_db)
+          st.success("Registration Successful! Please switch to Login tab.")
+
+  else:
+    st.subheader("🔄 Reset Password")
+    with st.form("forgot_form"):
+      f_username = st.text_input("Enter your Username").strip().lower()
+      new_password = st.text_input("Enter New Password", type="password")
+      f_submit = st.form_submit_button(label="Update Password")
+
+      if f_submit:
+        if f_username in st.session_state.users_db:
+          st.session_state.users_db[f_username]["password"] = new_password
+          save_json_file(USERS_FILE, st.session_state.users_db)
+          st.success("Password updated successfully! Please login.")
+        else:
+          st.error("Username not found!")
 
 else:
   # --- MAIN APP INTERFACE ---
@@ -180,6 +224,7 @@ else:
             st.session_state.measurements_list.append(m_item)
             save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
 
+            # Save hote hi active list se item hat jayega
             updated_selections = [
                 s for s in selections if s.get("cid") != t_data.get("cid")
             ]
