@@ -5,13 +5,6 @@ import urllib.parse
 from datetime import datetime
 import pandas as pd
 import streamlit as st
-from database import (
-    load_customers_from_disk,
-    load_stock_from_disk,
-    load_stock_from_upload,
-    save_customers_to_disk,
-    save_json_file,
-)
 from fpdf import FPDF
 
 st.set_page_config(
@@ -38,6 +31,14 @@ def load_json_file(filepath, default=None):
     except:
       return default
   return default
+
+
+def save_json_file(filepath, data):
+  try:
+    with open(filepath, "w", encoding="utf-8") as f:
+      json.dump(data, f, ensure_ascii=False, indent=4)
+  except Exception as e:
+    print(f"Error saving file: {e}")
 
 
 def clean_item_name(name):
@@ -175,7 +176,7 @@ else:
             }
             if "measurements_list" not in st.session_state:
               st.session_state.measurements_list = []
-            
+
             st.session_state.measurements_list.append(m_item)
             save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
 
