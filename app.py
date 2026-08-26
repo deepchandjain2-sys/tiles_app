@@ -658,6 +658,13 @@ elif st.session_state.current_nav == "3 Measurements, PDF & WhatsApp":
                         st.session_state.measurements_list = []
                     st.session_state.measurements_list.append(m_item)
                     save_json_file(MEASUREMENTS_FILE, st.session_state.measurements_list)
+                    # Save hone ke baad is item ko active/pending list se hata dein
+      if "pending_items_list" in st.session_state:
+         st.session_state.pending_items_list = [
+         x
+         for x in st.session_state.pending_items_list
+         if x.get("cid") != t_data.get("cid")
+  ]
                     st.success(f"Saved: {total_boxes} Boxes for {item_name} ({customer_sqft} Sq.Ft)")
                     st.rerun()
     if "measurements_list" in st.session_state and st.session_state.measurements_list:
