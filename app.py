@@ -13,9 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Direct CSV Export Link for the Google Sheet
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=0&single=true&output=csv"
-
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/export?format=csv"
 SELECTIONS_FILE = "customer_selections.json"
 CUSTOMERS_FILE = "customers_list.json"
 
@@ -25,7 +23,6 @@ def load_json_file(filepath, default_val):
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                # Filter out corrupt None rows
                 if isinstance(data, list):
                     return [x for x in data if isinstance(x, dict) and x.get("tile")]
                 return data
@@ -46,7 +43,6 @@ def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
         
-        # Locate header row containing ITEM NAME
         h_idx = 0
         for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
@@ -92,7 +88,7 @@ def get_master_df():
         if not df.empty:
             return df
     except Exception as ex:
-        st.warning(f"Live Sheet Load Notice: {str(ex)}")
+        st.warning(f"Live Sheet Sync Note: {str(ex)}")
         
     return pd.DataFrame([
         {"item_name": "1000 L 12X18 KK", "con_factor": 1.5, "packing_unit": 6.0, "sqft_per_box": 9.0},
@@ -101,7 +97,6 @@ def get_master_df():
         {"item_name": "AOSTA CARRARA GVT 4X6 15MM VARMORA", "con_factor": 23.25, "packing_unit": 1.0, "sqft_per_box": 23.25}
     ])
 
-# --- CALCULATION LOGIC ---
 def calculate_box_sqft(cf, pu):
     try:
         return round(float(cf) * float(pu), 2)
@@ -122,14 +117,14 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_fill_color(31, 78, 121)
-    pdf.rect(0, 0, 210, 25, 'F')
+    pdf.rect(0, 0, 210, 24, 'F')
     
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "JAY GRANITE & TILES", ln=True, align="C")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 5, "Architectural Selection & Estimate", ln=True, align="C")
-    pdf.ln(8)
+    pdf.set_font("Helvetica", "B", 15)
+    pdf.cell(0, 8, "JAY GRANITE & TILES", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 9)
+    pdf.cell(0, 5, "Tile Estimate & Required Boxes", ln=True, align="C")
+    pdf.ln(7)
     
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 10)
@@ -140,14 +135,13 @@ def generate_pdf_quotation(customer_info, items_list):
     
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(20, 7, "Floor", 1, 0, "C", fill=True)
+    pdf.cell(22, 7, "Floor", 1, 0, "C", fill=True)
     pdf.cell(32, 7, "Area", 1, 0, "C", fill=True)
-    pdf.cell(50, 7, "Tile Item", 1, 0, "L", fill=True)
-    pdf.cell(18, 7, "Size (Ft)", 1, 0, "C", fill=True)
-    pdf.cell(16, 7, "Con Fac", 1, 0, "C", fill=True)
-    pdf.cell(16, 7, "Pack", 1, 0, "C", fill=True)
-    pdf.cell(18, 7, "Sq.Ft", 1, 0, "R", fill=True)
-    pdf.cell(20, 7, "Boxes", 1, 1, "R", fill=True)
+    pdf.cell(62, 7, "Tile Item", 1, 0, "L", fill=True)
+    pdf.cell(18, 7, "Con Fac", 1, 0, "C", fill=True)
+    pdf.cell(16, 7, "Packing", 1, 0, "C", fill=True)
+    pdf.cell(20, 7, "Total Sq.Ft", 1, 0, "R", fill=True)
+    pdf.cell(20, 7, "Req. Boxes", 1, 1, "R", fill=True)
     
     pdf.set_font("Helvetica", "", 8)
     tot_sqft = 0.0
@@ -158,18 +152,17 @@ def generate_pdf_quotation(customer_info, items_list):
         tot_sqft += sq
         tot_boxes += bx
         
-        pdf.cell(20, 6, str(it.get("floor", "-"))[:10], 1, 0, "C")
+        pdf.cell(22, 6, str(it.get("floor", "-"))[:12], 1, 0, "C")
         pdf.cell(32, 6, str(it.get("area", "-"))[:18], 1, 0, "L")
-        pdf.cell(50, 6, str(it.get("tile", "-"))[:26], 1, 0, "L")
-        pdf.cell(18, 6, str(it.get("dimensions", "-")), 1, 0, "C")
-        pdf.cell(16, 6, f"{float(it.get('con_factor', 1.0)):.2f}", 1, 0, "C")
+        pdf.cell(62, 6, str(it.get("tile", "-"))[:34], 1, 0, "L")
+        pdf.cell(18, 6, f"{float(it.get('con_factor', 1.0)):.2f}", 1, 0, "C")
         pdf.cell(16, 6, f"{float(it.get('packing_unit', 1.0)):.0f}", 1, 0, "C")
-        pdf.cell(18, 6, f"{sq:.2f}", 1, 0, "R")
+        pdf.cell(20, 6, f"{sq:.2f}", 1, 0, "R")
         pdf.cell(20, 6, f"{bx:.0f}", 1, 1, "R")
         
     pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(152, 7, "Grand Total", 1, 0, "R", fill=True)
-    pdf.cell(18, 7, f"{tot_sqft:.2f}", 1, 0, "R", fill=True)
+    pdf.cell(150, 7, "Grand Total", 1, 0, "R", fill=True)
+    pdf.cell(20, 7, f"{tot_sqft:.2f}", 1, 0, "R", fill=True)
     pdf.cell(20, 7, f"{tot_boxes:.0f}", 1, 1, "R", fill=True)
     
     return bytes(pdf.output())
@@ -189,7 +182,7 @@ if "active_cart" not in st.session_state:
 # --- LOGIN SCREEN ---
 if not st.session_state.auth:
     st.title("🏛️ Jay Granite & Tiles Portal")
-    st.caption("Smart Tile Selection & Quotation Engine")
+    st.caption("Smart Tile Selection & Direct Estimation Engine")
     
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -215,7 +208,7 @@ if not st.session_state.auth:
                     st.error("Please enter credentials.")
     st.stop()
 
-# --- NAVIGATION ---
+# --- SIDEBAR NAVIGATION ---
 st.sidebar.title(f"👤 {st.session_state.username.upper()}")
 st.sidebar.markdown(f"**Role:** `{st.session_state.role.upper()}`")
 if st.sidebar.button("🚪 Sign Out", use_container_width=True):
@@ -225,13 +218,12 @@ if st.sidebar.button("🚪 Sign Out", use_container_width=True):
 nav_list = [
     "1️⃣ Customer Registration",
     "2️⃣ Tile Selection (Showroom)",
-    "3️⃣ Measurement, BOQ & Share PDF"
+    "3️⃣ Sq.Ft Entry & Final Estimate"
 ]
 if st.session_state.role == "admin":
     nav_list.extend(["📊 Executive Dashboard", "⚙️ Stock Master & Settings"])
 
 nav = st.sidebar.radio("Navigation Flow", nav_list)
-
 master_df = get_master_df()
 
 # --- PAGE 1: CUSTOMER REGISTRATION ---
@@ -242,7 +234,7 @@ if nav == "1️⃣ Customer Registration":
         cust_mob = st.text_input("Mobile Number *", value=st.session_state.current_customer.get("mobile", "") if st.session_state.current_customer.get("mobile") != "-" else "")
         cust_site = st.text_area("Site Address")
         
-        if st.form_submit_button("Proceed to Selection", type="primary"):
+        if st.form_submit_button("Proceed to Tile Selection", type="primary"):
             if cust_name.strip() and cust_mob.strip():
                 st.session_state.current_customer = {
                     "id": len(load_json_file(CUSTOMERS_FILE, [])) + 1,
@@ -254,11 +246,11 @@ if nav == "1️⃣ Customer Registration":
                 c_list = load_json_file(CUSTOMERS_FILE, [])
                 c_list.append(st.session_state.current_customer)
                 save_json_file(CUSTOMERS_FILE, c_list)
-                st.success(f"Customer **{cust_name}** selected!")
+                st.success(f"Customer **{cust_name}** saved!")
             else:
                 st.error("Customer Name aur Mobile zaroori hai.")
 
-# --- PAGE 2: TILE SELECTION (SHOWROOM) ---
+# --- PAGE 2: TILE SELECTION ---
 elif nav == "2️⃣ Tile Selection (Showroom)":
     st.title("🏷️ Showroom Tile Selection")
     st.info(f"Client: **{st.session_state.current_customer['name']}** ({st.session_state.current_customer['mobile']}) | Catalog: **{len(master_df)} Tiles Available**")
@@ -270,9 +262,9 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         surface = st.radio("Surface Type", ["Floor", "Wall"], horizontal=True)
     with col3:
         area_options = [
-            "Living Room / Hall", "Master Bedroom", "Bedroom 2", "Kitchen", 
-            "Kitchen Dado / Wall", "Dining Area", "Pooja Room", "Master Bathroom", 
-            "Common Bathroom", "Balcony", "Parking / Porch", "✏️ Custom Area"
+            "Living Room / Hall", "Master Bedroom", "Bedroom 2", "Bedroom 3",
+            "Kitchen", "Kitchen Dado / Wall", "Dining Area", "Pooja Room",
+            "Master Bathroom", "Common Bathroom", "Balcony", "Parking / Porch", "✏️ Custom Area"
         ]
         sel_area = st.selectbox("Designated Area", area_options)
         final_area = st.text_input("Custom Area Name", "Store Room") if sel_area == "✏️ Custom Area" else sel_area
@@ -285,15 +277,14 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         
     chosen_tile = st.selectbox("Select Tile Item", filtered_df["item_name"].tolist())
     
-    # Exact values from sheet
     matched_row = filtered_df[filtered_df["item_name"] == chosen_tile].iloc[0]
     cf = float(matched_row.get("con_factor", 1.0))
     pu = float(matched_row.get("packing_unit", 1.0))
     box_cov = calculate_box_sqft(cf, pu)
     
-    st.success(f"📐 **Live Specs:** Con Factor (`{cf}`) × Packing Unit (`{pu}`) = **{box_cov:.2f} Sq.Ft / Box**")
+    st.success(f"📐 **Live Sheet Data:** Con Factor (`{cf}`) × Packing Unit (`{pu}`) = **{box_cov:.2f} Sq.Ft / Box**")
     
-    if st.button("➕ Add Tile to Customer Cart", type="primary", use_container_width=True):
+    if st.button("➕ Add Tile to Cart", type="primary", use_container_width=True):
         new_item = {
             "id": int(datetime.now().timestamp() * 1000),
             "floor": floor,
@@ -302,129 +293,130 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
             "tile": chosen_tile,
             "con_factor": cf,
             "packing_unit": pu,
-            "length": 10.0,
-            "width": 10.0,
-            "dimensions": "10.0x10.0 ft",
             "sqft": 100.0,
             "boxes": calculate_boxes(100.0, cf, pu)
         }
-        # Clean existing cart from corrupted entries and append
         current_valid_cart = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
         current_valid_cart.append(new_item)
         st.session_state.active_cart = current_valid_cart
         save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
-        st.success(f"✅ **{chosen_tile}** add ho gaya!")
+        st.success(f"✅ **{chosen_tile}** add ho gayi!")
         st.rerun()
 
     st.markdown("---")
     valid_items = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
-    st.subheader(f"🛒 Current Cart Items ({len(valid_items)})")
+    st.subheader(f"🛒 Current Selected Items ({len(valid_items)})")
     
-    c_btn1, c_btn2 = st.columns([4, 1])
-    with c_btn2:
-        if st.button("🗑️ Clear Corrupt Cart", use_container_width=True):
-            st.session_state.active_cart = []
-            save_json_file(SELECTIONS_FILE, [])
-            st.rerun()
-            
     if valid_items:
         disp_df = pd.DataFrame(valid_items)[["floor", "area", "tile", "con_factor", "packing_unit"]]
         st.dataframe(disp_df.rename(columns={"floor": "Floor", "area": "Area", "tile": "Tile Item", "con_factor": "Con Factor", "packing_unit": "Packing Unit"}), use_container_width=True)
-        st.info("👉 Tiles add karne ke baad sidebar se **'3️⃣ Measurement, BOQ & Share PDF'** par jayein.")
+        st.info("👉 Tiles add karne ke baad sidebar se **'3️⃣ Sq.Ft Entry & Final Estimate'** page par jayein.")
     else:
         st.caption("Cart abhi khali hai.")
 
-# --- PAGE 3: MEASUREMENT, BOQ & SHARE PDF ---
-elif nav == "3️⃣ Measurement, BOQ & Share PDF":
-    st.title("📐 Measurement & Quotation Share")
+# --- PAGE 3: NEW CLEAN FORMAT (ITEM -> SQFT -> REQUIRED BOXES) ---
+elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
+    st.title("📐 Direct Sq.Ft & Box Calculation")
+    st.info(f"Client: **{st.session_state.current_customer['name']}** ({st.session_state.current_customer['mobile']})")
+    
     valid_items = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
     
     if not valid_items:
-        st.warning("Cart khali hai. Pehle **'2️⃣ Tile Selection'** page se tiles add karein.")
+        st.warning("Cart khali hai. Pehle **'2️⃣ Tile Selection'** page se tiles select karein.")
         st.stop()
         
-    st.subheader("✏️ Enter Site Dimensions (Length x Width in Feet):")
+    st.markdown("### ✏️ Enter Required Sq.Ft for Each Tile:")
     
+    # Clean Header Row
+    h_col1, h_col2, h_col3, h_col4 = st.columns([5, 2.5, 2.5, 1.5])
+    h_col1.markdown("**Tile Item & Location**")
+    h_col2.markdown("**Total Sq.Ft**")
+    h_col3.markdown("**Required Boxes**")
+    h_col4.markdown("**Action**")
+    st.divider()
+
+    updated_items = []
     for it in valid_items:
         cf = float(it.get("con_factor", 1.0))
         pu = float(it.get("packing_unit", 1.0))
-        cov = calculate_box_sqft(cf, pu)
+        cov_per_box = calculate_box_sqft(cf, pu)
+        current_sqft = float(it.get("sqft", 100.0))
+
+        c1, c2, c3, c4 = st.columns([5, 2.5, 2.5, 1.5])
         
-        c_desc, c_del = st.columns([4, 1])
-        with c_desc:
-            st.markdown(f"**{it['area']}** ({it['floor']} - {it['surface']}) — *{it['tile']}*")
-            st.caption(f"🔹 **Con Factor:** `{cf}` | **Packing Unit:** `{pu}` | **Coverage/Box:** `{cov:.2f} Sq.Ft`")
-        with c_del:
-            if st.button("❌ Remove", key=f"del_{it['id']}", type="secondary"):
+        with c1:
+            st.markdown(f"**{it['area']}** ({it['floor']} - {it['surface']})")
+            st.caption(f"🧱 *{it['tile']}*  \n*(1 Box = {cov_per_box:.2f} Sq.Ft | CF: {cf}, Pack: {pu:.0f})*")
+            
+        with c2:
+            new_sqft = st.number_input(
+                "Sq.Ft",
+                value=current_sqft,
+                step=5.0,
+                key=f"sqft_in_{it['id']}",
+                label_visibility="collapsed"
+            )
+            
+        # Real-time Box Calculation
+        calc_bx = calculate_boxes(new_sqft, cf, pu)
+        
+        with c3:
+            st.markdown(f"### **{calc_bx}** Boxes")
+            
+        with c4:
+            if st.button("❌ Remove", key=f"btn_del_{it['id']}", type="secondary"):
                 st.session_state.active_cart = [x for x in st.session_state.active_cart if x.get("id") != it.get("id")]
                 save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
                 st.rerun()
 
-    with st.form("measurement_boq_form"):
-        updated_list = []
-        for it in valid_items:
-            cf = float(it.get("con_factor", 1.0))
-            pu = float(it.get("packing_unit", 1.0))
-            
-            cl, cw = st.columns(2)
-            with cl:
-                l_val = st.number_input(f"Length (Ft) - {it['area']}", value=float(it.get("length", 10.0)), step=0.5, key=f"len_{it['id']}")
-            with cw:
-                w_val = st.number_input(f"Width (Ft) - {it['area']}", value=float(it.get("width", 10.0)), step=0.5, key=f"wid_{it['id']}")
-                
-            sq = round(l_val * w_val, 2)
-            bx = calculate_boxes(sq, cf, pu)
-            
-            it_copy = dict(it)
-            it_copy["length"] = l_val
-            it_copy["width"] = w_val
-            it_copy["dimensions"] = f"{l_val}x{w_val} ft"
-            it_copy["sqft"] = sq
-            it_copy["boxes"] = bx
-            updated_list.append(it_copy)
-            st.markdown("---")
-            
-        if st.form_submit_button("💾 Calculate & Update All Boxes", type="primary", use_container_width=True):
-            st.session_state.active_cart = updated_list
-            save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
-            st.success("Calculations updated successfully!")
-            st.rerun()
+        it_copy = dict(it)
+        it_copy["sqft"] = new_sqft
+        it_copy["boxes"] = calc_bx
+        updated_items.append(it_copy)
+        st.divider()
 
-    st.markdown("### 📋 Final Bill of Quantities (BOQ)")
-    summary_df = pd.DataFrame(valid_items)[["floor", "surface", "area", "tile", "dimensions", "con_factor", "packing_unit", "sqft", "boxes"]]
+    # Auto-save changes if values updated
+    if updated_items != st.session_state.active_cart:
+        st.session_state.active_cart = updated_items
+        save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
+
+    # --- COMPLETE DETAIL TABLE (BOQ) ---
+    st.markdown("### 📋 Complete Estimate & Detail Breakdown")
+    summary_df = pd.DataFrame(st.session_state.active_cart)[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
     st.dataframe(summary_df.rename(columns={
-        "floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item",
-        "dimensions": "Dimensions", "con_factor": "Con Factor", "packing_unit": "Packing Unit",
-        "sqft": "Sq.Ft", "boxes": "Boxes Required"
+        "floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item Name",
+        "con_factor": "Con Factor", "packing_unit": "Packing Unit",
+        "sqft": "Total Sq.Ft", "boxes": "Required Boxes"
     }), use_container_width=True)
     
-    tot_sq = sum(float(x.get("sqft", 0.0)) for x in valid_items)
-    tot_bx = sum(float(x.get("boxes", 0.0)) for x in valid_items)
+    tot_sq = sum(float(x.get("sqft", 0.0)) for x in st.session_state.active_cart)
+    tot_bx = sum(float(x.get("boxes", 0.0)) for x in st.session_state.active_cart)
     
     k1, k2, k3 = st.columns(3)
-    k1.metric("Total Items", len(valid_items))
+    k1.metric("Total Tile Items", len(st.session_state.active_cart))
     k2.metric("Total Area", f"{tot_sq:.2f} Sq.Ft")
     k3.metric("Total Required Boxes", f"{tot_bx:.0f} Boxes")
     
+    # WhatsApp Share Text
     wa_msg = f"🏛️ *JAY GRANITE & TILES - TILE ESTIMATE*\n\n"
     wa_msg += f"👤 *Client Name:* {st.session_state.current_customer['name']}\n"
     wa_msg += f"📱 *Mobile:* {st.session_state.current_customer['mobile']}\n"
     wa_msg += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
-    for it in valid_items:
+    for it in st.session_state.active_cart:
         wa_msg += f"🔹 *{it['area']}* ({it['floor']})\n"
         wa_msg += f"   • Tile: {it['tile']}\n"
-        wa_msg += f"   • Size: {it['dimensions']} | Area: {it['sqft']} Sq.Ft\n"
-        wa_msg += f"   • Quantity: *{it['boxes']:.0f} Boxes*\n\n"
+        wa_msg += f"   • Area: {it['sqft']:.2f} Sq.Ft\n"
+        wa_msg += f"   • Required: *{it['boxes']:.0f} Boxes*\n\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     wa_msg += f"📊 *Total Area:* {tot_sq:.2f} Sq.Ft\n"
     wa_msg += f"📦 *Total Required Boxes:* {tot_bx:.0f} Boxes\n\n"
     wa_msg += f"Thank you for choosing Jay Granite & Tiles!"
 
-    st.markdown("#### 💬 WhatsApp Quick Copy Text")
-    st.text_area("WhatsApp Message Text:", value=wa_msg, height=160)
+    st.markdown("#### 💬 WhatsApp Direct Copy Text")
+    st.text_area("WhatsApp Message Text:", value=wa_msg, height=150)
     
-    pdf_bytes = generate_pdf_quotation(st.session_state.current_customer, valid_items)
+    pdf_bytes = generate_pdf_quotation(st.session_state.current_customer, st.session_state.active_cart)
     
     b1, b2, b3 = st.columns(3)
     with b1:
@@ -442,7 +434,7 @@ elif nav == "3️⃣ Measurement, BOQ & Share PDF":
             mob_num = "91" + mob_num
         st.link_button("📲 1-Click WhatsApp Send", f"https://wa.me/{mob_num}?text={enc_txt}", use_container_width=True)
     with b3:
-        if st.button("🗑️ Reset Cart", use_container_width=True):
+        if st.button("🗑️ Reset Cart / Start New", use_container_width=True):
             st.session_state.active_cart = []
             save_json_file(SELECTIONS_FILE, [])
             st.rerun()
