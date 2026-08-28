@@ -8,7 +8,7 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Jay Granite Tile Selection", page_icon="🏛️", layout="wide")
 
-# --- CALCULATION LOGIC (NO WASTAGE) ---
+# --- CALCULATION LOGIC ---
 def calculate_boxes(length, width, sqft_per_box):
     try:
         l = float(length)
@@ -216,11 +216,11 @@ if not st.session_state.authenticated:
                                       (new_u, hash_pass(new_p), new_pin))
                             conn.commit()
                             conn.close()
-                            st.success(f"Salesman **{new_u}** created successfully!")
+                            st.success(f"Salesman **{new_u}** successfully created!")
                         except Exception as ex:
                             st.error(f"User error: {str(ex)}")
                     else:
-                        st.error("Username aur Password enter karein.")
+                        st.error("Username aur password enter karein.")
     st.stop()
 
 # --- SIDEBAR NAVIGATION ---
@@ -396,7 +396,6 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         c_kpi2.metric("Total Area", f"{sum_sqft:.2f} sqft")
         c_kpi3.metric("Total Boxes", f"{sum_boxes:.2f} Boxes")
         
-        # WhatsApp Readymade Formatted Message Text
         wa_text = f"🏛️ *JAY GRANITE & TILES - TILE SELECTION ESTIMATE*\n\n"
         wa_text += f"👤 *Client Name:* {st.session_state.cust_name}\n"
         wa_text += f"📱 *Mobile:* {st.session_state.cust_mobile}\n"
@@ -413,7 +412,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         wa_text += f"Thank you for choosing Jay Granite & Tiles!"
 
         st.markdown("#### 💬 WhatsApp Direct Copy-Paste Text")
-        st.text_area("Neeche diye gaye box se poora text select karke copy karein:", value=wa_text, height=180)
+        st.text_area("Yahan se poora message copy karke WhatsApp par bhejein:", value=wa_text, height=180)
 
         pdf_bytes = generate_pdf(st.session_state.cust_name, st.session_state.cust_mobile, cart_df, sum_sqft, sum_boxes)
         
@@ -505,22 +504,19 @@ elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "
     
     with t1:
         st.subheader("🔗 Live Connect Google Sheet (No Upload Needed)")
-        st.caption("Apni BUSY Item Master Google Sheet ka Public URL daalein:")
+        st.caption("Apni BUSY Item Master Google Sheet ka Public Share Link daalein:")
         
-        default_sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ/pub?output=csv"
-        sheet_url_input = st.text_input("Google Sheet Link (CSV / Export Link)", placeholder="https://docs.google.com/spreadsheets/d/...")
+        sheet_url_input = st.text_input("Google Sheet Link", placeholder="https://docs.google.com/spreadsheets/d/...")
         
         if st.button("🔄 Sync Live Stock From Google Sheet", type="primary"):
             if sheet_url_input.strip():
                 try:
-                    # Convert standard Google Sheet URL to direct CSV export link
                     url = sheet_url_input.strip()
                     if "/edit" in url:
                         url = url.split("/edit")[0] + "/export?format=csv"
                     
                     df_live = pd.read_csv(url)
                     
-                    # Detect Item Name & Box Coverage
                     name_col = next((c for c in df_live.columns if "ITEM" in str(c).upper() or "NAME" in str(c).upper() or "TILE" in str(c).upper()), df_live.columns[0])
                     sqft_col = next((c for c in df_live.columns if "SQFT" in str(c).upper() or "BOX" in str(c).upper() or "CON FACTOR" in str(c).upper()), None)
                     
