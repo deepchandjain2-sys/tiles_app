@@ -55,7 +55,7 @@ st.set_page_config(
     layout="wide"
 )
 
-DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/edit?usp=sharing"
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/edit"
 
 # --- PERSISTENT DATA FILE PATHS ---
 USERS_FILE = "users_data.json"
@@ -78,13 +78,20 @@ def save_json_file(filepath, data):
     except Exception:
         pass
 
-# --- DYNAMIC GOOGLE SHEET STOCK LOADER (FUTURE-PROOF) ---
+# --- DYNAMIC GOOGLE SHEET STOCK LOADER (ROBUST URL FIX) ---
 @st.cache_data(ttl=300)
 def load_dynamic_sheet_stock(sheet_url):
     try:
         url = sheet_url.strip()
-        if "/edit" in url:
+        if "/pubhtml" in url:
+            url = url.replace("/pubhtml", "/pub?output=csv")
+        elif "/pub?" in url:
+            if "output=csv" not in url:
+                url = url + "&output=csv"
+        elif "/edit" in url:
             url = url.split("/edit")[0] + "/export?format=csv"
+        elif not url.endswith("output=csv") and not url.endswith("format=csv"):
+            url = url.rstrip("/") + "/export?format=csv"
         
         raw_df = pd.read_csv(url, header=None, dtype=str)
         
@@ -137,12 +144,10 @@ def load_dynamic_sheet_stock(sheet_url):
         return pd.DataFrame()
 
 def get_master_df():
-    # 1. Primary: Dynamic Live Sheet Read
     df = load_dynamic_sheet_stock(DEFAULT_SHEET_URL)
     if df is not None and not df.empty:
         return df
     
-    # 2. Secondary: Fallback to local files
     for fname in ["ITEM MASTER.csv", "item_master.csv", "ITEM_MASTER.csv"]:
         if os.path.exists(fname):
             try:
@@ -383,7 +388,6 @@ elif nav == "3️⃣ Measurement, BOQ & Share PDF":
         
     st.subheader("✏️ Enter Site Dimensions (Length x Width in Feet):")
     
-    # Direct Removal Action
     for it in list(st.session_state.active_cart):
         cf = float(it.get("con_factor", 1.0))
         pu = float(it.get("packing_unit", 1.0))
@@ -508,7 +512,7 @@ elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin
             st.success(f"🎉 Successfully loaded **{len(new_df)} tiles** directly from Google Sheet!")
             st.rerun()
         else:
-            st.error("Could not sync with Google Sheet. Please check access permissions.")
+            st.error("Could not sync with Google Sheet. Please check the URL.")
             
     st.markdown("---")
     st.subheader(f"📦 Master Live Stock Catalog ({len(master_df)} Items)")
