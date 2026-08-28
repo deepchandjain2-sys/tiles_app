@@ -53,8 +53,8 @@ def init_db():
             area_type TEXT,
             area_name TEXT,
             tile_name TEXT,
-            con_factor REAL DEFAULT 1.0,
-            packing_unit REAL DEFAULT 1.0,
+            con_factor REAL DEFAULT 1.5,
+            packing_unit REAL DEFAULT 6.0,
             length REAL DEFAULT 10.0,
             width REAL DEFAULT 10.0,
             dimensions TEXT,
@@ -65,13 +65,13 @@ def init_db():
         )
     """)
     
-    # Auto-migration for schema upgrades
+    # Auto-migration for customer_selections
     c.execute("PRAGMA table_info(customer_selections)")
     cols = [col[1] for col in c.fetchall()]
     if "con_factor" not in cols:
-        c.execute("ALTER TABLE customer_selections ADD COLUMN con_factor REAL DEFAULT 1.0")
+        c.execute("ALTER TABLE customer_selections ADD COLUMN con_factor REAL DEFAULT 1.5")
     if "packing_unit" not in cols:
-        c.execute("ALTER TABLE customer_selections ADD COLUMN packing_unit REAL DEFAULT 1.0")
+        c.execute("ALTER TABLE customer_selections ADD COLUMN packing_unit REAL DEFAULT 6.0")
     if "length" not in cols:
         c.execute("ALTER TABLE customer_selections ADD COLUMN length REAL DEFAULT 10.0")
     if "width" not in cols:
@@ -81,11 +81,22 @@ def init_db():
         CREATE TABLE IF NOT EXISTS inventory_stock (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tile_name TEXT UNIQUE,
-            con_factor REAL,
-            packing_unit REAL,
-            sqft_per_box REAL
+            con_factor REAL DEFAULT 1.5,
+            packing_unit REAL DEFAULT 6.0,
+            sqft_per_box REAL DEFAULT 9.0
         )
     """)
+
+    # Auto-migration for inventory_stock
+    c.execute("PRAGMA table_info(inventory_stock)")
+    inv_cols = [col[1] for col in c.fetchall()]
+    if "con_factor" not in inv_cols:
+        c.execute("ALTER TABLE inventory_stock ADD COLUMN con_factor REAL DEFAULT 1.5")
+    if "packing_unit" not in inv_cols:
+        c.execute("ALTER TABLE inventory_stock ADD COLUMN packing_unit REAL DEFAULT 6.0")
+    if "sqft_per_box" not in inv_cols:
+        c.execute("ALTER TABLE inventory_stock ADD COLUMN sqft_per_box REAL DEFAULT 9.0")
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS login_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -290,7 +301,7 @@ if selected_page == "1️⃣ Customer Registration":
                     conn.close()
                     st.success(f"Customer **{c_name}** registered successfully!")
             else:
-                st.error("Customer Name aur Mobile Number zaroori hai.")
+                st.error("Customer Name aur Mobile Number enter karein.")
 
 # --- PAGE 2: TILE SELECTION ONLY ---
 elif selected_page == "2️⃣ Tile Selection Only":
@@ -313,11 +324,18 @@ elif selected_page == "2️⃣ Tile Selection Only":
         st.stop()
         
     conn = get_connection()
-    stock_df = pd.read_sql_query("SELECT tile_name, con_factor, packing_unit, sqft_per_box FROM inventory_stock", conn)
+    stock_df = pd.read_sql_query("SELECT * FROM inventory_stock", conn)
     conn.close()
     
     if stock_df.empty:
         stock_df = pd.DataFrame([{"tile_name": "1000 L 12X18 KK", "con_factor": 1.5, "packing_unit": 6.0, "sqft_per_box": 9.0}])
+    else:
+        if "con_factor" not in stock_df.columns:
+            stock_df["con_factor"] = 1.5
+        if "packing_unit" not in stock_df.columns:
+            stock_df["packing_unit"] = 6.0
+        if "sqft_per_box" not in stock_df.columns:
+            stock_df["sqft_per_box"] = stock_df["con_factor"] * stock_df["packing_unit"]
         
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
@@ -346,13 +364,13 @@ elif selected_page == "2️⃣ Tile Selection Only":
         
     tile_name = st.selectbox("Select Tile Item", filtered_df["tile_name"].tolist())
     
-    # Exact row fetch for selected tile
+    # Exact row values
     t_row = filtered_df[filtered_df["tile_name"] == tile_name].iloc[0]
     c_fac = float(t_row.get("con_factor", 1.5))
     p_unit = float(t_row.get("packing_unit", 6.0))
     box_coverage = round(c_fac * p_unit, 2)
     
-    st.info(f"📐 **Formula Applied:** Con Factor (`{c_fac}`) × Packing Unit (`{p_unit}`) = **{box_coverage:.2f} Sq.Ft / Box**")
+    st.info(f"📐 **Master Formula:** Con Factor (`{c_fac}`) × Packing Unit (`{p_unit}`) = **{box_coverage:.2f} Sq.Ft / Box**")
     
     if st.button("➕ Select & Add Tile to Customer Cart", type="primary", use_container_width=True):
         if not area_name:
@@ -395,11 +413,11 @@ elif selected_page == "2️⃣ Tile Selection Only":
     
     if not quick_cart.empty:
         st.dataframe(quick_cart[["Floor", "Type", "Area", "Tile", "Con Factor", "Packing Unit"]], use_container_width=True)
-        st.info("👉 Tiles select karne ke baad left menu se **'3️⃣ Measurement, BOQ & Share PDF'** page par jayein.")
+        st.info("👉 Tiles add karne ke baad left menu se **'3️⃣ Measurement, BOQ & Share PDF'** page par jayein.")
     else:
         st.caption("Abhi koi tile select nahi hui hai.")
 
-# --- PAGE 3: MEASUREMENT & SHARE PDF (EXACT FORMULA + INSTANT REMOVE) ---
+# --- PAGE 3: MEASUREMENT & SHARE PDF ---
 elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
     st.title("📐 Measurement, Calculations & Quotation Share")
     
@@ -429,7 +447,6 @@ elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
 
     st.subheader("✏️ Enter Site Measurements (Length x Width):")
     
-    # Instant Individual Removal Actions
     for idx, r in cart_df.iterrows():
         c_fac = float(r['con_factor']) if r['con_factor'] else 1.5
         p_unit = float(r['packing_unit']) if r['packing_unit'] else 6.0
@@ -449,7 +466,6 @@ elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
                 st.success("Item remove ho gaya!")
                 st.rerun()
 
-    # Form to update all dimensions together
     with st.form("measurement_update_form"):
         updated_rows = []
         for idx, r in cart_df.iterrows():
@@ -463,7 +479,6 @@ elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
             with c_w:
                 w_val = st.number_input(f"Width (Ft) - {r['Area']} (#{r['id']})", value=float(r['width']) if r['width'] else 10.0, step=0.5, key=f"wid_{r['id']}")
             
-            # Exact Formula: Total SqFt = L * W, Total Boxes = Total SqFt / (Con Factor * Packing Unit)
             calc_sqft = round(l_val * w_val, 2)
             calc_boxes = round(calc_sqft / one_box_sqft, 2) if one_box_sqft > 0 else 0.0
             
@@ -601,7 +616,7 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
         st.subheader("📑 Complete Raw Log")
         st.dataframe(sel_df, use_container_width=True)
 
-# --- PAGE 5: ADMIN CONTROL & GOOGLE SHEET SYNC (COL H & COL I) ---
+# --- PAGE 5: ADMIN CONTROL & GOOGLE SHEET SYNC ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
     t1, t2, t3 = st.tabs(["🔗 Direct Google Sheet Live Stock", "👥 Manage Staff / Salesmen", "📜 System Audits"])
