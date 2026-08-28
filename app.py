@@ -2,52 +2,10 @@ import json
 import os
 import math
 import urllib.parse
-import io
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 from datetime import datetime
-
-# --- DATABASE & MODULE IMPORTS / FALLBACKS ---
-try:
-    from database import (
-        load_stock_from_disk,
-        load_stock_from_upload,
-        save_customers_to_disk,
-        load_customers_from_disk
-    )
-except ImportError:
-    def load_stock_from_disk():
-        return None
-    def load_stock_from_upload(file):
-        return pd.read_csv(file)
-    def save_customers_to_disk(data):
-        with open("customers.json", "w") as f:
-            json.dump(data, f)
-    def load_customers_from_disk():
-        if os.path.exists("customers.json"):
-            with open("customers.json", "r") as f:
-                return json.load(f)
-        return []
-
-try:
-    from calculations import calculate_boxes, calculate_box_sqft
-except ImportError:
-    def calculate_box_sqft(con_factor, packing_unit):
-        try:
-            return round(float(con_factor) * float(packing_unit), 2)
-        except Exception:
-            return 16.0
-
-    def calculate_boxes(sqft, con_factor, packing_unit):
-        try:
-            sqft_val = float(sqft)
-            coverage = float(con_factor) * float(packing_unit)
-            if coverage <= 0:
-                return 0
-            return math.ceil(sqft_val / coverage)
-        except Exception:
-            return 0
 
 st.set_page_config(
     page_title="Jay Granite & Tiles Hub",
@@ -55,18 +13,22 @@ st.set_page_config(
     layout="wide"
 )
 
-DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=0&single=true&output=csv"
+# Direct CSV Export Link for the Google Sheet
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/export?format=csv"
 
-# --- PERSISTENT DATA FILE PATHS ---
-USERS_FILE = "users_data.json"
 SELECTIONS_FILE = "customer_selections.json"
-MEASUREMENTS_FILE = "measurements_data.json"
+CUSTOMERS_FILE = "customers_list.json"
 
+# --- PERSISTENT DATA HANDLERS ---
 def load_json_file(filepath, default_val):
     if os.path.exists(filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                # Filter out corrupt None rows
+                if isinstance(data, list):
+                    return [x for x in data if isinstance(x, dict) and x.get("tile")]
+                return data
         except Exception:
             return default_val
     return default_val
@@ -78,22 +40,11 @@ def save_json_file(filepath, data):
     except Exception:
         pass
 
-# --- DYNAMIC GOOGLE SHEET STOCK LOADER (ROBUST URL FIX) ---
-@st.cache_data(ttl=300)
-def load_dynamic_sheet_stock(sheet_url):
+# --- DIRECT GOOGLE SHEET STOCK LOADER ---
+@st.cache_data(ttl=60)
+def get_master_df():
     try:
-        url = sheet_url.strip()
-        if "/pubhtml" in url:
-            url = url.replace("/pubhtml", "/pub?output=csv")
-        elif "/pub?" in url:
-            if "output=csv" not in url:
-                url = url + "&output=csv"
-        elif "/edit" in url:
-            url = url.split("/edit")[0] + "/export?format=csv"
-        elif not url.endswith("output=csv") and not url.endswith("format=csv"):
-            url = url.rstrip("/") + "/export?format=csv"
-        
-        raw_df = pd.read_csv(url, header=None, dtype=str)
+        raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
         
         # Locate header row containing ITEM NAME
         h_idx = 0
@@ -108,10 +59,10 @@ def load_dynamic_sheet_stock(sheet_url):
         parsed_stock = []
         for _, r in data_rows.iterrows():
             item_name = str(r[0]).strip() if pd.notna(r[0]) else ""
-            if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED"]:
+            if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Read Column H (Index 7) -> CON FACTOR
+            # Column H (Index 7) -> CON FACTOR
             try:
                 cf_raw = str(r[7]).replace(',', '').strip() if len(r) > 7 and pd.notna(r[7]) else "1.0"
                 cf = float(pd.to_numeric(cf_raw, errors='coerce')) if cf_raw else 1.0
@@ -120,7 +71,7 @@ def load_dynamic_sheet_stock(sheet_url):
             except Exception:
                 cf = 1.0
                 
-            # Read Column I (Index 8) -> PACKING UNIT CON FACTOR
+            # Column I (Index 8) -> PACKING UNIT CON FACTOR
             try:
                 pu_raw = str(r[8]).replace(',', '').strip() if len(r) > 8 and pd.notna(r[8]) else "1.0"
                 pu = float(pd.to_numeric(pu_raw, errors='coerce')) if pu_raw else 1.0
@@ -138,39 +89,35 @@ def load_dynamic_sheet_stock(sheet_url):
             })
             
         df = pd.DataFrame(parsed_stock).drop_duplicates(subset=["item_name"])
-        return df
+        if not df.empty:
+            return df
     except Exception as ex:
-        st.error(f"Sheet Sync Notice: {str(ex)}")
-        return pd.DataFrame()
-
-def get_master_df():
-    df = load_dynamic_sheet_stock(DEFAULT_SHEET_URL)
-    if df is not None and not df.empty:
-        return df
-    
-    for fname in ["ITEM MASTER.csv", "item_master.csv", "ITEM_MASTER.csv"]:
-        if os.path.exists(fname):
-            try:
-                df = load_stock_from_upload(fname)
-                if df is not None and not df.empty:
-                    return df
-            except Exception:
-                pass
+        st.warning(f"Live Sheet Load Notice: {str(ex)}")
+        
     return pd.DataFrame([
         {"item_name": "1000 L 12X18 KK", "con_factor": 1.5, "packing_unit": 6.0, "sqft_per_box": 9.0},
         {"item_name": "ALBETA WHITE DAZZEL 2X4 ITALICA", "con_factor": 8.0, "packing_unit": 2.0, "sqft_per_box": 16.0},
+        {"item_name": "ATURIO VOLKAS CAR 9MM 4X6 MOT", "con_factor": 23.25, "packing_unit": 2.0, "sqft_per_box": 46.50},
         {"item_name": "AOSTA CARRARA GVT 4X6 15MM VARMORA", "con_factor": 23.25, "packing_unit": 1.0, "sqft_per_box": 23.25}
     ])
 
-def clean_item_name(raw_name):
-    name_str = str(raw_name).strip()
-    if name_str.lower().startswith("nan -"):
-        name_str = name_str[5:].strip()
-    elif name_str.lower().startswith("nan"):
-        name_str = name_str[3:].strip()
-    return name_str
+# --- CALCULATION LOGIC ---
+def calculate_box_sqft(cf, pu):
+    try:
+        return round(float(cf) * float(pu), 2)
+    except Exception:
+        return 16.0
 
-# --- PDF QUOTATION ENGINE ---
+def calculate_boxes(sqft, cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        if cov <= 0:
+            return 0
+        return math.ceil(float(sqft) / cov)
+    except Exception:
+        return 0
+
+# --- PDF GENERATOR ---
 def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
     pdf.add_page()
@@ -242,7 +189,7 @@ if "active_cart" not in st.session_state:
 # --- LOGIN SCREEN ---
 if not st.session_state.auth:
     st.title("🏛️ Jay Granite & Tiles Portal")
-    st.caption("Integrated Architecture & Tile Management System")
+    st.caption("Smart Tile Selection & Quotation Engine")
     
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -298,23 +245,23 @@ if nav == "1️⃣ Customer Registration":
         if st.form_submit_button("Proceed to Selection", type="primary"):
             if cust_name.strip() and cust_mob.strip():
                 st.session_state.current_customer = {
-                    "id": len(load_json_file("customers_list.json", [])) + 1,
+                    "id": len(load_json_file(CUSTOMERS_FILE, [])) + 1,
                     "name": cust_name.strip(),
                     "mobile": cust_mob.strip(),
                     "address": cust_site.strip(),
                     "salesman": st.session_state.username
                 }
-                c_list = load_json_file("customers_list.json", [])
+                c_list = load_json_file(CUSTOMERS_FILE, [])
                 c_list.append(st.session_state.current_customer)
-                save_json_file("customers_list.json", c_list)
+                save_json_file(CUSTOMERS_FILE, c_list)
                 st.success(f"Customer **{cust_name}** selected!")
             else:
-                st.error("Name aur Mobile number enter karein.")
+                st.error("Customer Name aur Mobile zaroori hai.")
 
-# --- PAGE 2: TILE SELECTION (SHOWROOM PITCH) ---
+# --- PAGE 2: TILE SELECTION (SHOWROOM) ---
 elif nav == "2️⃣ Tile Selection (Showroom)":
     st.title("🏷️ Showroom Tile Selection")
-    st.info(f"Active Client: **{st.session_state.current_customer['name']}** ({st.session_state.current_customer['mobile']}) | Staff: **{st.session_state.username}**")
+    st.info(f"Client: **{st.session_state.current_customer['name']}** ({st.session_state.current_customer['mobile']}) | Catalog: **{len(master_df)} Tiles Available**")
     
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -330,7 +277,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         sel_area = st.selectbox("Designated Area", area_options)
         final_area = st.text_input("Custom Area Name", "Store Room") if sel_area == "✏️ Custom Area" else sel_area
         
-    search = st.text_input("🔍 Search Tile (Code / Size / Name)", "")
+    search = st.text_input("🔍 Quick Search (Name / Size / Brand)", "")
     filtered_df = master_df[master_df["item_name"].str.contains(search, case=False, na=False)] if search else master_df
     
     if filtered_df.empty:
@@ -338,19 +285,17 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         
     chosen_tile = st.selectbox("Select Tile Item", filtered_df["item_name"].tolist())
     
-    # Exact Dynamic Values from Google Sheet / Master
+    # Exact values from sheet
     matched_row = filtered_df[filtered_df["item_name"] == chosen_tile].iloc[0]
     cf = float(matched_row.get("con_factor", 1.0))
     pu = float(matched_row.get("packing_unit", 1.0))
     box_cov = calculate_box_sqft(cf, pu)
     
-    st.success(f"📐 **Live Master Formula:** Con Factor (`{cf}`) × Packing Unit (`{pu}`) = **{box_cov:.2f} Sq.Ft / Box**")
+    st.success(f"📐 **Live Specs:** Con Factor (`{cf}`) × Packing Unit (`{pu}`) = **{box_cov:.2f} Sq.Ft / Box**")
     
     if st.button("➕ Add Tile to Customer Cart", type="primary", use_container_width=True):
         new_item = {
             "id": int(datetime.now().timestamp() * 1000),
-            "customer_id": st.session_state.current_customer.get("id", 1),
-            "customer_name": st.session_state.current_customer.get("name", "Walk-in"),
             "floor": floor,
             "surface": surface,
             "area": final_area,
@@ -363,32 +308,44 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
             "sqft": 100.0,
             "boxes": calculate_boxes(100.0, cf, pu)
         }
-        st.session_state.active_cart.append(new_item)
+        # Clean existing cart from corrupted entries and append
+        current_valid_cart = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
+        current_valid_cart.append(new_item)
+        st.session_state.active_cart = current_valid_cart
         save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
-        st.success(f"✅ **{chosen_tile}** added successfully!")
+        st.success(f"✅ **{chosen_tile}** add ho gaya!")
         st.rerun()
 
     st.markdown("---")
-    st.subheader(f"🛒 Current Cart Items ({len(st.session_state.active_cart)})")
-    if st.session_state.active_cart:
-        disp_df = pd.DataFrame(st.session_state.active_cart)[["floor", "area", "tile", "con_factor", "packing_unit"]]
+    valid_items = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
+    st.subheader(f"🛒 Current Cart Items ({len(valid_items)})")
+    
+    c_btn1, c_btn2 = st.columns([4, 1])
+    with c_btn2:
+        if st.button("🗑️ Clear Corrupt Cart", use_container_width=True):
+            st.session_state.active_cart = []
+            save_json_file(SELECTIONS_FILE, [])
+            st.rerun()
+            
+    if valid_items:
+        disp_df = pd.DataFrame(valid_items)[["floor", "area", "tile", "con_factor", "packing_unit"]]
         st.dataframe(disp_df.rename(columns={"floor": "Floor", "area": "Area", "tile": "Tile Item", "con_factor": "Con Factor", "packing_unit": "Packing Unit"}), use_container_width=True)
-        st.info("👉 Please proceed to **'3️⃣ Measurement, BOQ & Share PDF'** to update exact dimensions.")
+        st.info("👉 Tiles add karne ke baad sidebar se **'3️⃣ Measurement, BOQ & Share PDF'** par jayein.")
     else:
-        st.caption("No tiles selected yet.")
+        st.caption("Cart abhi khali hai.")
 
-# --- PAGE 3: MEASUREMENT, BOQ & PDF SHARE ---
+# --- PAGE 3: MEASUREMENT, BOQ & SHARE PDF ---
 elif nav == "3️⃣ Measurement, BOQ & Share PDF":
     st.title("📐 Measurement & Quotation Share")
-    st.info(f"Client: **{st.session_state.current_customer['name']}** ({st.session_state.current_customer['mobile']})")
+    valid_items = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
     
-    if not st.session_state.active_cart:
-        st.warning("Please select tiles from **'2️⃣ Tile Selection'** page first.")
+    if not valid_items:
+        st.warning("Cart khali hai. Pehle **'2️⃣ Tile Selection'** page se tiles add karein.")
         st.stop()
         
     st.subheader("✏️ Enter Site Dimensions (Length x Width in Feet):")
     
-    for it in list(st.session_state.active_cart):
+    for it in valid_items:
         cf = float(it.get("con_factor", 1.0))
         pu = float(it.get("packing_unit", 1.0))
         cov = calculate_box_sqft(cf, pu)
@@ -399,13 +356,13 @@ elif nav == "3️⃣ Measurement, BOQ & Share PDF":
             st.caption(f"🔹 **Con Factor:** `{cf}` | **Packing Unit:** `{pu}` | **Coverage/Box:** `{cov:.2f} Sq.Ft`")
         with c_del:
             if st.button("❌ Remove", key=f"del_{it['id']}", type="secondary"):
-                st.session_state.active_cart = [x for x in st.session_state.active_cart if x["id"] != it["id"]]
+                st.session_state.active_cart = [x for x in st.session_state.active_cart if x.get("id") != it.get("id")]
                 save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
                 st.rerun()
 
     with st.form("measurement_boq_form"):
         updated_list = []
-        for it in st.session_state.active_cart:
+        for it in valid_items:
             cf = float(it.get("con_factor", 1.0))
             pu = float(it.get("packing_unit", 1.0))
             
@@ -430,22 +387,22 @@ elif nav == "3️⃣ Measurement, BOQ & Share PDF":
         if st.form_submit_button("💾 Calculate & Update All Boxes", type="primary", use_container_width=True):
             st.session_state.active_cart = updated_list
             save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
-            st.success("All measurements updated accurately!")
+            st.success("Calculations updated successfully!")
             st.rerun()
 
     st.markdown("### 📋 Final Bill of Quantities (BOQ)")
-    summary_df = pd.DataFrame(st.session_state.active_cart)[["floor", "surface", "area", "tile", "dimensions", "con_factor", "packing_unit", "sqft", "boxes"]]
+    summary_df = pd.DataFrame(valid_items)[["floor", "surface", "area", "tile", "dimensions", "con_factor", "packing_unit", "sqft", "boxes"]]
     st.dataframe(summary_df.rename(columns={
         "floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item",
         "dimensions": "Dimensions", "con_factor": "Con Factor", "packing_unit": "Packing Unit",
         "sqft": "Sq.Ft", "boxes": "Boxes Required"
     }), use_container_width=True)
     
-    tot_sq = sum(float(x.get("sqft", 0.0)) for x in st.session_state.active_cart)
-    tot_bx = sum(float(x.get("boxes", 0.0)) for x in st.session_state.active_cart)
+    tot_sq = sum(float(x.get("sqft", 0.0)) for x in valid_items)
+    tot_bx = sum(float(x.get("boxes", 0.0)) for x in valid_items)
     
     k1, k2, k3 = st.columns(3)
-    k1.metric("Total Items", len(st.session_state.active_cart))
+    k1.metric("Total Items", len(valid_items))
     k2.metric("Total Area", f"{tot_sq:.2f} Sq.Ft")
     k3.metric("Total Required Boxes", f"{tot_bx:.0f} Boxes")
     
@@ -454,7 +411,7 @@ elif nav == "3️⃣ Measurement, BOQ & Share PDF":
     wa_msg += f"📱 *Mobile:* {st.session_state.current_customer['mobile']}\n"
     wa_msg += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
-    for it in st.session_state.active_cart:
+    for it in valid_items:
         wa_msg += f"🔹 *{it['area']}* ({it['floor']})\n"
         wa_msg += f"   • Tile: {it['tile']}\n"
         wa_msg += f"   • Size: {it['dimensions']} | Area: {it['sqft']} Sq.Ft\n"
@@ -465,9 +422,9 @@ elif nav == "3️⃣ Measurement, BOQ & Share PDF":
     wa_msg += f"Thank you for choosing Jay Granite & Tiles!"
 
     st.markdown("#### 💬 WhatsApp Quick Copy Text")
-    st.text_area("Copy and share directly on WhatsApp:", value=wa_msg, height=160)
+    st.text_area("WhatsApp Message Text:", value=wa_msg, height=160)
     
-    pdf_bytes = generate_pdf_quotation(st.session_state.current_customer, st.session_state.active_cart)
+    pdf_bytes = generate_pdf_quotation(st.session_state.current_customer, valid_items)
     
     b1, b2, b3 = st.columns(3)
     with b1:
@@ -490,32 +447,23 @@ elif nav == "3️⃣ Measurement, BOQ & Share PDF":
             save_json_file(SELECTIONS_FILE, [])
             st.rerun()
 
-# --- PAGE 4: EXECUTIVE DASHBOARD (ADMIN ONLY) ---
+# --- PAGE 4: EXECUTIVE DASHBOARD ---
 elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
     st.title("📊 Executive Dashboard")
-    all_custs = load_json_file("customers_list.json", [])
+    all_custs = load_json_file(CUSTOMERS_FILE, [])
     st.metric("👥 Total Clients Registered", len(all_custs))
     if all_custs:
         st.dataframe(pd.DataFrame(all_custs), use_container_width=True)
     else:
         st.info("No customer history found.")
 
-# --- PAGE 5: STOCK MASTER & SETTINGS (ADMIN ONLY) ---
+# --- PAGE 5: STOCK MASTER ---
 elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin":
     st.title("⚙️ Live Stock Master (Google Sheet Linked)")
-    sheet_input = st.text_input("Google Sheet Master URL", value=DEFAULT_SHEET_URL)
-    
-    if st.button("🔄 Sync Live Master Now", type="primary"):
+    st.info(f"Loaded **{len(master_df)} Tiles** directly from Google Sheet.")
+    if st.button("🔄 Refresh Sheet Cache"):
         st.cache_data.clear()
-        new_df = load_dynamic_sheet_stock(sheet_input.strip())
-        if not new_df.empty:
-            st.success(f"🎉 Successfully loaded **{len(new_df)} tiles** directly from Google Sheet!")
-            st.rerun()
-        else:
-            st.error("Could not sync with Google Sheet. Please check the URL.")
-            
-    st.markdown("---")
-    st.subheader(f"📦 Master Live Stock Catalog ({len(master_df)} Items)")
+        st.rerun()
     st.dataframe(master_df.rename(columns={
         "item_name": "Tile Item Name",
         "con_factor": "Con Factor (Col H)",
