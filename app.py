@@ -14,18 +14,14 @@ st.set_page_config(
 )
 
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/export?format=csv"
-SELECTIONS_FILE = "customer_selections.json"
-CUSTOMERS_FILE = "customers_list.json"
+CUSTOMERS_FILE = "customers_database.json"
 
-# --- PERSISTENT DATA HANDLERS ---
+# --- PERSISTENT DATABASE ENGINE ---
 def load_json_file(filepath, default_val):
     if os.path.exists(filepath):
         try:
             with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    return [x for x in data if isinstance(x, dict) and x.get("tile")]
-                return data
+                return json.load(f)
         except Exception:
             return default_val
     return default_val
@@ -37,12 +33,26 @@ def save_json_file(filepath, data):
     except Exception:
         pass
 
+def get_all_customers():
+    return load_json_file(CUSTOMERS_FILE, [])
+
+def save_customer_record(customer_data):
+    custs = get_all_customers()
+    found = False
+    for i, c in enumerate(custs):
+        if str(c.get("id")) == str(customer_data.get("id")) or (c.get("mobile") and c.get("mobile") == customer_data.get("mobile")):
+            custs[i] = customer_data
+            found = True
+            break
+    if not found:
+        custs.append(customer_data)
+    save_json_file(CUSTOMERS_FILE, custs)
+
 # --- DIRECT GOOGLE SHEET STOCK LOADER ---
 @st.cache_data(ttl=60)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
-        
         h_idx = 0
         for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
@@ -51,14 +61,13 @@ def get_master_df():
                 break
                 
         data_rows = raw_df.iloc[h_idx + 1:].copy()
-        
         parsed_stock = []
         for _, r in data_rows.iterrows():
             item_name = str(r[0]).strip() if pd.notna(r[0]) else ""
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Column H (Index 7) -> CON FACTOR
+            # Read Column H (Index 7) -> CON FACTOR
             try:
                 cf_raw = str(r[7]).replace(',', '').strip() if len(r) > 7 and pd.notna(r[7]) else "1.0"
                 cf = float(pd.to_numeric(cf_raw, errors='coerce')) if cf_raw else 1.0
@@ -67,7 +76,7 @@ def get_master_df():
             except Exception:
                 cf = 1.0
                 
-            # Column I (Index 8) -> PACKING UNIT CON FACTOR
+            # Read Column I (Index 8) -> PACKING UNIT CON FACTOR
             try:
                 pu_raw = str(r[8]).replace(',', '').strip() if len(r) > 8 and pd.notna(r[8]) else "1.0"
                 pu = float(pd.to_numeric(pu_raw, errors='coerce')) if pu_raw else 1.0
@@ -88,7 +97,7 @@ def get_master_df():
         if not df.empty:
             return df
     except Exception as ex:
-        st.warning(f"Live Sheet Sync Note: {str(ex)}")
+        st.warning(f"Live Sheet Load Note: {str(ex)}")
         
     return pd.DataFrame([
         {"item_name": "1000 L 12X18 KK", "con_factor": 1.5, "packing_unit": 6.0, "sqft_per_box": 9.0},
@@ -123,14 +132,15 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.set_font("Helvetica", "B", 15)
     pdf.cell(0, 8, "JAY GRANITE & TILES", ln=True, align="C")
     pdf.set_font("Helvetica", "", 9)
-    pdf.cell(0, 5, "Tile Estimate & Required Boxes", ln=True, align="C")
+    pdf.cell(0, 5, "Tile Selection & Final BOQ Estimate", ln=True, align="C")
     pdf.ln(7)
     
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 10)
     pdf.cell(100, 6, f"Customer: {customer_info.get('name', 'Walk-in')}", ln=False)
     pdf.cell(0, 6, f"Date: {datetime.now().strftime('%d-%m-%Y')}", ln=True, align="R")
-    pdf.cell(100, 6, f"Mobile: {customer_info.get('mobile', '-')}", ln=True)
+    pdf.cell(100, 6, f"Mobile: {customer_info.get('mobile', '-')}", ln=False)
+    pdf.cell(0, 6, f"Staff: {customer_info.get('salesman', 'Admin')}", ln=True, align="R")
     pdf.ln(4)
     
     pdf.set_fill_color(240, 240, 240)
@@ -175,14 +185,21 @@ if "username" not in st.session_state:
 if "role" not in st.session_state:
     st.session_state.role = "salesman"
 if "current_customer" not in st.session_state:
-    st.session_state.current_customer = {"id": 1, "name": "Walk-in Customer", "mobile": "-"}
-if "active_cart" not in st.session_state:
-    st.session_state.active_cart = load_json_file(SELECTIONS_FILE, [])
+    st.session_state.current_customer = {
+        "id": "1",
+        "name": "Walk-in Customer",
+        "mobile": "-",
+        "address": "-",
+        "salesman": "DEEPCHAND JAIN",
+        "status": "SELECTION ONLY",
+        "selections": [],
+        "created_at": datetime.now().strftime("%d-%m-%Y %H:%M")
+    }
 
 # --- LOGIN SCREEN ---
 if not st.session_state.auth:
     st.title("🏛️ Jay Granite & Tiles Portal")
-    st.caption("Smart Tile Selection & Direct Estimation Engine")
+    st.caption("Smart Tile Selection & Quotation Management")
     
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
@@ -205,7 +222,7 @@ if not st.session_state.auth:
                     st.session_state.role = "salesman"
                     st.rerun()
                 else:
-                    st.error("Please enter credentials.")
+                    st.error("Credentials daalein.")
     st.stop()
 
 # --- SIDEBAR NAVIGATION ---
@@ -216,7 +233,7 @@ if st.sidebar.button("🚪 Sign Out", use_container_width=True):
     st.rerun()
 
 nav_list = [
-    "1️⃣ Customer Registration",
+    "1️⃣ Customer Registration & History",
     "2️⃣ Tile Selection (Showroom)",
     "3️⃣ Sq.Ft Entry & Final Estimate"
 ]
@@ -226,34 +243,69 @@ if st.session_state.role == "admin":
 nav = st.sidebar.radio("Navigation Flow", nav_list)
 master_df = get_master_df()
 
-# --- PAGE 1: CUSTOMER REGISTRATION ---
-if nav == "1️⃣ Customer Registration":
-    st.title("📝 Customer Registration")
-    with st.form("reg_cust_form"):
-        cust_name = st.text_input("Customer Name *", value=st.session_state.current_customer.get("name", "") if st.session_state.current_customer.get("name") != "Walk-in Customer" else "")
-        cust_mob = st.text_input("Mobile Number *", value=st.session_state.current_customer.get("mobile", "") if st.session_state.current_customer.get("mobile") != "-" else "")
-        cust_site = st.text_area("Site Address")
-        
-        if st.form_submit_button("Proceed to Tile Selection", type="primary"):
-            if cust_name.strip() and cust_mob.strip():
-                st.session_state.current_customer = {
-                    "id": len(load_json_file(CUSTOMERS_FILE, [])) + 1,
-                    "name": cust_name.strip(),
-                    "mobile": cust_mob.strip(),
-                    "address": cust_site.strip(),
-                    "salesman": st.session_state.username
-                }
-                c_list = load_json_file(CUSTOMERS_FILE, [])
-                c_list.append(st.session_state.current_customer)
-                save_json_file(CUSTOMERS_FILE, c_list)
-                st.success(f"Customer **{cust_name}** saved!")
-            else:
-                st.error("Customer Name aur Mobile zaroori hai.")
+# --- PAGE 1: CUSTOMER REGISTRATION & HISTORY SELECTION ---
+if nav == "1️⃣ Customer Registration & History":
+    st.title("👥 Customer Management & Selection Resume")
+    
+    all_clients = get_all_customers()
+    tab_new, tab_existing = st.tabs(["➕ Register New Customer", "📂 Open Saved / Existing Customer"])
+    
+    with tab_new:
+        with st.form("new_cust_form"):
+            c_name = st.text_input("Customer Name *")
+            c_mob = st.text_input("Mobile Number *")
+            c_site = st.text_area("Site Address / City")
+            c_eng = st.text_input("Contractor / Architect Name (Optional)")
+            
+            if st.form_submit_button("Save & Start Tile Selection", type="primary"):
+                if c_name.strip() and c_mob.strip():
+                    new_cust = {
+                        "id": str(int(datetime.now().timestamp())),
+                        "name": c_name.strip(),
+                        "mobile": c_mob.strip(),
+                        "address": c_site.strip(),
+                        "engineer": c_eng.strip(),
+                        "salesman": st.session_state.username,
+                        "status": "SELECTION ONLY",
+                        "selections": [],
+                        "created_at": datetime.now().strftime("%d-%m-%Y %H:%M")
+                    }
+                    save_customer_record(new_cust)
+                    st.session_state.current_customer = new_cust
+                    st.success(f"Customer **{c_name}** successfully registered! Sidebar se **'2️⃣ Tile Selection'** par jayein.")
+                else:
+                    st.error("Customer Name aur Mobile number enter karein.")
 
-# --- PAGE 2: TILE SELECTION ---
+    with tab_existing:
+        if all_clients:
+            st.markdown("#### 🔍 Purane Customer Ko Chunein (Selection Resume Karein):")
+            client_options = {
+                f"{c['name']} | 📱 {c['mobile']} | 🏷️ {len(c.get('selections', []))} Items ({c.get('status', 'DRAFT')})": c 
+                for c in reversed(all_clients)
+            }
+            selected_label = st.selectbox("Select Customer From List", list(client_options.keys()))
+            chosen_cust = client_options[selected_label]
+            
+            c_info1, c_info2 = st.columns(2)
+            with c_info1:
+                st.write(f"**Customer:** {chosen_cust['name']}")
+                st.write(f"**Mobile:** {chosen_cust['mobile']}")
+                st.write(f"**Registered By:** `{chosen_cust.get('salesman', 'Admin')}`")
+            with c_info2:
+                st.write(f"**Status:** `{chosen_cust.get('status', 'SELECTION ONLY')}`")
+                st.write(f"**Previously Selected Items:** **{len(chosen_cust.get('selections', []))} Tiles**")
+                
+            if st.button("📂 Load Selected Customer Profile", type="primary", use_container_width=True):
+                st.session_state.current_customer = chosen_cust
+                st.success(f"**{chosen_cust['name']}** ka profile aur chuni hui tiles load ho gayi! Ab aap selection continue kar sakte hain ya measurement daal sakte hain.")
+        else:
+            st.info("Abhi tak koi saved customer nahi mila.")
+
+# --- PAGE 2: TILE SELECTION (AUTO-SAVE TO CUSTOMER PROFILE) ---
 elif nav == "2️⃣ Tile Selection (Showroom)":
+    curr_c = st.session_state.current_customer
     st.title("🏷️ Showroom Tile Selection")
-    st.info(f"Client: **{st.session_state.current_customer['name']}** ({st.session_state.current_customer['mobile']}) | Catalog: **{len(master_df)} Tiles Available**")
+    st.info(f"👤 Active Client: **{curr_c['name']}** ({curr_c['mobile']}) | 👔 Staff: **{curr_c.get('salesman', st.session_state.username)}** | 📦 Catalog: **{len(master_df)} Tiles**")
     
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -269,7 +321,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         sel_area = st.selectbox("Designated Area", area_options)
         final_area = st.text_input("Custom Area Name", "Store Room") if sel_area == "✏️ Custom Area" else sel_area
         
-    search = st.text_input("🔍 Quick Search (Name / Size / Brand)", "")
+    search = st.text_input("🔍 Quick Search (Tile Code / Size / Name)", "")
     filtered_df = master_df[master_df["item_name"].str.contains(search, case=False, na=False)] if search else master_df
     
     if filtered_df.empty:
@@ -284,7 +336,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     
     st.success(f"📐 **Live Sheet Data:** Con Factor (`{cf}`) × Packing Unit (`{pu}`) = **{box_cov:.2f} Sq.Ft / Box**")
     
-    if st.button("➕ Add Tile to Cart", type="primary", use_container_width=True):
+    if st.button("➕ Select & Add Tile (Save to Customer)", type="primary", use_container_width=True):
         new_item = {
             "id": int(datetime.now().timestamp() * 1000),
             "floor": floor,
@@ -296,38 +348,40 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
             "sqft": 100.0,
             "boxes": calculate_boxes(100.0, cf, pu)
         }
-        current_valid_cart = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
-        current_valid_cart.append(new_item)
-        st.session_state.active_cart = current_valid_cart
-        save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
-        st.success(f"✅ **{chosen_tile}** add ho gayi!")
+        
+        # Save directly in customer record
+        curr_c.setdefault("selections", []).append(new_item)
+        curr_c["status"] = "SELECTION ONLY"
+        st.session_state.current_customer = curr_c
+        save_customer_record(curr_c)
+        st.success(f"✅ **{chosen_tile}** add aur save ho gayi!")
         st.rerun()
 
     st.markdown("---")
-    valid_items = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
-    st.subheader(f"🛒 Current Selected Items ({len(valid_items)})")
+    saved_items = curr_c.get("selections", [])
+    st.subheader(f"🛒 Currently Selected Tiles ({len(saved_items)})")
     
-    if valid_items:
-        disp_df = pd.DataFrame(valid_items)[["floor", "area", "tile", "con_factor", "packing_unit"]]
-        st.dataframe(disp_df.rename(columns={"floor": "Floor", "area": "Area", "tile": "Tile Item", "con_factor": "Con Factor", "packing_unit": "Packing Unit"}), use_container_width=True)
-        st.info("👉 Tiles add karne ke baad sidebar se **'3️⃣ Sq.Ft Entry & Final Estimate'** page par jayein.")
+    if saved_items:
+        disp_df = pd.DataFrame(saved_items)[["floor", "surface", "area", "tile", "con_factor", "packing_unit"]]
+        st.dataframe(disp_df.rename(columns={"floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item", "con_factor": "Con Factor", "packing_unit": "Packing Unit"}), use_container_width=True)
+        st.info("👉 Selection complete hone ke baad sidebar se **'3️⃣ Sq.Ft Entry & Final Estimate'** page par jayein.")
     else:
-        st.caption("Cart abhi khali hai.")
+        st.caption("Is customer ke liye abhi koi tile select nahi hui hai.")
 
-# --- PAGE 3: NEW CLEAN FORMAT (ITEM -> SQFT -> REQUIRED BOXES) ---
+# --- PAGE 3: SQFT ENTRY & FINAL ESTIMATE (UPDATES STATUS TO FINALIZED) ---
 elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
+    curr_c = st.session_state.current_customer
     st.title("📐 Direct Sq.Ft & Box Calculation")
-    st.info(f"Client: **{st.session_state.current_customer['name']}** ({st.session_state.current_customer['mobile']})")
+    st.info(f"👤 Active Client: **{curr_c['name']}** ({curr_c['mobile']}) | 🏷️ Current Status: `{curr_c.get('status', 'SELECTION ONLY')}`")
     
-    valid_items = [x for x in st.session_state.active_cart if isinstance(x, dict) and x.get("tile")]
+    saved_items = curr_c.get("selections", [])
     
-    if not valid_items:
+    if not saved_items:
         st.warning("Cart khali hai. Pehle **'2️⃣ Tile Selection'** page se tiles select karein.")
         st.stop()
         
     st.markdown("### ✏️ Enter Required Sq.Ft for Each Tile:")
     
-    # Clean Header Row
     h_col1, h_col2, h_col3, h_col4 = st.columns([5, 2.5, 2.5, 1.5])
     h_col1.markdown("**Tile Item & Location**")
     h_col2.markdown("**Total Sq.Ft**")
@@ -336,7 +390,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     st.divider()
 
     updated_items = []
-    for it in valid_items:
+    for it in saved_items:
         cf = float(it.get("con_factor", 1.0))
         pu = float(it.get("packing_unit", 1.0))
         cov_per_box = calculate_box_sqft(cf, pu)
@@ -357,7 +411,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
                 label_visibility="collapsed"
             )
             
-        # Real-time Box Calculation
         calc_bx = calculate_boxes(new_sqft, cf, pu)
         
         with c3:
@@ -365,8 +418,9 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             
         with c4:
             if st.button("❌ Remove", key=f"btn_del_{it['id']}", type="secondary"):
-                st.session_state.active_cart = [x for x in st.session_state.active_cart if x.get("id") != it.get("id")]
-                save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
+                curr_c["selections"] = [x for x in curr_c["selections"] if x.get("id") != it.get("id")]
+                save_customer_record(curr_c)
+                st.session_state.current_customer = curr_c
                 st.rerun()
 
         it_copy = dict(it)
@@ -375,79 +429,173 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         updated_items.append(it_copy)
         st.divider()
 
-    # Auto-save changes if values updated
-    if updated_items != st.session_state.active_cart:
-        st.session_state.active_cart = updated_items
-        save_json_file(SELECTIONS_FILE, st.session_state.active_cart)
+    # Save measurements into customer record
+    if updated_items != curr_c.get("selections", []):
+        curr_c["selections"] = updated_items
+        curr_c["status"] = "FINALIZED"
+        curr_c["total_sqft"] = sum(x["sqft"] for x in updated_items)
+        curr_c["total_boxes"] = sum(x["boxes"] for x in updated_items)
+        save_customer_record(curr_c)
+        st.session_state.current_customer = curr_c
 
-    # --- COMPLETE DETAIL TABLE (BOQ) ---
-    st.markdown("### 📋 Complete Estimate & Detail Breakdown")
-    summary_df = pd.DataFrame(st.session_state.active_cart)[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
+    # --- COMPLETE DETAIL BREAKDOWN TABLE ---
+    st.markdown("### 📋 Final Bill of Quantities (BOQ)")
+    summary_df = pd.DataFrame(curr_c["selections"])[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
     st.dataframe(summary_df.rename(columns={
         "floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item Name",
         "con_factor": "Con Factor", "packing_unit": "Packing Unit",
         "sqft": "Total Sq.Ft", "boxes": "Required Boxes"
     }), use_container_width=True)
     
-    tot_sq = sum(float(x.get("sqft", 0.0)) for x in st.session_state.active_cart)
-    tot_bx = sum(float(x.get("boxes", 0.0)) for x in st.session_state.active_cart)
+    tot_sq = sum(float(x.get("sqft", 0.0)) for x in curr_c["selections"])
+    tot_bx = sum(float(x.get("boxes", 0.0)) for x in curr_c["selections"])
     
     k1, k2, k3 = st.columns(3)
-    k1.metric("Total Tile Items", len(st.session_state.active_cart))
+    k1.metric("Total Tile Items", len(curr_c["selections"]))
     k2.metric("Total Area", f"{tot_sq:.2f} Sq.Ft")
     k3.metric("Total Required Boxes", f"{tot_bx:.0f} Boxes")
     
-    # WhatsApp Share Text
-    wa_msg = f"🏛️ *JAY GRANITE & TILES - TILE ESTIMATE*\n\n"
-    wa_msg += f"👤 *Client Name:* {st.session_state.current_customer['name']}\n"
-    wa_msg += f"📱 *Mobile:* {st.session_state.current_customer['mobile']}\n"
+    wa_msg = f"🏛️ *JAY GRANITE & TILES - ESTIMATE & BOQ*\n\n"
+    wa_msg += f"👤 *Client Name:* {curr_c['name']}\n"
+    wa_msg += f"📱 *Mobile:* {curr_c['mobile']}\n"
+    wa_msg += f"👔 *Staff:* {curr_c.get('salesman', 'Admin')}\n"
     wa_msg += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
-    for it in st.session_state.active_cart:
+    for it in curr_c["selections"]:
         wa_msg += f"🔹 *{it['area']}* ({it['floor']})\n"
         wa_msg += f"   • Tile: {it['tile']}\n"
         wa_msg += f"   • Area: {it['sqft']:.2f} Sq.Ft\n"
         wa_msg += f"   • Required: *{it['boxes']:.0f} Boxes*\n\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
-    wa_msg += f"📊 *Total Area:* {tot_sq:.2f} Sq.Ft\n"
-    wa_msg += f"📦 *Total Required Boxes:* {tot_bx:.0f} Boxes\n\n"
+    wa_msg += f"📊 *Grand Total Area:* {tot_sq:.2f} Sq.Ft\n"
+    wa_msg += f"📦 *Grand Total Boxes:* {tot_bx:.0f} Boxes\n\n"
     wa_msg += f"Thank you for choosing Jay Granite & Tiles!"
 
-    st.markdown("#### 💬 WhatsApp Direct Copy Text")
+    st.markdown("#### 💬 WhatsApp Direct Share Text")
     st.text_area("WhatsApp Message Text:", value=wa_msg, height=150)
     
-    pdf_bytes = generate_pdf_quotation(st.session_state.current_customer, st.session_state.active_cart)
+    pdf_bytes = generate_pdf_quotation(curr_c, curr_c["selections"])
     
     b1, b2, b3 = st.columns(3)
     with b1:
         st.download_button(
             "📄 Download Estimate PDF",
             data=pdf_bytes,
-            file_name=f"Estimate_{st.session_state.current_customer['name']}_{datetime.now().strftime('%Y%m%d')}.pdf",
+            file_name=f"Estimate_{curr_c['name']}_{datetime.now().strftime('%Y%m%d')}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
     with b2:
         enc_txt = urllib.parse.quote(wa_msg)
-        mob_num = "".join(filter(str.isdigit, str(st.session_state.current_customer['mobile'])))
+        mob_num = "".join(filter(str.isdigit, str(curr_c['mobile'])))
         if len(mob_num) == 10:
             mob_num = "91" + mob_num
         st.link_button("📲 1-Click WhatsApp Send", f"https://wa.me/{mob_num}?text={enc_txt}", use_container_width=True)
     with b3:
-        if st.button("🗑️ Reset Cart / Start New", use_container_width=True):
-            st.session_state.active_cart = []
-            save_json_file(SELECTIONS_FILE, [])
+        if st.button("🗑️ Reset Cart / Start New Customer", use_container_width=True):
+            curr_c["selections"] = []
+            save_customer_record(curr_c)
+            st.session_state.current_customer = curr_c
             st.rerun()
 
-# --- PAGE 4: EXECUTIVE DASHBOARD ---
+# --- PAGE 4: EXECUTIVE DASHBOARD (SALESMAN PERFORMANCE & SELECTION VS FINAL) ---
 elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
-    st.title("📊 Executive Dashboard")
-    all_custs = load_json_file(CUSTOMERS_FILE, [])
-    st.metric("👥 Total Clients Registered", len(all_custs))
-    if all_custs:
-        st.dataframe(pd.DataFrame(all_custs), use_container_width=True)
-    else:
-        st.info("No customer history found.")
+    st.title("📊 Executive Business & Salesman Performance Dashboard")
+    all_clients = get_all_customers()
+    
+    if not all_clients:
+        st.info("Abhi koi customer data record nahi hua hai.")
+        st.stop()
+        
+    total_customers = len(all_clients)
+    draft_count = sum(1 for c in all_clients if c.get("status") == "SELECTION ONLY" and len(c.get("selections", [])) > 0)
+    final_count = sum(1 for c in all_clients if c.get("status") == "FINALIZED")
+    
+    total_sqft_business = sum(sum(float(it.get("sqft", 0)) for it in c.get("selections", [])) for c in all_clients)
+    total_boxes_business = sum(sum(float(it.get("boxes", 0)) for it in c.get("selections", [])) for c in all_clients)
+    
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("👥 Total Customers", total_customers)
+    m2.metric("🟡 Selection Only (Draft)", draft_count)
+    m3.metric("🟢 Finalized (BOQ Done)", final_count)
+    m4.metric("📦 Total Required Boxes", f"{total_boxes_business:,.0f}")
+    
+    st.divider()
+    d_tab1, d_tab2, d_tab3 = st.tabs(["👔 Salesman Performance Report", "📋 Customer Status Log", "📦 Item-wise Selection Frequency"])
+    
+    with d_tab1:
+        st.subheader("👔 Staff / Salesman Productivity Matrix")
+        salesman_records = []
+        for c in all_clients:
+            s_name = c.get("salesman", "Admin")
+            items_count = len(c.get("selections", []))
+            sqft = sum(float(it.get("sqft", 0)) for it in c.get("selections", []))
+            boxes = sum(float(it.get("boxes", 0)) for it in c.get("selections", []))
+            is_final = 1 if c.get("status") == "FINALIZED" else 0
+            is_draft = 1 if c.get("status") == "SELECTION ONLY" and items_count > 0 else 0
+            
+            salesman_records.append({
+                "salesman": s_name,
+                "clients": 1,
+                "draft_selections": is_draft,
+                "final_deals": is_final,
+                "total_tiles_selected": items_count,
+                "total_sqft": sqft,
+                "total_boxes": boxes
+            })
+            
+        if salesman_records:
+            df_sales = pd.DataFrame(salesman_records)
+            summary_salesman = df_sales.groupby("salesman").agg({
+                "clients": "count",
+                "draft_selections": "sum",
+                "final_deals": "sum",
+                "total_tiles_selected": "sum",
+                "total_sqft": "sum",
+                "total_boxes": "sum"
+            }).reset_index()
+            
+            st.dataframe(summary_salesman.rename(columns={
+                "salesman": "Salesman Name",
+                "clients": "Total Clients",
+                "draft_selections": "Selections Pending",
+                "final_deals": "Finalized Quotes",
+                "total_tiles_selected": "Total Tiles Selected",
+                "total_sqft": "Total Sq.Ft",
+                "total_boxes": "Total Boxes"
+            }), use_container_width=True)
+            
+    with d_tab2:
+        st.subheader("📋 Customer Deal Lifecycle Status")
+        cust_list_view = []
+        for c in all_clients:
+            it_cnt = len(c.get("selections", []))
+            sq = sum(float(it.get("sqft", 0)) for it in c.get("selections", []))
+            bx = sum(float(it.get("boxes", 0)) for it in c.get("selections", []))
+            cust_list_view.append({
+                "Customer": c.get("name"),
+                "Mobile": c.get("mobile"),
+                "Salesman": c.get("salesman", "Admin"),
+                "Status": f"🟢 FINALIZED" if c.get("status") == "FINALIZED" else "🟡 SELECTION ONLY",
+                "Items Selected": it_cnt,
+                "Total Sq.Ft": f"{sq:.2f}",
+                "Required Boxes": f"{bx:.0f}",
+                "Date": c.get("created_at", "-")
+            })
+        st.dataframe(pd.DataFrame(cust_list_view), use_container_width=True)
+
+    with d_tab3:
+        st.subheader("📦 Most Selected Tiles (Demand Analysis)")
+        all_items_flat = []
+        for c in all_clients:
+            for it in c.get("selections", []):
+                all_items_flat.append(it.get("tile"))
+        if all_items_flat:
+            freq_df = pd.Series(all_items_flat).value_counts().reset_index()
+            freq_df.columns = ["Tile Item Name", "Times Selected"]
+            st.dataframe(freq_df, use_container_width=True)
+        else:
+            st.caption("No selections data available.")
 
 # --- PAGE 5: STOCK MASTER ---
 elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin":
