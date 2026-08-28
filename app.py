@@ -8,18 +8,15 @@ from fpdf import FPDF
 
 st.set_page_config(page_title="Jay Granite Tile Selection", page_icon="🏛️", layout="wide")
 
-# --- CALCULATION LOGIC ---
-def calculate_boxes(length, width, sqft_per_box, wastage_pct=0.0):
+# --- CALCULATION LOGIC (NO WASTAGE) ---
+def calculate_boxes(length, width, sqft_per_box):
     try:
         l = float(length)
         w = float(width)
         box_sqft = float(sqft_per_box) if float(sqft_per_box) > 0 else 16.0
-        waste = float(wastage_pct)
-        
-        base_area = l * w
-        total_area = base_area * (1.0 + (waste / 100.0))
-        boxes = total_area / box_sqft
-        return round(total_area, 2), round(boxes, 2)
+        total_area = round(l * w, 2)
+        boxes = round(total_area / box_sqft, 2)
+        return total_area, boxes
     except:
         return 0.0, 0.0
 
@@ -219,11 +216,11 @@ if not st.session_state.authenticated:
                                       (new_u, hash_pass(new_p), new_pin))
                             conn.commit()
                             conn.close()
-                            st.success(f"Salesman **{new_u}** successfully created!")
+                            st.success(f"Salesman **{new_u}** created successfully!")
                         except Exception as ex:
                             st.error(f"User error: {str(ex)}")
                     else:
-                        st.error("Username aur password enter karein.")
+                        st.error("Username aur Password enter karein.")
     st.stop()
 
 # --- SIDEBAR NAVIGATION ---
@@ -298,7 +295,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         st.session_state.cust_id, st.session_state.cust_name, st.session_state.cust_mobile = cust_options[selected_cust_label]
         st.info(f"Active Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile}) | Staff: **{st.session_state.username}**")
     else:
-        st.warning("Pehle Customer Registration page par jaakar customer banayein.")
+        st.warning("Pehle Customer Registration page par jaakar customer register karein.")
         st.stop()
         
     conn = get_connection()
@@ -335,15 +332,13 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     tile_name = st.selectbox("Select Tile", filtered_df["tile_name"].tolist())
     sqft_box_val = float(filtered_df[filtered_df["tile_name"] == tile_name]["sqft_per_box"].values[0]) if not filtered_df.empty else 16.0
     
-    col_l, col_w, col_waste = st.columns(3)
+    col_l, col_w = st.columns(2)
     with col_l:
         length = st.number_input("Length (Ft)", value=10.0, step=0.5)
     with col_w:
         width = st.number_input("Width / Height (Ft)", value=10.0, step=0.5)
-    with col_waste:
-        waste = st.number_input("Wastage %", value=0.0, step=1.0)
         
-    tot_sqft, req_boxes = calculate_boxes(length, width, sqft_box_val, waste)
+    tot_sqft, req_boxes = calculate_boxes(length, width, sqft_box_val)
     
     st.caption(f"📦 Box Coverage: **{sqft_box_val:.2f} Sq.Ft / Box**")
     st.info(f"💡 Area: **{tot_sqft:.2f} Sq.Ft** | Box Estimate: **{req_boxes:.2f} Boxes**")
@@ -369,7 +364,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
                 area_name,
                 tile_name,
                 f"{length}x{width} ft",
-                round(tot_sqft, 2),
+                tot_sqft,
                 req_boxes,
                 'DRAFT',
                 curr_time
@@ -401,6 +396,25 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         c_kpi2.metric("Total Area", f"{sum_sqft:.2f} sqft")
         c_kpi3.metric("Total Boxes", f"{sum_boxes:.2f} Boxes")
         
+        # WhatsApp Readymade Formatted Message Text
+        wa_text = f"🏛️ *JAY GRANITE & TILES - TILE SELECTION ESTIMATE*\n\n"
+        wa_text += f"👤 *Client Name:* {st.session_state.cust_name}\n"
+        wa_text += f"📱 *Mobile:* {st.session_state.cust_mobile}\n"
+        wa_text += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
+        wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
+        for _, r in cart_df.iterrows():
+            wa_text += f"🔹 *{r['Area']}* ({r['Floor']} - {r['Type']})\n"
+            wa_text += f"   • Tile: {r['Tile']}\n"
+            wa_text += f"   • Size: {r['Dimensions']} | Area: {r['SqFt']} Sq.Ft\n"
+            wa_text += f"   • Quantity: *{r['Boxes']} Boxes*\n\n"
+        wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
+        wa_text += f"📊 *Total Area:* {sum_sqft:.2f} Sq.Ft\n"
+        wa_text += f"📦 *Total Required Boxes:* {sum_boxes:.2f} Boxes\n\n"
+        wa_text += f"Thank you for choosing Jay Granite & Tiles!"
+
+        st.markdown("#### 💬 WhatsApp Direct Copy-Paste Text")
+        st.text_area("Neeche diye gaye box se poora text select karke copy karein:", value=wa_text, height=180)
+
         pdf_bytes = generate_pdf(st.session_state.cust_name, st.session_state.cust_mobile, cart_df, sum_sqft, sum_boxes)
         
         btn_col1, btn_col2, btn_col3 = st.columns(3)
@@ -414,26 +428,13 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
             )
             
         with btn_col2:
-            wa_text = f"*🏛️ JAY GRANITE & TILES - Selection Estimate*\n\n"
-            wa_text += f"👤 *Client:* {st.session_state.cust_name}\n"
-            wa_text += f"📱 *Mobile:* {st.session_state.cust_mobile}\n"
-            wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
-            for _, r in cart_df.iterrows():
-                wa_text += f"▪️ *{r['Area']}* ({r['Floor']})\n"
-                wa_text += f"   Tile: {r['Tile']}\n"
-                wa_text += f"   Total: {r['SqFt']} Sq.Ft | *{r['Boxes']} Boxes*\n\n"
-            wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
-            wa_text += f"📊 *Total Area:* {sum_sqft:.2f} Sq.Ft\n"
-            wa_text += f"📦 *Total Required:* {sum_boxes:.2f} Boxes\n\n"
-            wa_text += f"Thank you for visiting Jay Granite & Tiles!"
-            
             encoded_text = urllib.parse.quote(wa_text)
             clean_mob = "".join(filter(str.isdigit, str(st.session_state.cust_mobile)))
             if not clean_mob.startswith("91") and len(clean_mob) == 10:
                 clean_mob = "91" + clean_mob
             
             wa_link = f"https://wa.me/{clean_mob}?text={encoded_text}"
-            st.link_button("📲 1-Click WhatsApp Share", wa_link, use_container_width=True)
+            st.link_button("📲 1-Click WhatsApp Send", wa_link, use_container_width=True)
             
         with btn_col3:
             if st.button("🗑️ Reset Active Cart", use_container_width=True):
@@ -465,12 +466,7 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
     k4.metric("📦 Total Boxes", f"{total_boxes_all:,.2f} Boxes")
 
     st.markdown("---")
-    dash_tab1, dash_tab2, dash_tab3, dash_tab4 = st.tabs([
-        "👥 Customer-wise Summary", 
-        "👔 Salesman Performance", 
-        "📑 Detailed Master Log",
-        "📊 Export Google Sheet Data"
-    ])
+    dash_tab1, dash_tab2, dash_tab3 = st.tabs(["👥 Customer-wise Summary", "👔 Salesman Performance", "📑 Detailed Master Log"])
 
     with dash_tab1:
         st.subheader("📋 Customer Wise Selection Status")
@@ -502,77 +498,62 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
         st.subheader("📑 Complete Raw Log")
         st.dataframe(sel_df, use_container_width=True)
 
-    with dash_tab4:
-        st.subheader("📤 Download / Sync to Google Sheets")
-        st.caption("Aap yahan se poora active customer data CSV/Excel ke roop mein direct Google Sheets mein import kar sakte hain:")
-        if not sel_df.empty:
-            csv_data = sel_df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Master Selections CSV for Google Sheets",
-                data=csv_data,
-                file_name=f"JayGranite_Master_Selections_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
-                type="primary",
-                use_container_width=True
-            )
-
-# --- PAGE 4: ADMIN CONTROL & STAFF MANAGEMENT (ADMIN ONLY) ---
+# --- PAGE 4: ADMIN CONTROL & GOOGLE SHEET SYNC ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
-    t1, t2, t3 = st.tabs(["📦 Inventory Stock Data", "👥 Manage Staff / Salesmen", "📜 System Audits"])
+    t1, t2, t3 = st.tabs(["🔗 Direct Google Sheet Live Stock", "👥 Manage Staff / Salesmen", "📜 System Audits"])
     
     with t1:
-        st.subheader("📥 Upload BUSY Accounting Item Master")
-        uploaded_file = st.file_uploader("Upload CSV / Excel File", type=["csv", "xlsx", "xls"])
+        st.subheader("🔗 Live Connect Google Sheet (No Upload Needed)")
+        st.caption("Apni BUSY Item Master Google Sheet ka Public URL daalein:")
         
-        if uploaded_file is not None:
-            if st.button("🚀 Import & Update All Stock Items", type="primary"):
+        default_sheet_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ/pub?output=csv"
+        sheet_url_input = st.text_input("Google Sheet Link (CSV / Export Link)", placeholder="https://docs.google.com/spreadsheets/d/...")
+        
+        if st.button("🔄 Sync Live Stock From Google Sheet", type="primary"):
+            if sheet_url_input.strip():
                 try:
-                    raw_df = pd.read_csv(uploaded_file, header=None) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file, header=None)
-                    h_idx = 0
-                    for i in range(min(15, len(raw_df))):
-                        row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
-                        if any("ITEM NAME" in s for s in row_vals):
-                            h_idx = i
-                            break
-                    headers = [str(c).strip().upper() if pd.notna(c) else f"COL_{idx}" for idx, c in enumerate(raw_df.iloc[h_idx].values)]
-                    df_clean = raw_df.iloc[h_idx + 1:].copy()
-                    df_clean.columns = headers
+                    # Convert standard Google Sheet URL to direct CSV export link
+                    url = sheet_url_input.strip()
+                    if "/edit" in url:
+                        url = url.split("/edit")[0] + "/export?format=csv"
                     
-                    name_col = next((c for c in df_clean.columns if "ITEM NAME" in c), df_clean.columns[1])
-                    cf_col = next((c for c in df_clean.columns if c == "CON FACTOR" or (("CON FACTOR" in c) and ("TYPE" not in c) and ("PACKING" not in c))), None)
-                    pack_col = next((c for c in df_clean.columns if "PACKING UNIT" in c or "PACKING" in c), None)
+                    df_live = pd.read_csv(url)
                     
-                    if cf_col and pack_col:
-                        c1 = pd.to_numeric(df_clean[cf_col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(1.0)
-                        c2 = pd.to_numeric(df_clean[pack_col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(1.0)
-                        df_clean["Sqft_Per_Box"] = (c1 * c2).round(2)
+                    # Detect Item Name & Box Coverage
+                    name_col = next((c for c in df_live.columns if "ITEM" in str(c).upper() or "NAME" in str(c).upper() or "TILE" in str(c).upper()), df_live.columns[0])
+                    sqft_col = next((c for c in df_live.columns if "SQFT" in str(c).upper() or "BOX" in str(c).upper() or "CON FACTOR" in str(c).upper()), None)
+                    
+                    if sqft_col:
+                        df_live["Sqft_Per_Box"] = pd.to_numeric(df_live[sqft_col].astype(str).str.replace(r'[^\d.]', '', regex=True), errors='coerce').fillna(16.0)
                     else:
-                        df_clean["Sqft_Per_Box"] = 16.0
+                        df_live["Sqft_Per_Box"] = 16.0
                         
-                    df_clean["Tile_Name"] = df_clean[name_col].astype(str).str.strip()
+                    df_live["Tile_Name"] = df_live[name_col].astype(str).str.strip()
+                    df_clean = df_live[["Tile_Name", "Sqft_Per_Box"]].dropna().drop_duplicates(subset=["Tile_Name"])
                     df_clean = df_clean[df_clean["Tile_Name"] != ""]
-                    df_clean = df_clean[~df_clean["Tile_Name"].str.upper().isin(["NAN", "ITEM NAME", "TOTAL", "NONE", "UNNAMED", "NULL"])]
                     
-                    final_items = df_clean[["Tile_Name", "Sqft_Per_Box"]].drop_duplicates(subset=["Tile_Name"]).reset_index(drop=True)
+                    conn = get_connection()
+                    c = conn.cursor()
+                    c.execute("DELETE FROM inventory_stock")
+                    for _, row in df_clean.iterrows():
+                        c.execute("INSERT OR REPLACE INTO inventory_stock (tile_name, sqft_per_box) VALUES (?, ?)", 
+                                  (str(row["Tile_Name"]), float(row["Sqft_Per_Box"])))
+                    conn.commit()
+                    conn.close()
                     
-                    if not final_items.empty:
-                        conn = get_connection()
-                        c = conn.cursor()
-                        c.execute("DELETE FROM inventory_stock")
-                        for _, row in final_items.iterrows():
-                            c.execute("INSERT OR REPLACE INTO inventory_stock (tile_name, sqft_per_box) VALUES (?, ?)", (str(row["Tile_Name"]), float(row["Sqft_Per_Box"])))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"🎉 Total **{len(final_items)} Tiles** stock database mein load ho gayi!")
-                        st.rerun()
+                    st.success(f"🎉 Google Sheet se total **{len(df_clean)} Tiles** live database mein automatically load ho gayi!")
+                    st.rerun()
                 except Exception as ex:
-                    st.error(f"Error reading file: {str(ex)}")
+                    st.error(f"Google Sheet read nahi hui: {str(ex)}. Sheet ko 'Anyone with link can view' set karein.")
+            else:
+                st.warning("Google Sheet ka link paste karein.")
         
         conn = get_connection()
         stock_view = pd.read_sql_query("SELECT * FROM inventory_stock", conn)
         conn.close()
-        st.subheader(f"📦 Current Live Stock ({len(stock_view)} Items)")
+        st.markdown("---")
+        st.subheader(f"📦 Current Live Stock ({len(stock_view)} Items Loaded)")
         st.dataframe(stock_view, use_container_width=True)
 
     with t2:
