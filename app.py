@@ -139,7 +139,6 @@ def get_master_df():
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Read Column H (Index 7) -> CON FACTOR
             try:
                 cf_raw = str(r[7]).replace(',', '').strip() if len(r) > 7 and pd.notna(r[7]) else "1.0"
                 cf = float(pd.to_numeric(cf_raw, errors='coerce')) if cf_raw else 1.0
@@ -148,7 +147,6 @@ def get_master_df():
             except Exception:
                 cf = 1.0
                 
-            # Read Column I (Index 8) -> PACKING UNIT CON FACTOR
             try:
                 pu_raw = str(r[8]).replace(',', '').strip() if len(r) > 8 and pd.notna(r[8]) else "1.0"
                 pu = float(pd.to_numeric(pu_raw, errors='coerce')) if pu_raw else 1.0
@@ -426,7 +424,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     else:
         st.caption("Abhi koi tile select nahi hui hai.")
 
-# --- PAGE 3: SQFT ENTRY & FINAL ESTIMATE (CLEAN UI + AUTO ARCHIVE) ---
+# --- PAGE 3: SQFT ENTRY & FINAL ESTIMATE ---
 elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     if not st.session_state.current_customer:
         st.warning("Pehle Customer Registration page se koi customer select karein.")
@@ -491,7 +489,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         updated_items.append(it_copy)
         st.divider()
 
-    # Save calculated values silently
     if updated_items != curr_c.get("selections", []):
         curr_c["selections"] = updated_items
         curr_c["total_sqft"] = sum(x["sqft"] for x in updated_items)
@@ -515,7 +512,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     k2.metric("Total Area", f"{tot_sq:.2f} Sq.Ft")
     k3.metric("Total Required Boxes", f"{tot_bx:.0f} Boxes")
     
-    # Clean WhatsApp string prepared in background (without showing raw text on screen)
+    # WhatsApp Message with integrated Physical Stock Request for Staff
     wa_msg = f"🏛️ *JAY GRANITE & TILES - ESTIMATE & BOQ*\n\n"
     wa_msg += f"👤 *Client Name:* {curr_c['name']}\n"
     wa_msg += f"📱 *Mobile:* {curr_c['mobile']}\n"
@@ -530,7 +527,12 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     wa_msg += f"📊 *Grand Total Area:* {tot_sq:.2f} Sq.Ft\n"
     wa_msg += f"📦 *Grand Total Boxes:* {tot_bx:.0f} Boxes\n\n"
+    wa_msg += f"⚠️ *NOTE FOR GODOWN / STAFF:*\n"
+    wa_msg += f"Please update physical stock and reply with availability status.\n\n"
     wa_msg += f"Thank you for choosing Jay Granite & Tiles!"
+
+    with st.expander("👁️ View / Copy WhatsApp Message Text"):
+        st.text_area("Message Preview:", value=wa_msg, height=160)
 
     pdf_bytes = generate_pdf_quotation(curr_c, curr_c["selections"])
     enc_txt = urllib.parse.quote(wa_msg)
@@ -551,14 +553,13 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     with b2:
         st.link_button("📲 1-Click WhatsApp Send", f"https://wa.me/{mob_num}?text={enc_txt}", use_container_width=True)
     with b3:
-        # Finalize & Clear from current active workspace
         if st.button("✅ Finalize Deal & Archive Customer", type="primary", use_container_width=True):
             curr_c["status"] = "FINALIZED"
             curr_c["total_sqft"] = tot_sq
             curr_c["total_boxes"] = tot_bx
             update_customer_db(curr_c)
             st.session_state.current_customer = None
-            st.success(f"🎉 **{curr_c['name']}** ki deal finalize aur save ho gayi! Screen agle customer ke liye ready hai.")
+            st.success(f"🎉 **{curr_c['name']}** finalize ho gaya! Screen agle customer ke liye clear hai.")
             st.rerun()
 
 # --- PAGE 4: EXECUTIVE DASHBOARD ---
