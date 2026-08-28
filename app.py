@@ -5,9 +5,23 @@ import hashlib
 import urllib.parse
 from datetime import datetime
 from fpdf import FPDF
-import calculations
 
 st.set_page_config(page_title="Jay Granite Tile Selection", page_icon="🏛️", layout="wide")
+
+# --- CALCULATION LOGIC ---
+def calculate_boxes(length, width, sqft_per_box, wastage_pct=0.0):
+    try:
+        l = float(length)
+        w = float(width)
+        box_sqft = float(sqft_per_box) if float(sqft_per_box) > 0 else 16.0
+        waste = float(wastage_pct)
+        
+        base_area = l * w
+        total_area = base_area * (1.0 + (waste / 100.0))
+        boxes = total_area / box_sqft
+        return round(total_area, 2), round(boxes, 2)
+    except:
+        return 0.0, 0.0
 
 # --- DATABASE SETUP ---
 DB_FILE = "jay_granite_tiles.db"
@@ -76,7 +90,6 @@ def init_db():
         )
     """)
     
-    # Default Admins
     admins = [
         ("DEEPCHAND JAIN", "deep123", "1234"),
         ("GOURAV", "GOURAV", "1234"),
@@ -157,7 +170,7 @@ if not st.session_state.authenticated:
     with col2:
         st.subheader("🔐 Staff Sign In")
         
-        tab_login, tab_reg = st.tabs(["👤 Sign In", "➕ Register New Salesman"])
+        tab_login, tab_reg = st.tabs(["👤 Sign In", "➕ Register Salesman"])
         
         with tab_login:
             with st.form("login_form"):
@@ -167,7 +180,6 @@ if not st.session_state.authenticated:
                 sub = st.form_submit_button("🚀 Login", type="primary", use_container_width=True)
                 
                 if sub:
-                    # Master bypass
                     if (u.upper() in ["DEEPCHAND JAIN", "ADMIN", "GOURAV"] and p in ["deep123", "pass123", "admin123", "GOURAV", "deep1965", "1234"]) or (role_choice == "Admin" and p in ["deep123", "admin123", "1234"]):
                         st.session_state.authenticated = True
                         st.session_state.username = u if u else "DEEPCHAND JAIN"
@@ -195,8 +207,8 @@ if not st.session_state.authenticated:
             with st.form("reg_form"):
                 new_u = st.text_input("Salesman Username").strip()
                 new_p = st.text_input("Password", type="password").strip()
-                new_pin = st.text_input("4-Digit Recovery PIN", max_chars=4, value="1234").strip()
-                reg_btn = st.form_submit_button("Create Salesman Account", use_container_width=True)
+                new_pin = st.text_input("4-Digit PIN", max_chars=4, value="1234").strip()
+                reg_btn = st.form_submit_button("Create Salesman", use_container_width=True)
                 
                 if reg_btn:
                     if new_u and new_p:
@@ -207,11 +219,11 @@ if not st.session_state.authenticated:
                                       (new_u, hash_pass(new_p), new_pin))
                             conn.commit()
                             conn.close()
-                            st.success(f"Salesman **{new_u}** successfully ban gaya! Ab Sign In karein.")
+                            st.success(f"Salesman **{new_u}** successfully created!")
                         except Exception as ex:
                             st.error(f"User error: {str(ex)}")
                     else:
-                        st.error("Username aur password bharna zaroori hai.")
+                        st.error("Username aur password enter karein.")
     st.stop()
 
 # --- SIDEBAR NAVIGATION ---
@@ -259,15 +271,15 @@ if selected_page == "1️⃣ Customer Registration":
                     c.execute("""
                         INSERT INTO customers (salesman, customer_name, mobile, address, engineer_name, engineer_mobile, status, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
-                    """, (st.session_state.username, c_name.strip(), c_mob.strip(), c_addr, eng_name, eng_mob, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    """, (st.session_state.username, c_name.strip(), c_mob.strip(), c_addr, eng_name, eng_mob, 'ACTIVE', datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
                     st.session_state.cust_id = c.lastrowid
                     st.session_state.cust_name = c_name.strip()
                     st.session_state.cust_mobile = c_mob.strip()
                     conn.commit()
                     conn.close()
-                    st.success(f"Customer **{c_name}** successfully registered!")
+                    st.success(f"Customer **{c_name}** registered successfully!")
             else:
-                st.error("Customer Name aur Mobile Number enter karein.")
+                st.error("Customer Name aur Mobile Number zaroori hai.")
 
 # --- PAGE 2: SELECTION HUB ---
 elif selected_page == "2️⃣ Tile Multi-Selection Hub":
@@ -319,7 +331,6 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     
     if filtered_df.empty:
         filtered_df = stock_df
-        st.caption("Tile match nahi hui, saari items show ho rahi hain.")
         
     tile_name = st.selectbox("Select Tile", filtered_df["tile_name"].tolist())
     sqft_box_val = float(filtered_df[filtered_df["tile_name"] == tile_name]["sqft_per_box"].values[0]) if not filtered_df.empty else 16.0
@@ -332,7 +343,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     with col_waste:
         waste = st.number_input("Wastage %", value=0.0, step=1.0)
         
-    tot_sqft, req_boxes = calculations.calculate_boxes(length, width, sqft_box_val, waste)
+    tot_sqft, req_boxes = calculate_boxes(length, width, sqft_box_val, waste)
     
     st.caption(f"📦 Box Coverage: **{sqft_box_val:.2f} Sq.Ft / Box**")
     st.info(f"💡 Area: **{tot_sqft:.2f} Sq.Ft** | Box Estimate: **{req_boxes:.2f} Boxes**")
@@ -341,6 +352,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         if not area_name:
             st.error("Area Name bharna zaroori hai.")
         else:
+            curr_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             conn = get_connection()
             c = conn.cursor()
             c.execute("""
@@ -360,7 +372,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
                 round(tot_sqft, 2),
                 req_boxes,
                 'DRAFT',
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                curr_time
             ))
             conn.commit()
             conn.close()
@@ -453,7 +465,12 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
     k4.metric("📦 Total Boxes", f"{total_boxes_all:,.2f} Boxes")
 
     st.markdown("---")
-    dash_tab1, dash_tab2, dash_tab3 = st.tabs(["👥 Customer-wise Summary", "👔 Salesman Performance", "📑 Detailed Master Log"])
+    dash_tab1, dash_tab2, dash_tab3, dash_tab4 = st.tabs([
+        "👥 Customer-wise Summary", 
+        "👔 Salesman Performance", 
+        "📑 Detailed Master Log",
+        "📊 Export Google Sheet Data"
+    ])
 
     with dash_tab1:
         st.subheader("📋 Customer Wise Selection Status")
@@ -484,6 +501,20 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
     with dash_tab3:
         st.subheader("📑 Complete Raw Log")
         st.dataframe(sel_df, use_container_width=True)
+
+    with dash_tab4:
+        st.subheader("📤 Download / Sync to Google Sheets")
+        st.caption("Aap yahan se poora active customer data CSV/Excel ke roop mein direct Google Sheets mein import kar sakte hain:")
+        if not sel_df.empty:
+            csv_data = sel_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Master Selections CSV for Google Sheets",
+                data=csv_data,
+                file_name=f"JayGranite_Master_Selections_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                type="primary",
+                use_container_width=True
+            )
 
 # --- PAGE 4: ADMIN CONTROL & STAFF MANAGEMENT (ADMIN ONLY) ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
