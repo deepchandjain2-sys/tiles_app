@@ -366,7 +366,9 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        floor = st.selectbox("Floor Level", ["Ground Floor", "First Floor", "Second Floor", "Third Floor", "Terrace"])
+        floor_options = ["Ground Floor", "First Floor", "Second Floor", "Third Floor", "Terrace", "✏️ Custom Floor"]
+        sel_floor = st.selectbox("Floor Level", floor_options)
+        final_floor = st.text_input("Custom Floor Name", "Basement / Mezzanine") if sel_floor == "✏️ Custom Floor" else sel_floor
     with col2:
         surface = st.radio("Surface Type", ["Floor", "Wall"], horizontal=True)
     with col3:
@@ -396,7 +398,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     if st.button("➕ Select & Add Tile (Save to Database)", type="primary", use_container_width=True):
         new_item = {
             "id": int(datetime.now().timestamp() * 1000),
-            "floor": floor,
+            "floor": final_floor,
             "surface": surface,
             "area": final_area,
             "tile": chosen_tile,
@@ -512,7 +514,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     k2.metric("Total Area", f"{tot_sq:.2f} Sq.Ft")
     k3.metric("Total Required Boxes", f"{tot_bx:.0f} Boxes")
     
-    # WhatsApp Message with integrated Physical Stock Request for Staff
     wa_msg = f"🏛️ *JAY GRANITE & TILES - ESTIMATE & BOQ*\n\n"
     wa_msg += f"👤 *Client Name:* {curr_c['name']}\n"
     wa_msg += f"📱 *Mobile:* {curr_c['mobile']}\n"
