@@ -3,7 +3,6 @@ import pandas as pd
 import sqlite3
 import hashlib
 import urllib.parse
-import re
 from datetime import datetime
 from fpdf import FPDF
 
@@ -11,48 +10,52 @@ st.set_page_config(page_title="Jay Granite Tile Selection", page_icon="🏛️",
 
 DEFAULT_GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/edit?usp=sharing"
 
-# --- SMART TILE SIZE TO CON FACTOR & PACKING ENGINE ---
+# --- COMPREHENSIVE TILE SIZE ENGINE ---
 def get_con_and_packing_by_size(tile_name, sheet_cf=None, sheet_pack=None):
-    # If sheet already provided valid distinct values (not default 1.5/6.0)
+    # Check if Google Sheet already provides authentic specific values
     if sheet_cf and sheet_pack and float(sheet_cf) > 0 and float(sheet_pack) > 0:
         c_val = float(sheet_cf)
         p_val = float(sheet_pack)
-        # Check if it is a real custom row
         if not (c_val == 1.5 and p_val == 6.0 and "12X18" not in str(tile_name).upper()):
             return round(c_val, 2), round(p_val, 1)
 
-    t = str(tile_name).upper().replace(" ", "").replace("*", "X")
+    t = str(tile_name).upper().replace(" ", "").replace("*", "X").replace("MM", "")
     
-    # 800x1600 Slab
-    if "800X1600" in t or "1600X800" in t:
-        return 13.78, 2.0  # 27.55 Sqft/Box
-    # 2x4 or 600x1200
-    elif "2X4" in t or "600X1200" in t or "1200X600" in t or "4X2" in t:
-        return 8.00, 2.0   # 16.00 Sqft/Box
-    # 2x2 or 600x600
+    # 6x4 Ft or 1200x1800 Slab
+    if "6X4" in t or "4X6" in t or "1200X1800" in t or "1800X1200" in t:
+        return 24.00, 1.0   # 24.00 Sqft/Box
+    # 4x8 Ft or 1200x2400 Big Slab
+    elif "4X8" in t or "8X4" in t or "1200X2400" in t or "2400X1200" in t:
+        return 31.00, 1.0   # 31.00 Sqft/Box
+    # 800x1600 Big Slab
+    elif "800X1600" in t or "1600X800" in t:
+        return 13.78, 2.0   # 27.55 Sqft/Box
+    # 2x4 Ft or 600x1200
+    elif "2X4" in t or "4X2" in t or "600X1200" in t or "1200X600" in t:
+        return 8.00, 2.0    # 16.00 Sqft/Box
+    # 2x2 Ft or 600x600
     elif "2X2" in t or "600X600" in t:
-        return 4.00, 4.0   # 16.00 Sqft/Box
-    # 12x18 or 300x450
+        return 4.00, 4.0    # 16.00 Sqft/Box
+    # 12x18 Inch or 300x450
     elif "12X18" in t or "18X12" in t or "300X450" in t or "450X300" in t:
-        return 1.50, 6.0   # 9.00 Sqft/Box
-    # 16x16 or 400x400
+        return 1.50, 6.0    # 9.00 Sqft/Box
+    # 16x16 Inch or 400x400
     elif "16X16" in t or "400X400" in t:
-        return 1.73, 5.0   # 8.65 Sqft/Box
-    # 1x1 or 300x300
+        return 1.73, 5.0    # 8.65 Sqft/Box
+    # 1x1 Ft or 300x300
     elif "1X1" in t or "300X300" in t:
-        return 1.00, 10.0  # 10.00 Sqft/Box
-    # 12x24 or 300x600
+        return 1.00, 10.0   # 10.00 Sqft/Box
+    # 12x24 Inch or 300x600
     elif "12X24" in t or "300X600" in t:
-        return 2.00, 5.0   # 10.00 Sqft/Box
-    # 800x800 or 32x32
+        return 2.00, 5.0    # 10.00 Sqft/Box
+    # 800x800 or 32x32 Inch
     elif "800X800" in t or "32X32" in t:
-        return 6.89, 3.0   # 20.66 Sqft/Box
-    # 2x1 or 1x2 or 300x600
+        return 6.89, 3.0    # 20.66 Sqft/Box
+    # 2x1 Ft or 1x2
     elif "2X1" in t or "1X2" in t:
-        return 2.00, 6.0   # 12.00 Sqft/Box
+        return 2.00, 6.0    # 12.00 Sqft/Box
     
-    # Generic Default
-    return 8.00, 2.0  # Default 16.0 Sq.Ft
+    return 8.00, 2.0
 
 # --- DATABASE SETUP ---
 DB_FILE = "jay_granite_tiles.db"
@@ -165,7 +168,6 @@ def init_db():
         )
     """)
     
-    # Auto-migration
     c.execute("PRAGMA table_info(customer_selections)")
     cols = [col[1] for col in c.fetchall()]
     if "con_factor" not in cols:
@@ -397,7 +399,7 @@ if selected_page == "1️⃣ Customer Registration":
             else:
                 st.error("Customer Name aur Mobile Number zaroori hai.")
 
-# --- PAGE 2: TILE SELECTION ONLY (AUTOMATIC SIZE-WISE MAPPING) ---
+# --- PAGE 2: TILE SELECTION ONLY (EXACT SIZE DERIVATION) ---
 elif selected_page == "2️⃣ Tile Selection Only":
     st.title("🏷️ Showroom Tile Selection (Quick Add)")
     
@@ -423,9 +425,7 @@ elif selected_page == "2️⃣ Tile Selection Only":
     
     if stock_df.empty:
         stock_df = pd.DataFrame([
-            {"tile_name": "1000 L 12X18 KK", "con_factor": 1.5, "packing_unit": 6.0, "sqft_per_box": 9.0},
-            {"tile_name": "ALBETA WHITE DAZZEL 2X4 ITALICA", "con_factor": 8.0, "packing_unit": 2.0, "sqft_per_box": 16.0},
-            {"tile_name": "ALFIO WHITE 800X1600 VARMORA", "con_factor": 13.78, "packing_unit": 2.0, "sqft_per_box": 27.55}
+            {"tile_name": "ENDLESS STATUARIO AMAZE 6X4 15MM LAVIT", "con_factor": 24.0, "packing_unit": 1.0, "sqft_per_box": 24.0}
         ])
         
     st.markdown("---")
@@ -455,7 +455,7 @@ elif selected_page == "2️⃣ Tile Selection Only":
         
     tile_name = st.selectbox("Select Tile Item", filtered_df["tile_name"].tolist())
     
-    # Accurate Size-wise derivation
+    # Derivation based on size
     matched_row = filtered_df[filtered_df["tile_name"] == tile_name].iloc[0]
     c_fac, p_unit = get_con_and_packing_by_size(tile_name, matched_row.get("con_factor"), matched_row.get("packing_unit"))
     box_coverage = round(c_fac * p_unit, 2)
@@ -492,7 +492,7 @@ elif selected_page == "2️⃣ Tile Selection Only":
             ))
             conn.commit()
             conn.close()
-            st.success(f"✅ **{tile_name}** add ho gayi!")
+            st.success(f"✅ **{tile_name}** cart mein add ho gayi!")
             st.rerun()
 
     st.markdown("---")
@@ -503,11 +503,11 @@ elif selected_page == "2️⃣ Tile Selection Only":
     
     if not quick_cart.empty:
         st.dataframe(quick_cart[["Floor", "Type", "Area", "Tile", "Con Factor", "Packing Unit"]], use_container_width=True)
-        st.info("👉 Tiles add karne ke baad left menu se **'3️⃣ Measurement, BOQ & Share PDF'** page par jayein.")
+        st.info("👉 Tiles select karne ke baad left menu se **'3️⃣ Measurement, BOQ & Share PDF'** page par jayein.")
     else:
         st.caption("Abhi koi tile select nahi hui hai.")
 
-# --- PAGE 3: MEASUREMENT & SHARE PDF (SIZE-AWARE AUTO RECALCULATION) ---
+# --- PAGE 3: MEASUREMENT & SHARE PDF ---
 elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
     st.title("📐 Measurement, Calculations & Quotation Share")
     
@@ -537,7 +537,6 @@ elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
 
     st.subheader("✏️ Enter Site Measurements (Length x Width):")
     
-    # Direct Removal Action & Live Specs
     for idx, r in cart_df.iterrows():
         c_fac, p_unit = get_con_and_packing_by_size(r['Tile'], r['con_factor'], r['packing_unit'])
         one_box_sqft = round(c_fac * p_unit, 2)
@@ -596,7 +595,6 @@ elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
     )
     conn.close()
 
-    # Re-verify and auto-fill any display lag
     for idx, row in summary_df.iterrows():
         c_fac, p_unit = get_con_and_packing_by_size(row["Tile"], row["Con_Factor"], row["Packing_Unit"])
         summary_df.at[idx, "Con_Factor"] = c_fac
