@@ -25,10 +25,9 @@ def sync_stock_from_sheet(sheet_url):
         if "/edit" in url:
             url = url.split("/edit")[0] + "/export?format=csv"
         
-        # Read raw CSV file
+        # Read exact CSV without mangling headers
         raw_df = pd.read_csv(url, header=None, dtype=str)
         
-        # Detect exact column index based on headers or positions (A=0, H=7, I=8)
         h_idx = 0
         for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
@@ -44,17 +43,18 @@ def sync_stock_from_sheet(sheet_url):
             if not item_val or item_val.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED"]:
                 continue
             
-            # Extract Column H (Index 7) & Column I (Index 8) directly
+            # Read Exact Column H (Index 7) -> Con Factor
             try:
-                cf_raw = str(r[7]).replace(',', '').strip() if len(r) > 7 and pd.notna(r[7]) else "1"
+                cf_raw = str(r[7]).replace(',', '').strip() if len(r) > 7 and pd.notna(r[7]) else "1.0"
                 cf_val = float(pd.to_numeric(cf_raw, errors='coerce')) if cf_raw else 1.0
                 if pd.isna(cf_val) or cf_val <= 0:
                     cf_val = 1.0
             except:
                 cf_val = 1.0
                 
+            # Read Exact Column I (Index 8) -> Packing Unit
             try:
-                pk_raw = str(r[8]).replace(',', '').strip() if len(r) > 8 and pd.notna(r[8]) else "1"
+                pk_raw = str(r[8]).replace(',', '').strip() if len(r) > 8 and pd.notna(r[8]) else "1.0"
                 pk_val = float(pd.to_numeric(pk_raw, errors='coerce')) if pk_raw else 1.0
                 if pd.isna(pk_val) or pk_val <= 0:
                     pk_val = 1.0
@@ -177,10 +177,6 @@ def init_db():
             c.execute("INSERT INTO users (username, password_hash, role, security_pin) VALUES (?, ?, 'admin', ?)",
                       (u_name, hash_pass(u_pass), u_pin))
             
-    c.execute("SELECT count(*) FROM inventory_stock")
-    if c.fetchone()[0] == 0:
-        sync_stock_from_sheet(DEFAULT_GOOGLE_SHEET_URL)
-        
     conn.commit()
     conn.close()
 
@@ -393,7 +389,7 @@ elif selected_page == "2️⃣ Tile Selection Only":
     conn.close()
     
     if stock_df.empty:
-        st.warning("Stock Master khali hai. Admin page par jakar Google Sheet sync karein.")
+        st.warning("Master Stock khali hai. Admin page par jaakar Google Sheet Sync karein.")
         stock_df = pd.DataFrame([{"tile_name": "ATURIO VOLKAS CAR 9MM 4X6 MOT", "con_factor": 23.25, "packing_unit": 2.0, "sqft_per_box": 46.5}])
         
     st.markdown("---")
@@ -423,6 +419,7 @@ elif selected_page == "2️⃣ Tile Selection Only":
         
     tile_name = st.selectbox("Select Tile Item", filtered_df["tile_name"].tolist())
     
+    # Exact Sheet Row Fetch
     matched_row = filtered_df[filtered_df["tile_name"] == tile_name].iloc[0]
     c_fac = float(matched_row["con_factor"])
     p_unit = float(matched_row["packing_unit"])
@@ -674,7 +671,7 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
         st.subheader("📑 Complete Raw Log")
         st.dataframe(sel_df, use_container_width=True)
 
-# --- PAGE 5: ADMIN CONTROL & EXACT POSITION SYNC ---
+# --- PAGE 5: ADMIN CONTROL & EXACT GOOGLE SHEET SYNC ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
     t1, t2, t3 = st.tabs(["🔗 Direct Google Sheet Live Stock", "👥 Manage Staff / Salesmen", "📜 System Audits"])
@@ -687,7 +684,7 @@ elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "
             if sheet_url_input.strip():
                 success, count_or_err = sync_stock_from_sheet(sheet_url_input.strip())
                 if success:
-                    st.success(f"🎉 Google Sheet se total **{count_or_err} Tiles** Column H (`Con Factor`) aur Column I (`Packing Unit`) ke exact values ke sath sync ho gayi!")
+                    st.success(f"🎉 Google Sheet se total **{count_or_err} Tiles** exact Column H aur Column I ke sath sync ho gayi!")
                     st.rerun()
                 else:
                     st.error(f"Sync failed: {count_or_err}")
