@@ -75,6 +75,17 @@ def init_db():
             timestamp TEXT
         )
     """)
+    
+    # Auto-migration: Ensure columns exist if table was created previously
+    c.execute("PRAGMA table_info(customer_selections)")
+    cols = [col[1] for col in c.fetchall()]
+    if "length" not in cols:
+        c.execute("ALTER TABLE customer_selections ADD COLUMN length REAL DEFAULT 10.0")
+    if "width" not in cols:
+        c.execute("ALTER TABLE customer_selections ADD COLUMN width REAL DEFAULT 10.0")
+    if "sqft_per_box" not in cols:
+        c.execute("ALTER TABLE customer_selections ADD COLUMN sqft_per_box REAL DEFAULT 16.0")
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS inventory_stock (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,7 +101,6 @@ def init_db():
         )
     """)
     
-    # Default Admins
     admins = [
         ("DEEPCHAND JAIN", "deep123", "1234"),
         ("GOURAV", "GOURAV", "1234"),
@@ -219,11 +229,11 @@ if not st.session_state.authenticated:
                                       (new_u, hash_pass(new_p), new_pin))
                             conn.commit()
                             conn.close()
-                            st.success(f"Salesman **{new_u}** successfully ban gaya! Ab Sign In karein.")
+                            st.success(f"Salesman **{new_u}** create ho gaya! Ab Sign In karein.")
                         except Exception as ex:
                             st.error(f"User error: {str(ex)}")
                     else:
-                        st.error("Username aur password bharna zaroori hai.")
+                        st.error("Username aur Password bharein.")
     st.stop()
 
 # --- SIDEBAR NAVIGATION ---
@@ -281,11 +291,11 @@ if selected_page == "1️⃣ Customer Registration":
                     st.session_state.cust_mobile = c_mob.strip()
                     conn.commit()
                     conn.close()
-                    st.success(f"Customer **{c_name}** registered successfully!")
+                    st.success(f"Customer **{c_name}** successfully registered!")
             else:
                 st.error("Customer Name aur Mobile Number enter karein.")
 
-# --- PAGE 2: TILE SELECTION ONLY (FAST SHOWROOM PITCH) ---
+# --- PAGE 2: TILE SELECTION ONLY ---
 elif selected_page == "2️⃣ Tile Selection Only":
     st.title("🏷️ Showroom Tile Selection (Quick Add)")
     
@@ -300,9 +310,9 @@ elif selected_page == "2️⃣ Tile Selection Only":
         
         selected_cust_label = st.selectbox("👤 Active Customer", list(cust_options.keys()), index=default_idx)
         st.session_state.cust_id, st.session_state.cust_name, st.session_state.cust_mobile = cust_options[selected_cust_label]
-        st.info(f"Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile}) | Attended By: **{st.session_state.username}**")
+        st.info(f"Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile}) | Staff: **{st.session_state.username}**")
     else:
-        st.warning("Pehle Customer Registration page par customer banayein.")
+        st.warning("Pehle Customer Registration page par customer add karein.")
         st.stop()
         
     conn = get_connection()
@@ -370,7 +380,7 @@ elif selected_page == "2️⃣ Tile Selection Only":
             ))
             conn.commit()
             conn.close()
-            st.success(f"✅ **{tile_name}** ({area_name}) successfully add ho gayi! Measurement page par size update karein.")
+            st.success(f"✅ **{tile_name}** ({area_name}) add ho gayi!")
             st.rerun()
 
     st.markdown("---")
@@ -381,11 +391,11 @@ elif selected_page == "2️⃣ Tile Selection Only":
     
     if not quick_cart.empty:
         st.dataframe(quick_cart[["Floor", "Type", "Area", "Tile"]], use_container_width=True)
-        st.info("👉 Tiles add karne ke baad left sidebar se **'3️⃣ Measurement, BOQ & Share PDF'** page par jayein.")
+        st.info("👉 Tiles select karne ke baad left sidebar se **'3️⃣ Measurement, BOQ & Share PDF'** page par jayein.")
     else:
         st.caption("Abhi koi tile select nahi hui hai.")
 
-# --- PAGE 3: MEASUREMENT, ESTIMATE & SHARE PDF ---
+# --- PAGE 3: MEASUREMENT & SHARE PDF ---
 elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
     st.title("📐 Measurement, Calculations & Quotation Share")
     
@@ -410,7 +420,7 @@ elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
     conn.close()
 
     if cart_df.empty:
-        st.warning("Is customer ke liye pehle **'2️⃣ Tile Selection Only'** page se tiles select karein.")
+        st.warning("Is customer ke liye pehle **'2️⃣ Tile Selection Only'** page se tiles add karein.")
         st.stop()
 
     st.subheader("✏️ Enter Site Measurements (Length x Width):")
@@ -448,7 +458,6 @@ elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
             st.success("Measurements calculate aur save ho gaye!")
             st.rerun()
 
-    # Re-fetch updated summary
     conn = get_connection()
     summary_df = pd.read_sql_query(
         "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes "
@@ -484,7 +493,7 @@ elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
     wa_text += f"Thank you for choosing Jay Granite & Tiles!"
 
     st.markdown("#### 💬 WhatsApp Direct Copy-Paste Text")
-    st.text_area("Yahan se poora text copy karke WhatsApp par share karein:", value=wa_text, height=180)
+    st.text_area("Yahan se message copy karke WhatsApp par share karein:", value=wa_text, height=180)
 
     pdf_bytes = generate_pdf(st.session_state.cust_name, st.session_state.cust_mobile, summary_df, sum_sqft, sum_boxes)
     
