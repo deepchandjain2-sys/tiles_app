@@ -61,7 +61,6 @@ DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYK
 USERS_FILE = "users_data.json"
 SELECTIONS_FILE = "customer_selections.json"
 MEASUREMENTS_FILE = "measurements_data.json"
-STOCK_CACHE_FILE = "stock_cache.json"
 
 def load_json_file(filepath, default_val):
     if os.path.exists(filepath):
@@ -241,7 +240,7 @@ if not st.session_state.auth:
     st.caption("Integrated Architecture & Tile Management System")
     
     c1, c2, c3 = st.columns([1, 2, 1])
-    with col2 := c2:
+    with c2:
         st.subheader("🔐 Staff Sign In")
         with st.form("login_form"):
             role_type = st.radio("Account Role", ["Salesman", "Admin"], horizontal=True)
