@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # Direct CSV Export Link for the Google Sheet
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/export?format=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=0&single=true&output=csv"
 
 SELECTIONS_FILE = "customer_selections.json"
 CUSTOMERS_FILE = "customers_list.json"
