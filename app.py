@@ -55,7 +55,7 @@ st.set_page_config(
     layout="wide"
 )
 
-DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/edit"
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=0&single=true&output=csv"
 
 # --- PERSISTENT DATA FILE PATHS ---
 USERS_FILE = "users_data.json"
