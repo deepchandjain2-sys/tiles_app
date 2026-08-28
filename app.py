@@ -1,21 +1,99 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
+import hashlib
 import urllib.parse
 from datetime import datetime
 from fpdf import FPDF
 import calculations
-import database
 
 st.set_page_config(page_title="Jay Granite Tile Selection", page_icon="🏛️", layout="wide")
 
-# Initialize Database
-database.create_tables()
+# --- DATABASE SETUP ---
+DB_FILE = "jay_granite_tiles.db"
+
+def hash_pass(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def get_connection():
-    return database.get_connection()
+    return sqlite3.connect(DB_FILE, check_same_thread=False)
 
-# PDF Generator
+def init_db():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            role TEXT,
+            security_pin TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            salesman TEXT,
+            customer_name TEXT,
+            mobile TEXT,
+            address TEXT,
+            engineer_name TEXT,
+            engineer_mobile TEXT,
+            status TEXT,
+            created_at TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS customer_selections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER,
+            customer_name TEXT,
+            mobile TEXT,
+            salesman TEXT,
+            floor TEXT,
+            area_type TEXT,
+            area_name TEXT,
+            tile_name TEXT,
+            dimensions TEXT,
+            sqft_covered REAL,
+            boxes_required REAL,
+            status TEXT,
+            timestamp TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS inventory_stock (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tile_name TEXT UNIQUE,
+            sqft_per_box REAL
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS login_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            timestamp TEXT
+        )
+    """)
+    
+    # Default Admins
+    admins = [
+        ("DEEPCHAND JAIN", "deep123", "1234"),
+        ("GOURAV", "GOURAV", "1234"),
+        ("ADMIN", "admin123", "1234")
+    ]
+    for u_name, u_pass, u_pin in admins:
+        c.execute("SELECT id FROM users WHERE UPPER(username) = ?", (u_name.upper(),))
+        if not c.fetchone():
+            c.execute("INSERT INTO users (username, password_hash, role, security_pin) VALUES (?, ?, 'admin', ?)",
+                      (u_name, hash_pass(u_pass), u_pin))
+            
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# --- PDF GENERATOR ---
 def generate_pdf(customer_name, mobile, df, total_sqft, total_boxes):
     pdf = FPDF()
     pdf.add_page()
@@ -56,7 +134,7 @@ def generate_pdf(customer_name, mobile, df, total_sqft, total_boxes):
     
     return bytes(pdf.output())
 
-# Session State Setup
+# --- SESSION STATE ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
@@ -89,7 +167,7 @@ if not st.session_state.authenticated:
                 sub = st.form_submit_button("🚀 Login", type="primary", use_container_width=True)
                 
                 if sub:
-                    # Direct Master Admin Access
+                    # Master bypass
                     if (u.upper() in ["DEEPCHAND JAIN", "ADMIN", "GOURAV"] and p in ["deep123", "pass123", "admin123", "GOURAV", "deep1965", "1234"]) or (role_choice == "Admin" and p in ["deep123", "admin123", "1234"]):
                         st.session_state.authenticated = True
                         st.session_state.username = u if u else "DEEPCHAND JAIN"
@@ -98,7 +176,7 @@ if not st.session_state.authenticated:
 
                     conn = get_connection()
                     c = conn.cursor()
-                    c.execute("SELECT username, role FROM users WHERE LOWER(username) = ? AND password_hash = ?", (u.lower(), database.hash_pass(p)))
+                    c.execute("SELECT username, role FROM users WHERE UPPER(username) = ? AND password_hash = ?", (u.upper(), hash_pass(p)))
                     user = c.fetchone()
                     
                     if user:
@@ -125,17 +203,15 @@ if not st.session_state.authenticated:
                         try:
                             conn = get_connection()
                             c = conn.cursor()
-                            c.execute("""
-                                INSERT INTO users (username, password_hash, role, security_pin)
-                                VALUES (?, ?, 'salesman', ?)
-                            """, (new_u, database.hash_pass(new_p), new_pin))
+                            c.execute("INSERT INTO users (username, password_hash, role, security_pin) VALUES (?, ?, 'salesman', ?)",
+                                      (new_u, hash_pass(new_p), new_pin))
                             conn.commit()
                             conn.close()
-                            st.success(f"Salesman **{new_u}** successfully created! Ab login tab se sign in karein.")
+                            st.success(f"Salesman **{new_u}** successfully ban gaya! Ab Sign In karein.")
                         except Exception as ex:
                             st.error(f"User error: {str(ex)}")
                     else:
-                        st.error("Username aur password enter karein.")
+                        st.error("Username aur password bharna zaroori hai.")
     st.stop()
 
 # --- SIDEBAR NAVIGATION ---
@@ -189,9 +265,9 @@ if selected_page == "1️⃣ Customer Registration":
                     st.session_state.cust_mobile = c_mob.strip()
                     conn.commit()
                     conn.close()
-                    st.success(f"Customer **{c_name}** registered successfully!")
+                    st.success(f"Customer **{c_name}** successfully registered!")
             else:
-                st.error("Customer Name aur Mobile Number zaroori hai.")
+                st.error("Customer Name aur Mobile Number enter karein.")
 
 # --- PAGE 2: SELECTION HUB ---
 elif selected_page == "2️⃣ Tile Multi-Selection Hub":
@@ -210,12 +286,10 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         st.session_state.cust_id, st.session_state.cust_name, st.session_state.cust_mobile = cust_options[selected_cust_label]
         st.info(f"Active Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile}) | Staff: **{st.session_state.username}**")
     else:
-        st.warning("Pehle Customer Registration page par jaakar customer register karein.")
+        st.warning("Pehle Customer Registration page par jaakar customer banayein.")
         st.stop()
         
     conn = get_connection()
-    c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS inventory_stock (id INTEGER PRIMARY KEY AUTOINCREMENT, tile_name TEXT UNIQUE, sqft_per_box REAL)")
     stock_df = pd.read_sql_query("SELECT tile_name, sqft_per_box FROM inventory_stock", conn)
     conn.close()
     
@@ -245,7 +319,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     
     if filtered_df.empty:
         filtered_df = stock_df
-        st.caption("Tile match nahi hui, saari items list ho rahi hain.")
+        st.caption("Tile match nahi hui, saari items show ho rahi hain.")
         
     tile_name = st.selectbox("Select Tile", filtered_df["tile_name"].tolist())
     sqft_box_val = float(filtered_df[filtered_df["tile_name"] == tile_name]["sqft_per_box"].values[0]) if not filtered_df.empty else 16.0
@@ -405,13 +479,13 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
             ).reset_index()
             st.dataframe(salesman_summary, use_container_width=True)
         else:
-            st.info("Salesman activity log empty hai.")
+            st.info("Salesman activity empty hai.")
 
     with dash_tab3:
         st.subheader("📑 Complete Raw Log")
         st.dataframe(sel_df, use_container_width=True)
 
-# --- PAGE 4: ADMIN & STAFF CONTROL (ADMIN ONLY) ---
+# --- PAGE 4: ADMIN CONTROL & STAFF MANAGEMENT (ADMIN ONLY) ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
     t1, t2, t3 = st.tabs(["📦 Inventory Stock Data", "👥 Manage Staff / Salesmen", "📜 System Audits"])
@@ -454,7 +528,6 @@ elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "
                     if not final_items.empty:
                         conn = get_connection()
                         c = conn.cursor()
-                        c.execute("CREATE TABLE IF NOT EXISTS inventory_stock (id INTEGER PRIMARY KEY AUTOINCREMENT, tile_name TEXT UNIQUE, sqft_per_box REAL)")
                         c.execute("DELETE FROM inventory_stock")
                         for _, row in final_items.iterrows():
                             c.execute("INSERT OR REPLACE INTO inventory_stock (tile_name, sqft_per_box) VALUES (?, ?)", (str(row["Tile_Name"]), float(row["Sqft_Per_Box"])))
@@ -493,12 +566,12 @@ elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "
                     c.execute("DELETE FROM users WHERE username = ? AND role = 'salesman'", (del_user,))
                     conn.commit()
                     conn.close()
-                    st.success(f"Salesman **{del_user}** delete ho gaya!")
+                    st.success(f"Salesman **{del_user}** successfully delete ho gaya!")
                     st.rerun()
                 else:
                     st.warning("Pehle checkbox check karein.")
         else:
-            st.info("Abhi koi Salesman create nahi kiya gaya hai.")
+            st.info("Abhi koi Salesman register nahi hai.")
         
     with t3:
         st.subheader("Recent Sign-in Audits")
