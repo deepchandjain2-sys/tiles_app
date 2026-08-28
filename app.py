@@ -65,6 +65,9 @@ def init_db():
             area_type TEXT,
             area_name TEXT,
             tile_name TEXT,
+            length REAL DEFAULT 10.0,
+            width REAL DEFAULT 10.0,
+            sqft_per_box REAL DEFAULT 16.0,
             dimensions TEXT,
             sqft_covered REAL,
             boxes_required REAL,
@@ -87,6 +90,7 @@ def init_db():
         )
     """)
     
+    # Default Admins
     admins = [
         ("DEEPCHAND JAIN", "deep123", "1234"),
         ("GOURAV", "GOURAV", "1234"),
@@ -110,7 +114,7 @@ def generate_pdf(customer_name, mobile, df, total_sqft, total_boxes):
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, "JAY GRANITE & TILES", ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, "Architectural Tile Selection & BOQ Estimate", ln=True, align="C")
+    pdf.cell(0, 6, "Architectural Tile Selection & Measurement Estimate", ln=True, align="C")
     pdf.ln(5)
     
     pdf.set_font("Helvetica", "B", 10)
@@ -166,7 +170,6 @@ if not st.session_state.authenticated:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.subheader("🔐 Staff Sign In")
-        
         tab_login, tab_reg = st.tabs(["👤 Sign In", "➕ Register Salesman"])
         
         with tab_login:
@@ -216,11 +219,11 @@ if not st.session_state.authenticated:
                                       (new_u, hash_pass(new_p), new_pin))
                             conn.commit()
                             conn.close()
-                            st.success(f"Salesman **{new_u}** successfully created!")
+                            st.success(f"Salesman **{new_u}** successfully ban gaya! Ab Sign In karein.")
                         except Exception as ex:
                             st.error(f"User error: {str(ex)}")
                     else:
-                        st.error("Username aur password enter karein.")
+                        st.error("Username aur password bharna zaroori hai.")
     st.stop()
 
 # --- SIDEBAR NAVIGATION ---
@@ -232,7 +235,11 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state.role = "salesman"
     st.rerun()
 
-nav_options = ["1️⃣ Customer Registration", "2️⃣ Tile Multi-Selection Hub"]
+nav_options = [
+    "1️⃣ Customer Registration", 
+    "2️⃣ Tile Selection Only", 
+    "3️⃣ Measurement, BOQ & Share PDF"
+]
 if st.session_state.role == "admin":
     nav_options.extend(["📊 Executive Dashboard", "⚙️ Admin & Live Stock"])
 
@@ -248,7 +255,7 @@ if selected_page == "1️⃣ Customer Registration":
         eng_name = st.text_input("Engineer / Contractor Name (Optional)")
         eng_mob = st.text_input("Engineer Mobile (Optional)")
         
-        if st.form_submit_button("Save & Proceed to Selection", type="primary"):
+        if st.form_submit_button("Save & Proceed to Tile Selection", type="primary"):
             if c_name.strip() and c_mob.strip():
                 conn = get_connection()
                 c = conn.cursor()
@@ -276,11 +283,11 @@ if selected_page == "1️⃣ Customer Registration":
                     conn.close()
                     st.success(f"Customer **{c_name}** registered successfully!")
             else:
-                st.error("Customer Name aur Mobile Number zaroori hai.")
+                st.error("Customer Name aur Mobile Number enter karein.")
 
-# --- PAGE 2: SELECTION HUB ---
-elif selected_page == "2️⃣ Tile Multi-Selection Hub":
-    st.title("📐 Tile Multi-Selection Hub")
+# --- PAGE 2: TILE SELECTION ONLY (FAST SHOWROOM PITCH) ---
+elif selected_page == "2️⃣ Tile Selection Only":
+    st.title("🏷️ Showroom Tile Selection (Quick Add)")
     
     conn = get_connection()
     all_custs = pd.read_sql_query("SELECT id, customer_name, mobile FROM customers ORDER BY id DESC", conn)
@@ -291,11 +298,11 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         default_label = next((k for k, v in cust_options.items() if v[0] == st.session_state.get('cust_id')), list(cust_options.keys())[0])
         default_idx = list(cust_options.keys()).index(default_label)
         
-        selected_cust_label = st.selectbox("👤 Select Active Customer", list(cust_options.keys()), index=default_idx)
+        selected_cust_label = st.selectbox("👤 Active Customer", list(cust_options.keys()), index=default_idx)
         st.session_state.cust_id, st.session_state.cust_name, st.session_state.cust_mobile = cust_options[selected_cust_label]
-        st.info(f"Active Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile}) | Staff: **{st.session_state.username}**")
+        st.info(f"Client: **{st.session_state.cust_name}** ({st.session_state.cust_mobile}) | Attended By: **{st.session_state.username}**")
     else:
-        st.warning("Pehle Customer Registration page par jaakar customer register karein.")
+        st.warning("Pehle Customer Registration page par customer banayein.")
         st.stop()
         
     conn = get_connection()
@@ -305,6 +312,7 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
     if stock_df.empty:
         stock_df = pd.DataFrame([{"tile_name": "AKROS STEEL TEXTURA 2X4 ITALICA", "sqft_per_box": 16.0}])
         
+    st.markdown("---")
     c1, c2, c3 = st.columns(3)
     with c1:
         floor = st.selectbox("Floor Level", ["Ground Floor", "First Floor", "Second Floor", "Third Floor", "Terrace"])
@@ -323,37 +331,29 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
         else:
             area_name = selected_area
         
-    search_q = st.text_input("🔍 Search Tile Name / Size", "")
+    search_q = st.text_input("🔍 Quick Tile Search (Code / Size / Name)", "")
     filtered_df = stock_df[stock_df["tile_name"].str.contains(search_q, case=False, na=False)] if search_q else stock_df
     
     if filtered_df.empty:
         filtered_df = stock_df
         
-    tile_name = st.selectbox("Select Tile", filtered_df["tile_name"].tolist())
+    tile_name = st.selectbox("Select Tile Item", filtered_df["tile_name"].tolist())
     sqft_box_val = float(filtered_df[filtered_df["tile_name"] == tile_name]["sqft_per_box"].values[0]) if not filtered_df.empty else 16.0
     
-    col_l, col_w = st.columns(2)
-    with col_l:
-        length = st.number_input("Length (Ft)", value=10.0, step=0.5)
-    with col_w:
-        width = st.number_input("Width / Height (Ft)", value=10.0, step=0.5)
-        
-    tot_sqft, req_boxes = calculate_boxes(length, width, sqft_box_val)
+    st.caption(f"📦 Box Packing: **{sqft_box_val:.2f} Sq.Ft / Box**")
     
-    st.caption(f"📦 Box Coverage: **{sqft_box_val:.2f} Sq.Ft / Box**")
-    st.info(f"💡 Area: **{tot_sqft:.2f} Sq.Ft** | Box Estimate: **{req_boxes:.2f} Boxes**")
-    
-    if st.button("➕ Add This Area to Selection List", use_container_width=True, type="primary"):
+    if st.button("➕ Select & Add Tile to Customer Cart", type="primary", use_container_width=True):
         if not area_name:
-            st.error("Area Name bharna zaroori hai.")
+            st.error("Area Name enter karein.")
         else:
+            tot_sqft, req_boxes = calculate_boxes(10.0, 10.0, sqft_box_val)
             curr_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             conn = get_connection()
             c = conn.cursor()
             c.execute("""
                 INSERT INTO customer_selections 
-                (customer_id, customer_name, mobile, salesman, floor, area_type, area_name, tile_name, dimensions, sqft_covered, boxes_required, status, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (customer_id, customer_name, mobile, salesman, floor, area_type, area_name, tile_name, length, width, sqft_per_box, dimensions, sqft_covered, boxes_required, status, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10.0, 10.0, ?, '10.0x10.0 ft', ?, ?, 'DRAFT', ?)
             """, (
                 st.session_state.cust_id,
                 st.session_state.cust_name,
@@ -363,88 +363,156 @@ elif selected_page == "2️⃣ Tile Multi-Selection Hub":
                 area_type,
                 area_name,
                 tile_name,
-                f"{length}x{width} ft",
+                sqft_box_val,
                 tot_sqft,
                 req_boxes,
-                'DRAFT',
                 curr_time
             ))
             conn.commit()
             conn.close()
-            st.success(f"{area_name} list mein save ho gaya!")
+            st.success(f"✅ **{tile_name}** ({area_name}) successfully add ho gayi! Measurement page par size update karein.")
             st.rerun()
 
     st.markdown("---")
-    st.markdown(f"### 📋 Final Bill of Quantities (BOQ) - {st.session_state.cust_name}")
+    st.subheader(f"🛒 Currently Selected Tiles ({st.session_state.cust_name})")
+    conn = get_connection()
+    quick_cart = pd.read_sql_query("SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'", conn, params=(st.session_state.cust_id,))
+    conn.close()
+    
+    if not quick_cart.empty:
+        st.dataframe(quick_cart[["Floor", "Type", "Area", "Tile"]], use_container_width=True)
+        st.info("👉 Tiles add karne ke baad left sidebar se **'3️⃣ Measurement, BOQ & Share PDF'** page par jayein.")
+    else:
+        st.caption("Abhi koi tile select nahi hui hai.")
 
+# --- PAGE 3: MEASUREMENT, ESTIMATE & SHARE PDF ---
+elif selected_page == "3️⃣ Measurement, BOQ & Share PDF":
+    st.title("📐 Measurement, Calculations & Quotation Share")
+    
+    conn = get_connection()
+    all_custs = pd.read_sql_query("SELECT id, customer_name, mobile FROM customers ORDER BY id DESC", conn)
+    conn.close()
+    
+    if not all_custs.empty:
+        cust_options = {f"{row['customer_name']} ({row['mobile']})": (row['id'], row['customer_name'], row['mobile']) for _, row in all_custs.iterrows()}
+        default_label = next((k for k, v in cust_options.items() if v[0] == st.session_state.get('cust_id')), list(cust_options.keys())[0])
+        default_idx = list(cust_options.keys()).index(default_label)
+        
+        selected_cust_label = st.selectbox("👤 Active Customer", list(cust_options.keys()), index=default_idx)
+        st.session_state.cust_id, st.session_state.cust_name, st.session_state.cust_mobile = cust_options[selected_cust_label]
+    
     conn = get_connection()
     cart_df = pd.read_sql_query(
+        "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, length, width, sqft_per_box, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes "
+        "FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'",
+        conn, params=(st.session_state.cust_id,)
+    )
+    conn.close()
+
+    if cart_df.empty:
+        st.warning("Is customer ke liye pehle **'2️⃣ Tile Selection Only'** page se tiles select karein.")
+        st.stop()
+
+    st.subheader("✏️ Enter Site Measurements (Length x Width):")
+    with st.form("measurement_update_form"):
+        updated_rows = []
+        for idx, r in cart_df.iterrows():
+            st.markdown(f"**{idx+1}. {r['Area']}** ({r['Floor']} - {r['Type']}) — *{r['Tile']}*")
+            c_l, c_w, c_del = st.columns([2, 2, 1])
+            with c_l:
+                l_val = st.number_input(f"Length (Ft) - #{r['id']}", value=float(r['length']) if r['length'] else 10.0, step=0.5, key=f"len_{r['id']}")
+            with c_w:
+                w_val = st.number_input(f"Width / Height (Ft) - #{r['id']}", value=float(r['width']) if r['width'] else 10.0, step=0.5, key=f"wid_{r['id']}")
+            with c_del:
+                del_me = st.checkbox("Remove ❌", key=f"del_{r['id']}")
+            
+            box_sqft = float(r['sqft_per_box']) if r['sqft_per_box'] else 16.0
+            new_sqft, new_boxes = calculate_boxes(l_val, w_val, box_sqft)
+            updated_rows.append((r['id'], l_val, w_val, f"{l_val}x{w_val} ft", new_sqft, new_boxes, del_me))
+            st.markdown("---")
+            
+        if st.form_submit_button("💾 Save All Measurements & Update BOQ", type="primary", use_container_width=True):
+            conn = get_connection()
+            c = conn.cursor()
+            for r_id, l_v, w_v, dim_str, s_v, b_v, should_del in updated_rows:
+                if should_del:
+                    c.execute("DELETE FROM customer_selections WHERE id = ?", (r_id,))
+                else:
+                    c.execute("""
+                        UPDATE customer_selections 
+                        SET length = ?, width = ?, dimensions = ?, sqft_covered = ?, boxes_required = ?
+                        WHERE id = ?
+                    """, (l_v, w_v, dim_str, s_v, b_v, r_id))
+            conn.commit()
+            conn.close()
+            st.success("Measurements calculate aur save ho gaye!")
+            st.rerun()
+
+    # Re-fetch updated summary
+    conn = get_connection()
+    summary_df = pd.read_sql_query(
         "SELECT id, floor as Floor, area_type as Type, area_name as Area, tile_name as Tile, dimensions as Dimensions, sqft_covered as SqFt, boxes_required as Boxes "
         "FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'",
         conn, params=(st.session_state.cust_id,)
     )
     conn.close()
 
-    if not cart_df.empty:
-        st.dataframe(cart_df[["Floor", "Type", "Area", "Tile", "Dimensions", "SqFt", "Boxes"]], use_container_width=True)
-        
-        sum_sqft = cart_df["SqFt"].sum()
-        sum_boxes = round(cart_df["Boxes"].sum(), 2)
-        
-        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
-        c_kpi1.metric("Total Items", len(cart_df))
-        c_kpi2.metric("Total Area", f"{sum_sqft:.2f} sqft")
-        c_kpi3.metric("Total Boxes", f"{sum_boxes:.2f} Boxes")
-        
-        wa_text = f"🏛️ *JAY GRANITE & TILES - TILE SELECTION ESTIMATE*\n\n"
-        wa_text += f"👤 *Client Name:* {st.session_state.cust_name}\n"
-        wa_text += f"📱 *Mobile:* {st.session_state.cust_mobile}\n"
-        wa_text += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
-        wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
-        for _, r in cart_df.iterrows():
-            wa_text += f"🔹 *{r['Area']}* ({r['Floor']} - {r['Type']})\n"
-            wa_text += f"   • Tile: {r['Tile']}\n"
-            wa_text += f"   • Size: {r['Dimensions']} | Area: {r['SqFt']} Sq.Ft\n"
-            wa_text += f"   • Quantity: *{r['Boxes']} Boxes*\n\n"
-        wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
-        wa_text += f"📊 *Total Area:* {sum_sqft:.2f} Sq.Ft\n"
-        wa_text += f"📦 *Total Required Boxes:* {sum_boxes:.2f} Boxes\n\n"
-        wa_text += f"Thank you for choosing Jay Granite & Tiles!"
+    st.markdown(f"### 📋 Final Bill of Quantities (BOQ) - {st.session_state.cust_name}")
+    st.dataframe(summary_df[["Floor", "Type", "Area", "Tile", "Dimensions", "SqFt", "Boxes"]], use_container_width=True)
+    
+    sum_sqft = summary_df["SqFt"].sum()
+    sum_boxes = round(summary_df["Boxes"].sum(), 2)
+    
+    c_k1, c_k2, c_k3 = st.columns(3)
+    c_k1.metric("Total Items", len(summary_df))
+    c_k2.metric("Total Area", f"{sum_sqft:.2f} Sq.Ft")
+    c_k3.metric("Total Boxes Required", f"{sum_boxes:.2f} Boxes")
+    
+    wa_text = f"🏛️ *JAY GRANITE & TILES - TILE SELECTION ESTIMATE*\n\n"
+    wa_text += f"👤 *Client Name:* {st.session_state.cust_name}\n"
+    wa_text += f"📱 *Mobile:* {st.session_state.cust_mobile}\n"
+    wa_text += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
+    wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
+    for _, r in summary_df.iterrows():
+        wa_text += f"🔹 *{r['Area']}* ({r['Floor']} - {r['Type']})\n"
+        wa_text += f"   • Tile: {r['Tile']}\n"
+        wa_text += f"   • Size: {r['Dimensions']} | Area: {r['SqFt']} Sq.Ft\n"
+        wa_text += f"   • Quantity: *{r['Boxes']} Boxes*\n\n"
+    wa_text += f"━━━━━━━━━━━━━━━━━━━━\n"
+    wa_text += f"📊 *Total Area:* {sum_sqft:.2f} Sq.Ft\n"
+    wa_text += f"📦 *Total Required Boxes:* {sum_boxes:.2f} Boxes\n\n"
+    wa_text += f"Thank you for choosing Jay Granite & Tiles!"
 
-        st.markdown("#### 💬 WhatsApp Direct Copy-Paste Text")
-        st.text_area("Yahan se poora message copy karke WhatsApp par bhejein:", value=wa_text, height=180)
+    st.markdown("#### 💬 WhatsApp Direct Copy-Paste Text")
+    st.text_area("Yahan se poora text copy karke WhatsApp par share karein:", value=wa_text, height=180)
 
-        pdf_bytes = generate_pdf(st.session_state.cust_name, st.session_state.cust_mobile, cart_df, sum_sqft, sum_boxes)
-        
-        btn_col1, btn_col2, btn_col3 = st.columns(3)
-        with btn_col1:
-            st.download_button(
-                label="📄 Download Quotation PDF",
-                data=pdf_bytes,
-                file_name=f"Estimate_{st.session_state.cust_name}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-            
-        with btn_col2:
-            encoded_text = urllib.parse.quote(wa_text)
-            clean_mob = "".join(filter(str.isdigit, str(st.session_state.cust_mobile)))
-            if not clean_mob.startswith("91") and len(clean_mob) == 10:
-                clean_mob = "91" + clean_mob
-            
-            wa_link = f"https://wa.me/{clean_mob}?text={encoded_text}"
-            st.link_button("📲 1-Click WhatsApp Send", wa_link, use_container_width=True)
-            
-        with btn_col3:
-            if st.button("🗑️ Reset Active Cart", use_container_width=True):
-                conn = get_connection()
-                c = conn.cursor()
-                c.execute("DELETE FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'", (st.session_state.cust_id,))
-                conn.commit()
-                conn.close()
-                st.rerun()
+    pdf_bytes = generate_pdf(st.session_state.cust_name, st.session_state.cust_mobile, summary_df, sum_sqft, sum_boxes)
+    
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        st.download_button(
+            label="📄 Download Estimate PDF",
+            data=pdf_bytes,
+            file_name=f"Estimate_{st.session_state.cust_name}_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+    with b2:
+        encoded_text = urllib.parse.quote(wa_text)
+        clean_mob = "".join(filter(str.isdigit, str(st.session_state.cust_mobile)))
+        if not clean_mob.startswith("91") and len(clean_mob) == 10:
+            clean_mob = "91" + clean_mob
+        st.link_button("📲 1-Click WhatsApp Send", f"https://wa.me/{clean_mob}?text={encoded_text}", use_container_width=True)
+    with b3:
+        if st.button("🗑️ Reset Cart", use_container_width=True):
+            conn = get_connection()
+            c = conn.cursor()
+            c.execute("DELETE FROM customer_selections WHERE customer_id = ? AND status = 'DRAFT'", (st.session_state.cust_id,))
+            conn.commit()
+            conn.close()
+            st.rerun()
 
-# --- PAGE 3: DASHBOARD (ADMIN ONLY) ---
+# --- PAGE 4: EXECUTIVE DASHBOARD (ADMIN ONLY) ---
 elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "admin":
     st.title("📊 Executive Business & Selections Dashboard")
     
@@ -497,15 +565,13 @@ elif selected_page == "📊 Executive Dashboard" and st.session_state.role == "a
         st.subheader("📑 Complete Raw Log")
         st.dataframe(sel_df, use_container_width=True)
 
-# --- PAGE 4: ADMIN CONTROL & GOOGLE SHEET SYNC ---
+# --- PAGE 5: ADMIN CONTROL & GOOGLE SHEET SYNC ---
 elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "admin":
     st.title("⚙️ Administrative Control")
     t1, t2, t3 = st.tabs(["🔗 Direct Google Sheet Live Stock", "👥 Manage Staff / Salesmen", "📜 System Audits"])
     
     with t1:
         st.subheader("🔗 Live Connect Google Sheet (No Upload Needed)")
-        st.caption("Apni BUSY Item Master Google Sheet ka Public Share Link daalein:")
-        
         sheet_url_input = st.text_input("Google Sheet Link", placeholder="https://docs.google.com/spreadsheets/d/...")
         
         if st.button("🔄 Sync Live Stock From Google Sheet", type="primary"):
@@ -538,10 +604,10 @@ elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "
                     conn.commit()
                     conn.close()
                     
-                    st.success(f"🎉 Google Sheet se total **{len(df_clean)} Tiles** live database mein automatically load ho gayi!")
+                    st.success(f"🎉 Google Sheet se total **{len(df_clean)} Tiles** live load ho gayi!")
                     st.rerun()
                 except Exception as ex:
-                    st.error(f"Google Sheet read nahi hui: {str(ex)}. Sheet ko 'Anyone with link can view' set karein.")
+                    st.error(f"Google Sheet read nahi hui: {str(ex)}")
             else:
                 st.warning("Google Sheet ka link paste karein.")
         
@@ -549,7 +615,7 @@ elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "
         stock_view = pd.read_sql_query("SELECT * FROM inventory_stock", conn)
         conn.close()
         st.markdown("---")
-        st.subheader(f"📦 Current Live Stock ({len(stock_view)} Items Loaded)")
+        st.subheader(f"📦 Current Live Stock ({len(stock_view)} Items)")
         st.dataframe(stock_view, use_container_width=True)
 
     with t2:
@@ -560,10 +626,8 @@ elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "
 
         if not salesmen_df.empty:
             st.dataframe(salesmen_df.rename(columns={"id": "ID", "username": "Salesman Name", "role": "Role"}), use_container_width=True)
-            
             st.markdown("---")
             st.markdown("#### 🗑️ Salesman Account Delete Karein")
-            
             del_user = st.selectbox("Salesman Chuniye", salesmen_df["username"].tolist())
             confirm_del = st.checkbox(f"Main confirm karta hoon ki **{del_user}** ko delete karna hai.")
             
@@ -574,7 +638,7 @@ elif selected_page == "⚙️ Admin & Live Stock" and st.session_state.role == "
                     c.execute("DELETE FROM users WHERE username = ? AND role = 'salesman'", (del_user,))
                     conn.commit()
                     conn.close()
-                    st.success(f"Salesman **{del_user}** successfully delete ho gaya!")
+                    st.success(f"Salesman **{del_user}** delete ho gaya!")
                     st.rerun()
                 else:
                     st.warning("Pehle checkbox check karein.")
