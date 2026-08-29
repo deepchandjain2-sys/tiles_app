@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/export?format=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=0&single=true&output=csv"
 DB_FILE = "jay_granite_master.db"
 
 # --- SQLITE DATABASE ENGINE ---
