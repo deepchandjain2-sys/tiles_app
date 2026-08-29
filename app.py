@@ -127,8 +127,8 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER ---
-@st.cache_data(ttl=60)
+# --- DIRECT GOOGLE SHEET STOCK LOADER (100% LIVE) ---
+@st.cache_data(ttl=30)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
@@ -174,14 +174,9 @@ def get_master_df():
         if not df.empty:
             return df
     except Exception as ex:
-        st.warning(f"Live Sheet Load Note: {str(ex)}")
+        st.error(f"Google Sheet Sync Error: {str(ex)}")
         
-    return pd.DataFrame([
-        {"item_name": "1000 L 12X18 KK", "con_factor": 1.5, "packing_unit": 6.0, "sqft_per_box": 9.0},
-        {"item_name": "ALBETA WHITE DAZZEL 2X4 ITALICA", "con_factor": 8.0, "packing_unit": 2.0, "sqft_per_box": 16.0},
-        {"item_name": "ATURIO VOLKAS CAR 9MM 4X6 MOT", "con_factor": 23.25, "packing_unit": 2.0, "sqft_per_box": 46.50},
-        {"item_name": "AOSTA CARRARA GVT 4X6 15MM VARMORA", "con_factor": 23.25, "packing_unit": 1.0, "sqft_per_box": 23.25}
-    ])
+    return pd.DataFrame()
 
 def calculate_box_sqft(cf, pu):
     try:
