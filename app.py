@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=0&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/export?format=csv"
 DB_FILE = "jay_granite_master.db"
 
 # --- SQLITE DATABASE ENGINE ---
@@ -117,6 +117,13 @@ def update_customer_db(cust_dict):
         float(cust_dict.get("total_boxes", 0.0)),
         cust_dict.get("id")
     ))
+    conn.commit()
+    conn.close()
+
+def delete_customer_db(cust_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM customers_master WHERE id = ?", (cust_id,))
     conn.commit()
     conn.close()
 
@@ -348,9 +355,18 @@ if nav == "1️⃣ Customer Registration & History":
                 st.write(f"**Selected Tiles:** **{len(chosen_cust.get('selections', []))} Items**")
                 st.write(f"**Date:** {chosen_cust.get('created_at', '-')}")
                 
-            if st.button("📂 Load Selected Customer Profile", type="primary", use_container_width=True):
-                st.session_state.current_customer = chosen_cust
-                st.success(f"**{chosen_cust['name']}** load ho gaya! Ab aap selection continue kar sakte hain ya measurement daal sakte hain.")
+            b_load, b_del = st.columns([2, 1])
+            with b_load:
+                if st.button("📂 Load Selected Customer Profile", type="primary", use_container_width=True):
+                    st.session_state.current_customer = chosen_cust
+                    st.success(f"**{chosen_cust['name']}** load ho gaya! Ab aap selection continue kar sakte hain ya measurement daal sakte hain.")
+            with b_del:
+                if st.button("🗑️ Delete Customer", type="secondary", use_container_width=True):
+                    delete_customer_db(chosen_cust['id'])
+                    if st.session_state.get("current_customer") and st.session_state.current_customer.get("id") == chosen_cust['id']:
+                        st.session_state.current_customer = None
+                    st.success(f"Customer **{chosen_cust['name']}** permanently delete kar diya gaya hai!")
+                    st.rerun()
         else:
             st.info("Abhi koi saved customer nahi hai.")
 
