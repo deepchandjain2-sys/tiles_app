@@ -14,7 +14,7 @@ st.set_page_config(
     layout="wide"
 )
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=0&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1qhlBmCLiDdAKQMxRbYKSrFcEHybFkxfv2XIABLsO6pA/export?format=csv"
 DB_FILE = "jay_granite_master.db"
 
 # --- SQLITE DATABASE ENGINE ---
@@ -537,19 +537,18 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     wa_msg += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     for it in curr_c["selections"]:
-        wa_msg += f"🔹 *{it['area']}* ({it['floor']})\n"
+        wa_msg += f"🔹 *{it['area']}* ({it['floor']} - {it['surface']})\n"
         wa_msg += f"   • Tile: {it['tile']}\n"
         wa_msg += f"   • Area: {it['sqft']:.2f} Sq.Ft\n"
-        wa_msg += f"   • Required: *{it['boxes']:.0f} Boxes*\n\n"
+        wa_msg += f"   • Required: *{it['boxes']:.0f} Boxes*\n"
+        wa_msg += f"   • Enter Physical Stock: [          ]\n\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     wa_msg += f"📊 *Grand Total Area:* {tot_sq:.2f} Sq.Ft\n"
     wa_msg += f"📦 *Grand Total Boxes:* {tot_bx:.0f} Boxes\n\n"
-    wa_msg += f"⚠️ *NOTE FOR GODOWN / STAFF:*\n"
-    wa_msg += f"Please update physical stock and reply with availability status.\n\n"
     wa_msg += f"Thank you for choosing Jay Granite & Tiles!"
 
     with st.expander("👁️ View / Copy WhatsApp Message Text"):
-        st.text_area("Message Preview:", value=wa_msg, height=160)
+        st.text_area("Message Preview:", value=wa_msg, height=180)
 
     pdf_bytes = generate_pdf_quotation(curr_c, curr_c["selections"])
     enc_txt = urllib.parse.quote(wa_msg)
