@@ -159,36 +159,52 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER (COLUMN H & I FIX) ---
-@st.cache_data(ttl=15)
+# --- DIRECT GOOGLE SHEET STOCK LOADER (HEADER NAME MATCHING FIX) ---
+@st.cache_data(ttl=10)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
         h_idx = 0
         for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
-            if any("ITEM NAME" in s for s in row_vals) or any("ITEM" in s for s in row_vals):
+            if any("ITEM NAME" in s for s in row_vals):
                 h_idx = i
                 break
                 
+        # Header row se column positions detect karein
+        headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
         data_rows = raw_df.iloc[h_idx + 1:].copy()
+        
+        # Column indices find karein
+        item_col = 0
+        cf_col = 7  # Default Column H
+        pu_col = 8  # Default Column I
+        
+        for idx, h in enumerate(headers):
+            if "ITEM" in h:
+                item_col = idx
+            elif h == "CON FACTOR" or "CON FACTOR" in h:
+                # Agar multiple Con Factor hain toh H wala (pehla wala) lein
+                if cf_col == 7: cf_col = idx
+            elif "PACKING" in h:
+                pu_col = idx
+
         parsed_stock = []
         for _, r in data_rows.iterrows():
-            # Column A (Index 0) se Item Name uthayega
-            item_name = str(r[0]).strip() if len(r) > 0 and pd.notna(r[0]) else ""
+            item_name = str(r[item_col]).strip() if len(r) > item_col and pd.notna(r[item_col]) else ""
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Column H (Index 7) = Con Factor
+            # Con Factor (Column H)
             try:
-                cf_val = float(str(r[7]).replace(',', '').strip()) if len(r) > 7 and pd.notna(r[7]) else 1.0
+                cf_val = float(str(r[cf_col]).replace(',', '').strip()) if len(r) > cf_col and pd.notna(r[cf_col]) else 1.0
                 if cf_val <= 0: cf_val = 1.0
             except Exception:
                 cf_val = 1.0
                 
-            # Column I (Index 8) = Packing Unit
+            # Packing Unit (Column I)
             try:
-                pu_val = float(str(r[8]).replace(',', '').strip()) if len(r) > 8 and pd.notna(r[8]) else 1.0
+                pu_val = float(str(r[pu_col]).replace(',', '').strip()) if len(r) > pu_col and pd.notna(r[pu_col]) else 1.0
                 if pu_val <= 0: pu_val = 1.0
             except Exception:
                 pu_val = 1.0
@@ -206,15 +222,7 @@ def get_master_df():
             return df
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
-    return pd.DataFrame()
-def calculate_box_sqft(cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        return round(cov, 2) if cov > 0 else 16.0
-    except Exception:
-        return 16.0
-
-def calculate_boxes(sqft, cf, pu):
+    return pd.DataFrame()def calculate_boxes(sqft, cf, pu):
     try:
         cov = float(cf) * float(pu)
         if cov <= 0:
