@@ -32,6 +32,7 @@ def init_database():
             address TEXT,
             engineer TEXT,
             salesman TEXT,
+            branch TEXT DEFAULT 'Hiriyur',
             status TEXT DEFAULT 'SELECTION ONLY',
             selections_json TEXT DEFAULT '[]',
             total_sqft REAL DEFAULT 0.0,
@@ -40,6 +41,13 @@ def init_database():
         )
     """)
     conn.commit()
+    
+    # Auto-migrate table if branch column doesn't exist in existing db
+    try:
+        c.execute("ALTER TABLE customers_master ADD COLUMN branch TEXT DEFAULT 'Hiriyur'")
+        conn.commit()
+    except Exception:
+        pass
     conn.close()
 
 init_database()
@@ -47,7 +55,7 @@ init_database()
 def get_all_customers_db():
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT id, name, mobile, address, engineer, salesman, status, selections_json, total_sqft, total_boxes, created_at FROM customers_master ORDER BY id DESC")
+    c.execute("SELECT id, name, mobile, address, engineer, salesman, status, selections_json, total_sqft, total_boxes, created_at, branch FROM customers_master ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
     
@@ -68,18 +76,19 @@ def get_all_customers_db():
             "selections": sels,
             "total_sqft": r[8],
             "total_boxes": r[9],
-            "created_at": r[10]
+            "created_at": r[10],
+            "branch": r[11] if len(r) > 11 and r[11] else "Hiriyur"
         })
     return clients
 
-def insert_new_customer(name, mobile, address, engineer, salesman):
+def insert_new_customer(name, mobile, address, engineer, salesman, branch):
     conn = get_db()
     c = conn.cursor()
     now_str = datetime.now().strftime("%d-%m-%Y %H:%M")
     c.execute("""
-        INSERT INTO customers_master (name, mobile, address, engineer, salesman, status, selections_json, total_sqft, total_boxes, created_at)
-        VALUES (?, ?, ?, ?, ?, 'SELECTION ONLY', '[]', 0.0, 0.0, ?)
-    """, (name, mobile, address, engineer, salesman, now_str))
+        INSERT INTO customers_master (name, mobile, address, engineer, salesman, branch, status, selections_json, total_sqft, total_boxes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'SELECTION ONLY', '[]', 0.0, 0.0, ?)
+    """, (name, mobile, address, engineer, salesman, branch, now_str))
     new_id = c.lastrowid
     conn.commit()
     conn.close()
@@ -90,6 +99,7 @@ def insert_new_customer(name, mobile, address, engineer, salesman):
         "address": address,
         "engineer": engineer,
         "salesman": salesman,
+        "branch": branch,
         "status": "SELECTION ONLY",
         "selections": [],
         "total_sqft": 0.0,
@@ -103,7 +113,7 @@ def update_customer_db(cust_dict):
     sels_json = json.dumps(cust_dict.get("selections", []), ensure_ascii=False)
     c.execute("""
         UPDATE customers_master 
-        SET name = ?, mobile = ?, address = ?, engineer = ?, salesman = ?, status = ?, selections_json = ?, total_sqft = ?, total_boxes = ?
+        SET name = ?, mobile = ?, address = ?, engineer = ?, salesman = ?, branch = ?, status = ?, selections_json = ?, total_sqft = ?, total_boxes = ?
         WHERE id = ?
     """, (
         cust_dict.get("name"),
@@ -111,6 +121,7 @@ def update_customer_db(cust_dict):
         cust_dict.get("address"),
         cust_dict.get("engineer"),
         cust_dict.get("salesman"),
+        cust_dict.get("branch", "Hiriyur"),
         cust_dict.get("status", "SELECTION ONLY"),
         sels_json,
         float(cust_dict.get("total_sqft", 0.0)),
@@ -202,7 +213,7 @@ def generate_pdf_quotation(customer_info, items_list):
     
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 15)
-    pdf.cell(0, 8, "JAY GRANITE & TILES", ln=True, align="C")
+    pdf.cell(0, 8, f"JAY GRANITE & TILES - {customer_info.get('branch', 'HIRIYUR').upper()} SHOWROOM", ln=True, align="C")
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(0, 5, "Tile Selection & Final BOQ Estimate", ln=True, align="C")
     pdf.ln(7)
@@ -212,7 +223,7 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.cell(100, 6, f"Customer: {customer_info.get('name', 'Walk-in')}", ln=False)
     pdf.cell(0, 6, f"Date: {datetime.now().strftime('%d-%m-%Y')}", ln=True, align="R")
     pdf.cell(100, 6, f"Mobile: {customer_info.get('mobile', '-')}", ln=False)
-    pdf.cell(0, 6, f"Staff: {customer_info.get('salesman', 'Admin')}", ln=True, align="R")
+    pdf.cell(0, 6, f"Staff: {customer_info.get('salesman', 'Admin')} ({customer_info.get('branch', 'Hiriyur')})", ln=True, align="R")
     pdf.ln(4)
     
     pdf.set_fill_color(240, 240, 240)
@@ -256,6 +267,8 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 if "role" not in st.session_state:
     st.session_state.role = "salesman"
+if "branch" not in st.session_state:
+    st.session_state.branch = "Hiriyur"
 if "current_customer" not in st.session_state:
     st.session_state.current_customer = None
 
@@ -269,6 +282,12 @@ if not st.session_state.auth:
         st.subheader("🔐 Staff Sign In")
         with st.form("login_form"):
             role_type = st.radio("Account Role", ["Salesman", "Admin"], horizontal=True)
+            
+            if role_type == "Salesman":
+                branch_choice = st.selectbox("Select Branch / Showroom", ["Hiriyur", "Davangere"])
+            else:
+                branch_choice = st.selectbox("Select View / Showroom", ["All Showrooms", "Hiriyur", "Davangere"])
+                
             u = st.text_input("Username").strip()
             p = st.text_input("Password", type="password").strip()
             submit = st.form_submit_button("🚀 Sign In", type="primary", use_container_width=True)
@@ -278,11 +297,13 @@ if not st.session_state.auth:
                     st.session_state.auth = True
                     st.session_state.username = u if u else "DEEPCHAND JAIN"
                     st.session_state.role = "admin"
+                    st.session_state.branch = branch_choice
                     st.rerun()
                 elif u and p:
                     st.session_state.auth = True
                     st.session_state.username = u
                     st.session_state.role = "salesman"
+                    st.session_state.branch = branch_choice
                     st.rerun()
                 else:
                     st.error("Credentials enter karein.")
@@ -291,6 +312,16 @@ if not st.session_state.auth:
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.title(f"👤 {st.session_state.username.upper()}")
 st.sidebar.markdown(f"**Role:** `{st.session_state.role.upper()}`")
+
+if st.session_state.role == "admin":
+    st.session_state.branch = st.sidebar.selectbox(
+        "🏢 Active Showroom View",
+        ["All Showrooms", "Hiriyur", "Davangere"],
+        index=["All Showrooms", "Hiriyur", "Davangere"].index(st.session_state.branch)
+    )
+else:
+    st.sidebar.markdown(f"**🏢 Showroom:** `{st.session_state.branch}`")
+
 if st.sidebar.button("🚪 Sign Out", use_container_width=True):
     st.session_state.auth = False
     st.session_state.current_customer = None
@@ -299,7 +330,8 @@ if st.sidebar.button("🚪 Sign Out", use_container_width=True):
 nav_list = [
     "1️⃣ Customer Registration & History",
     "2️⃣ Tile Selection (Showroom)",
-    "3️⃣ Sq.Ft Entry & Final Estimate"
+    "3️⃣ Sq.Ft Entry & Final Estimate",
+    "📈 Salesman Progress Report"
 ]
 if st.session_state.role == "admin":
     nav_list.extend(["📊 Executive Dashboard", "⚙️ Stock Master & Settings"])
@@ -312,7 +344,15 @@ if nav == "1️⃣ Customer Registration & History":
     st.title("👥 Customer Registration & Selection History")
     
     all_clients = get_all_customers_db()
-    tab_new, tab_existing = st.tabs(["➕ Register New Customer", f"📂 Active / Draft Customers ({len(all_clients)} Total)"])
+    # Filter for salesman
+    if st.session_state.role == "salesman":
+        filtered_clients = [c for c in all_clients if c.get("branch") == st.session_state.branch]
+    elif st.session_state.branch != "All Showrooms":
+        filtered_clients = [c for c in all_clients if c.get("branch") == st.session_state.branch]
+    else:
+        filtered_clients = all_clients
+
+    tab_new, tab_existing = st.tabs(["➕ Register New Customer", f"📂 Active / Draft Customers ({len(filtered_clients)} in {st.session_state.branch})"])
     
     with tab_new:
         with st.form("new_cust_form"):
@@ -321,20 +361,24 @@ if nav == "1️⃣ Customer Registration & History":
             c_site = st.text_area("Site Address / City")
             c_eng = st.text_input("Contractor / Architect Name (Optional)")
             
+            # Showroom assignment
+            assigned_branch = st.session_state.branch if st.session_state.branch != "All Showrooms" else "Hiriyur"
+            st.info(f"Showroom Branch: **{assigned_branch}**")
+            
             if st.form_submit_button("💾 Save Customer & Start Selection", type="primary"):
                 if c_name.strip() and c_mob.strip():
-                    new_cust = insert_new_customer(c_name.strip(), c_mob.strip(), c_site.strip(), c_eng.strip(), st.session_state.username)
+                    new_cust = insert_new_customer(c_name.strip(), c_mob.strip(), c_site.strip(), c_eng.strip(), st.session_state.username, assigned_branch)
                     st.session_state.current_customer = new_cust
                     st.success(f"🎉 Customer **{c_name}** (#ID: {new_cust['id']}) register ho gaya! Sidebar se **'2️⃣ Tile Selection'** par jayein.")
                 else:
                     st.error("Customer Name aur Mobile zaroori hai.")
 
     with tab_existing:
-        if all_clients:
+        if filtered_clients:
             st.markdown(f"#### 🔍 Customer List:")
             client_options = {
-                f"#{c['id']} | {c['name']} | 📱 {c['mobile']} | 🏷️ {len(c.get('selections', []))} Items [{c.get('status', 'SELECTION ONLY')}]": c 
-                for c in all_clients
+                f"#{c['id']} | {c['name']} | 📱 {c['mobile']} | 🏢 {c.get('branch', 'Hiriyur')} | 🏷️ {len(c.get('selections', []))} Items [{c.get('status', 'SELECTION ONLY')}]": c 
+                for c in filtered_clients
             }
             selected_label = st.selectbox("Customer Chuniye", list(client_options.keys()))
             chosen_cust = client_options[selected_label]
@@ -344,6 +388,7 @@ if nav == "1️⃣ Customer Registration & History":
                 st.write(f"**Customer ID:** `#{chosen_cust['id']}`")
                 st.write(f"**Name:** {chosen_cust['name']}")
                 st.write(f"**Mobile:** {chosen_cust['mobile']}")
+                st.write(f"**Showroom:** `{chosen_cust.get('branch', 'Hiriyur')}`")
                 st.write(f"**Registered By:** `{chosen_cust.get('salesman', 'Admin')}`")
             with c_info2:
                 st.write(f"**Status:** `{chosen_cust.get('status', 'SELECTION ONLY')}`")
@@ -373,7 +418,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         
     curr_c = st.session_state.current_customer
     st.title("🏷️ Showroom Tile Selection")
-    st.info(f"👤 Active Client: **{curr_c['name']}** (#{curr_c['id']} - {curr_c['mobile']}) | 👔 Staff: **{curr_c.get('salesman', st.session_state.username)}** | 📦 Catalog: **{len(master_df)} Tiles**")
+    st.info(f"👤 Active Client: **{curr_c['name']}** (#{curr_c['id']} - {curr_c['mobile']}) | 🏢 Branch: **{curr_c.get('branch', 'Hiriyur')}** | 👔 Staff: **{curr_c.get('salesman', st.session_state.username)}** | 📦 Catalog: **{len(master_df)} Tiles**")
     
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -445,7 +490,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         
     curr_c = st.session_state.current_customer
     st.title("📐 Direct Sq.Ft & Box Calculation")
-    st.info(f"👤 Active Client: **{curr_c['name']}** (#{curr_c['id']} - {curr_c['mobile']}) | 🏷️ Status: `{curr_c.get('status', 'SELECTION ONLY')}`")
+    st.info(f"👤 Active Client: **{curr_c['name']}** (#{curr_c['id']} - {curr_c['mobile']}) | 🏢 Branch: `{curr_c.get('branch', 'Hiriyur')}` | 🏷️ Status: `{curr_c.get('status', 'SELECTION ONLY')}`")
     
     saved_items = curr_c.get("selections", [])
     
@@ -525,10 +570,11 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     k2.metric("Total Area", f"{tot_sq:.2f} Sq.Ft")
     k3.metric("Total Required Boxes", f"{tot_bx:.0f} Boxes")
     
-    wa_msg = f"🏛️ *JAY GRANITE & TILES - ESTIMATE & BOQ*\n\n"
+    wa_msg = f"🏛️ *JAY GRANITE & TILES - {curr_c.get('branch', 'HIRIYUR').upper()} SHOWROOM*\n"
+    wa_msg += f"ESTIMATE & BOQ QUOTATION\n\n"
     wa_msg += f"👤 *Client Name:* {curr_c['name']}\n"
     wa_msg += f"📱 *Mobile:* {curr_c['mobile']}\n"
-    wa_msg += f"👔 *Staff:* {curr_c.get('salesman', 'Admin')}\n"
+    wa_msg += f"👔 *Staff:* {curr_c.get('salesman', 'Admin')} ({curr_c.get('branch', 'Hiriyur')})\n"
     wa_msg += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     for it in curr_c["selections"]:
@@ -536,7 +582,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         wa_msg += f"   • Tile: {it['tile']}\n"
         wa_msg += f"   • Area: {it['sqft']:.2f} Sq.Ft\n"
         wa_msg += f"   • Required: *{it['boxes']:.0f} Boxes*\n"
-        wa_msg += f"   • Enter Physical Stock: [          ]\n\n"
+        wa_msg += f"   • Enter Physical Stock: [         ]\n\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     wa_msg += f"📊 *Grand Total Area:* {tot_sq:.2f} Sq.Ft\n"
     wa_msg += f"📦 *Grand Total Boxes:* {tot_bx:.0f} Boxes\n\n"
@@ -573,21 +619,93 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             st.success(f"🎉 **{curr_c['name']}** finalize ho gaya! Screen agle customer ke liye clear hai.")
             st.rerun()
 
-# --- PAGE 4: EXECUTIVE DASHBOARD ---
+# --- PAGE 4: SALESMAN PROGRESS REPORT ---
+elif nav == "📈 Salesman Progress Report":
+    st.title("📈 Salesman Progress & Performance Tracking")
+    all_clients = get_all_customers_db()
+    
+    curr_user = st.session_state.username
+    curr_role = st.session_state.role
+    curr_branch = st.session_state.branch
+
+    if curr_role == "salesman":
+        my_clients = [c for c in all_clients if c.get("salesman", "").lower() == curr_user.lower()]
+        st.info(f"👤 Salesman: **{curr_user}** | 🏢 Showroom: **{curr_branch}**")
+        
+        my_total_quotes = len(my_clients)
+        my_finalized = sum(1 for c in my_clients if c.get("status") == "FINALIZED")
+        my_total_boxes = sum(float(c.get("total_boxes", 0.0)) for c in my_clients)
+        target_boxes = 1500.0
+        progress_pct = min(100, int((my_total_boxes / target_boxes) * 100))
+
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("My Total Clients", my_total_quotes)
+        s2.metric("Final Deals Closed", my_finalized)
+        s3.metric("Total Boxes Estimated", f"{my_total_boxes:,.0f}")
+        s4.metric("Monthly Target", f"{progress_pct}%")
+
+        st.write("🎯 **Monthly Target Progress:**")
+        st.progress(progress_pct / 100)
+        
+        st.subheader("📋 My Recent Customer History")
+        my_records = []
+        for c in my_clients:
+            my_records.append({
+                "ID": f"#{c['id']}",
+                "Customer": c['name'],
+                "Mobile": c['mobile'],
+                "Status": c.get('status', 'SELECTION ONLY'),
+                "Tiles": len(c.get('selections', [])),
+                "Boxes": f"{float(c.get('total_boxes', 0)):.0f}",
+                "Date": c.get('created_at', '-')
+            })
+        if my_records:
+            st.dataframe(pd.DataFrame(my_records), use_container_width=True)
+        else:
+            st.caption("Aapka koi customer data abhi record nahi hua hai.")
+
+    else:
+        # Admin View for Salesman Progress
+        st.subheader(f"📊 All Staff Performance ({curr_branch})")
+        df_clients = pd.DataFrame(all_clients)
+        if not df_clients.empty:
+            if curr_branch != "All Showrooms":
+                df_clients = df_clients[df_clients["branch"] == curr_branch]
+            
+            if not df_clients.empty:
+                summary = df_clients.groupby(["salesman", "branch"]).agg(
+                    Total_Clients=("id", "count"),
+                    Total_Boxes=("total_boxes", "sum"),
+                    Total_SqFt=("total_sqft", "sum")
+                ).reset_index()
+                st.dataframe(summary, use_container_width=True)
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.caption("📊 **Clients by Salesman**")
+                    st.bar_chart(data=summary, x="salesman", y="Total_Clients")
+                with c2:
+                    st.caption("📦 **Boxes Estimated by Salesman**")
+                    st.bar_chart(data=summary, x="salesman", y="Total_Boxes")
+            else:
+                st.info(f"{curr_branch} showroom mein abhi koi data nahi hai.")
+
+# --- PAGE 5: EXECUTIVE DASHBOARD ---
 elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
-    st.title("📊 Executive Business & Salesman Performance Dashboard")
+    st.title("📊 Executive Business & Showroom Comparison Dashboard")
     all_clients = get_all_customers_db()
     
     if not all_clients:
         st.info("Abhi koi customer data record nahi hua hai.")
         st.stop()
-        
-    total_customers = len(all_clients)
-    draft_count = sum(1 for c in all_clients if c.get("status") == "SELECTION ONLY" and len(c.get("selections", [])) > 0)
-    final_count = sum(1 for c in all_clients if c.get("status") == "FINALIZED")
+
+    curr_branch = st.session_state.branch
+    view_clients = all_clients if curr_branch == "All Showrooms" else [c for c in all_clients if c.get("branch") == curr_branch]
     
-    total_sqft_business = sum(float(c.get("total_sqft", 0)) for c in all_clients)
-    total_boxes_business = sum(float(c.get("total_boxes", 0)) for c in all_clients)
+    total_customers = len(view_clients)
+    draft_count = sum(1 for c in view_clients if c.get("status") == "SELECTION ONLY" and len(c.get("selections", [])) > 0)
+    final_count = sum(1 for c in view_clients if c.get("status") == "FINALIZED")
+    total_boxes_business = sum(float(c.get("total_boxes", 0)) for c in view_clients)
     
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("👥 Total Customers", total_customers)
@@ -596,54 +714,37 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
     m4.metric("📦 Total Required Boxes", f"{total_boxes_business:,.0f}")
     
     st.divider()
-    d_tab1, d_tab2, d_tab3 = st.tabs(["👔 Salesman Performance Report", "📋 Customer Status Log", "📦 Item-wise Selection Frequency"])
+    d_tab1, d_tab2, d_tab3 = st.tabs(["🏢 Showroom vs Showroom Comparison", "📋 Customer Status Log", "📦 Item-wise Selection Frequency"])
     
     with d_tab1:
-        st.subheader("👔 Staff / Salesman Productivity Matrix")
-        salesman_records = []
-        for c in all_clients:
-            s_name = c.get("salesman", "Admin")
-            items_count = len(c.get("selections", []))
-            sqft = float(c.get("total_sqft", 0.0))
-            boxes = float(c.get("total_boxes", 0.0))
-            is_final = 1 if c.get("status") == "FINALIZED" else 0
-            is_draft = 1 if c.get("status") == "SELECTION ONLY" and items_count > 0 else 0
+        st.subheader("🏢 Showroom Business Comparison (Hiriyur vs Davangere)")
+        df_all = pd.DataFrame(all_clients)
+        if "branch" in df_all.columns:
+            branch_summary = df_all.groupby("branch").agg(
+                Total_Customers=("id", "count"),
+                Total_SqFt=("total_sqft", "sum"),
+                Total_Boxes=("total_boxes", "sum")
+            ).reset_index()
             
-            salesman_records.append({
-                "salesman": s_name,
-                "clients": 1,
-                "draft_selections": is_draft,
-                "final_deals": is_final,
-                "total_tiles_selected": items_count,
-                "total_sqft": sqft,
-                "total_boxes": boxes
-            })
-            
-        if salesman_records:
-            df_sales = pd.DataFrame(salesman_records)
-            summary_salesman = df_sales.groupby("salesman").agg({
-                "clients": "count",
-                "draft_selections": "sum",
-                "final_deals": "sum",
-                "total_tiles_selected": "sum",
-                "total_sqft": "sum",
-                "total_boxes": "sum"
-            }).reset_index()
-            
-            st.dataframe(summary_salesman.rename(columns={
-                "salesman": "Salesman Name",
-                "clients": "Total Clients",
-                "draft_selections": "Selections Pending",
-                "final_deals": "Finalized Quotes",
-                "total_tiles_selected": "Total Tiles Selected",
-                "total_sqft": "Total Sq.Ft",
-                "total_boxes": "Total Boxes"
+            st.dataframe(branch_summary.rename(columns={
+                "branch": "Showroom Branch",
+                "Total_Customers": "Total Footfall / Customers",
+                "Total_SqFt": "Total Sq.Ft",
+                "Total_Boxes": "Total Boxes"
             }), use_container_width=True)
+            
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                st.caption("📈 **Customer Footfall by Branch**")
+                st.bar_chart(data=branch_summary, x="branch", y="Total_Customers")
+            with col_b2:
+                st.caption("📦 **Total Estimated Boxes by Branch**")
+                st.bar_chart(data=branch_summary, x="branch", y="Total_Boxes")
             
     with d_tab2:
         st.subheader("📋 Customer Deal Lifecycle Status")
         cust_list_view = []
-        for c in all_clients:
+        for c in view_clients:
             it_cnt = len(c.get("selections", []))
             sq = float(c.get("total_sqft", 0.0))
             bx = float(c.get("total_boxes", 0.0))
@@ -651,6 +752,7 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
                 "ID": f"#{c.get('id')}",
                 "Customer": c.get("name"),
                 "Mobile": c.get("mobile"),
+                "Branch": c.get("branch", "Hiriyur"),
                 "Salesman": c.get("salesman", "Admin"),
                 "Status": f"🟢 FINALIZED" if c.get("status") == "FINALIZED" else "🟡 SELECTION ONLY",
                 "Items Selected": it_cnt,
@@ -663,7 +765,7 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
     with d_tab3:
         st.subheader("📦 Most Selected Tiles (Demand Analysis)")
         all_items_flat = []
-        for c in all_clients:
+        for c in view_clients:
             for it in c.get("selections", []):
                 all_items_flat.append(it.get("tile"))
         if all_items_flat:
@@ -673,7 +775,7 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
         else:
             st.caption("No selections data available.")
 
-# --- PAGE 5: STOCK MASTER ---
+# --- PAGE 6: STOCK MASTER ---
 elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin":
     st.title("⚙️ Live Stock Master (Google Sheet Linked)")
     st.info(f"Loaded **{len(master_df)} Tiles** directly from Google Sheet.")
