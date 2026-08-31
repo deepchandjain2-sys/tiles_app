@@ -136,46 +136,64 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- UNIVERSAL GOOGLE SHEET LOADER (COLUMN H × COLUMN I) ---
+# --- UNIVERSAL GOOGLE SHEET LOADER (EXACT HEADER MATCH FIX) ---
 @st.cache_data(ttl=5)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
         h_idx = 0
         for i in range(min(15, len(raw_df))):
-            row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
-            if any("ITEM NAME" in s for s in row_vals) or any("ITEM" in s for s in row_vals):
+            row_vals = [str(x).upper().strip() for x in raw_df.iloc[i].values if pd.notna(x)]
+            if "ITEM NAME" in row_vals:
                 h_idx = i
                 break
                 
+        headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
         data_rows = raw_df.iloc[h_idx + 1:].copy()
-        parsed_stock = []
         
+        item_col = 0
+        cf_col = None
+        pu_col = None
+        
+        # EXACT Match lagaya hai taaki galti se 'CON FACTOR TYPE' na uth jaye
+        for idx, h in enumerate(headers):
+            if h == "ITEM NAME":
+                item_col = idx
+            elif h == "CON FACTOR":  # Sirf aur sirf exact H column match hoga
+                cf_col = idx
+            elif "PACKING" in h:
+                pu_col = idx
+
+        # Agar header naam match na ho, tab hi default 7 aur 8 lega
+        if cf_col is None: cf_col = 7
+        if pu_col is None: pu_col = 8
+
+        parsed_stock = []
         for _, r in data_rows.iterrows():
-            # Column A (Index 0) = Item Name
-            item_name = str(r.iloc[0]).strip() if len(r) > 0 and pd.notna(r.iloc[0]) else ""
+            if item_col >= len(r) or not pd.notna(r.iloc[item_col]): 
+                continue
+            item_name = str(r.iloc[item_col]).strip()
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Column H (Index 7) = Con Factor
+            # Con Factor
             cf_val = 1.0
-            if len(r) > 7 and pd.notna(r.iloc[7]):
+            if cf_col < len(r) and pd.notna(r.iloc[cf_col]):
                 try:
-                    cf_val = float(str(r.iloc[7]).replace(',', '').strip())
+                    cf_val = float(str(r.iloc[cf_col]).replace(',', '').strip())
                 except Exception:
                     cf_val = 1.0
             if cf_val <= 0: cf_val = 1.0
 
-            # Column I (Index 8) = Packing Unit
+            # Packing Unit
             pu_val = 1.0
-            if len(r) > 8 and pd.notna(r.iloc[8]):
+            if pu_col < len(r) and pd.notna(r.iloc[pu_col]):
                 try:
-                    pu_val = float(str(r.iloc[8]).replace(',', '').strip())
+                    pu_val = float(str(r.iloc[pu_col]).replace(',', '').strip())
                 except Exception:
                     pu_val = 1.0
             if pu_val <= 0: pu_val = 1.0
                 
-            # Universal Box Coverage = Con Factor (Col H) * Packing Unit (Col I)
             box_cov = round(cf_val * pu_val, 2)
             parsed_stock.append({
                 "item_name": item_name,
