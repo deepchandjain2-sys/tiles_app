@@ -187,6 +187,21 @@ def get_master_df():
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
     return pd.DataFrame()
+def calculate_box_sqft(cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        return round(cov, 2) if cov > 0 else 1.0
+    except Exception:
+        return 1.0
+
+def calculate_boxes(sqft, cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        if cov <= 0:
+            cov = 1.0
+        return math.ceil(float(sqft) / cov)
+    except Exception:
+        return 0    
 def calculate_boxes(sqft, cf, pu):
     try:
         cov = float(cf) * float(pu)
