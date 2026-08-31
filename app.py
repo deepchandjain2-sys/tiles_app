@@ -153,54 +153,43 @@ def calculate_boxes(sqft, cf, pu):
     except Exception:
         return 0
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER (EXACT COLUMN H & I) ---
+# --- DIRECT GOOGLE SHEET STOCK LOADER (DIRECT INDEX 7 & 8) ---
 @st.cache_data(ttl=5)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
+        
+        # Data rows row index 1 (yani 2nd row) se shuru hoti hain
         h_idx = 0
-        for i in range(min(15, len(raw_df))):
+        for i in range(min(10, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
             if any("ITEM NAME" in s for s in row_vals):
                 h_idx = i
                 break
                 
-        headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
         data_rows = raw_df.iloc[h_idx + 1:].copy()
-        
-        item_col = 0
-        cf_col = None
-        pu_col = None
-        
-        for idx, h in enumerate(headers):
-            if "ITEM" in h:
-                item_col = idx
-            elif "CON FACTOR" in h:
-                if cf_col is None:
-                    cf_col = idx
-            elif "PACKING" in h:
-                pu_col = idx
-
         parsed_stock = []
+        
         for _, r in data_rows.iterrows():
-            item_name = str(r.iloc[item_col]).strip() if len(r) > item_col and pd.notna(r.iloc[item_col]) else ""
+            # Column A (Index 0) = Item Name
+            item_name = str(r.iloc[0]).strip() if len(r) > 0 and pd.notna(r.iloc[0]) else ""
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Con Factor (Column H)
+            # Column H (Index 7) = Con Factor
             cf_val = 1.0
-            if cf_col is not None and len(r) > cf_col and pd.notna(r.iloc[cf_col]):
+            if len(r) > 7 and pd.notna(r.iloc[7]):
                 try:
-                    cf_val = float(str(r.iloc[cf_col]).replace(',', '').strip())
+                    cf_val = float(str(r.iloc[7]).replace(',', '').strip())
                 except Exception:
                     cf_val = 1.0
             if cf_val <= 0: cf_val = 1.0
 
-            # Packing Unit (Column I)
+            # Column I (Index 8) = Packing Unit
             pu_val = 1.0
-            if pu_col is not None and len(r) > pu_col and pd.notna(r.iloc[pu_col]):
+            if len(r) > 8 and pd.notna(r.iloc[8]):
                 try:
-                    pu_val = float(str(r.iloc[pu_col]).replace(',', '').strip())
+                    pu_val = float(str(r.iloc[8]).replace(',', '').strip())
                 except Exception:
                     pu_val = 1.0
             if pu_val <= 0: pu_val = 1.0
@@ -218,9 +207,7 @@ def get_master_df():
             return df
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
-    return pd.DataFrame()
-
-# --- PDF GENERATOR ---
+    return pd.DataFrame()# --- PDF GENERATOR ---
 def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
     pdf.add_page()
