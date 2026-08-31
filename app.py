@@ -688,7 +688,7 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
         st.stop()
 
     curr_branch = st.session_state.branch
-    view_clients = all_clients if curr_branch == "All Showrooms" else [c for c in all_clients if c.get("branch"] == curr_branch]
+    view_clients = all_clients if curr_branch == "All Showrooms" else [c for c in all_clients if c.get("branch") == curr_branch]
     total_customers = len(view_clients)
     draft_count = sum(1 for c in view_clients if c.get("status") == "SELECTION ONLY" and len(c.get("selections", [])) > 0)
     final_count = sum(1 for c in view_clients if c.get("status") == "FINALIZED")
