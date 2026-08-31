@@ -136,13 +136,13 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER (EXACT COLUMN H & I INDEX FIX) ---
+# --- DIRECT GOOGLE SHEET STOCK LOADER (HEADER NAME MATCHING) ---
 @st.cache_data(ttl=5)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
         
-        # Row 1 (Index 0 ya 1) ke baad data shuru hota hai
+        # Header row (ITEM NAME, CON FACTOR, PACKING UNIT) dhoondhein
         h_idx = 0
         for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
@@ -150,28 +150,46 @@ def get_master_df():
                 h_idx = i
                 break
                 
+        headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
         data_rows = raw_df.iloc[h_idx + 1:].copy()
-        parsed_stock = []
         
+        # Columns ke exact index pata lagayein
+        item_col = 0
+        cf_col = None
+        pu_col = None
+        
+        for idx, h in enumerate(headers):
+            if "ITEM" in h:
+                item_col = idx
+            elif "CON FACTOR" in h:
+                if cf_col is None:  # Pehla wala Con Factor (Column H)
+                    cf_col = idx
+            elif "PACKING" in h:
+                pu_col = idx
+
+        parsed_stock = []
         for _, r in data_rows.iterrows():
-            # Column A (Index 0) = Item Name
-            item_name = str(r.iloc[0]).strip() if len(r) > 0 and pd.notna(r.iloc[0]) else ""
+            item_name = str(r.iloc[item_col]).strip() if len(r) > item_col and pd.notna(r.iloc[item_col]) else ""
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Column H (Index 7) = Con Factor
-            try:
-                cf_val = float(str(r.iloc[7]).replace(',', '').strip()) if len(r) > 7 and pd.notna(r.iloc[7]) else 1.0
-                if cf_val <= 0: cf_val = 1.0
-            except Exception:
-                cf_val = 1.0
+            # Con Factor (Column H)
+            cf_val = 1.0
+            if cf_col is not None and len(r) > cf_col and pd.notna(r.iloc[cf_col]):
+                try:
+                    cf_val = float(str(r.iloc[cf_col]).replace(',', '').strip())
+                except Exception:
+                    cf_val = 1.0
+            if cf_val <= 0: cf_val = 1.0
 
-            # Column I (Index 8) = Packing Unit
-            try:
-                pu_val = float(str(r.iloc[8]).replace(',', '').strip()) if len(r) > 8 and pd.notna(r.iloc[8]) else 1.0
-                if pu_val <= 0: pu_val = 1.0
-            except Exception:
-                pu_val = 1.0
+            # Packing Unit (Column I)
+            pu_val = 1.0
+            if pu_col is not None and len(r) > pu_col and pd.notna(r.iloc[pu_col]):
+                try:
+                    pu_val = float(str(r.iloc[pu_col]).replace(',', '').strip())
+                except Exception:
+                    pu_val = 1.0
+            if pu_val <= 0: pu_val = 1.0
                 
             box_cov = round(cf_val * pu_val, 2)
             parsed_stock.append({
@@ -187,30 +205,6 @@ def get_master_df():
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
     return pd.DataFrame()
-def calculate_box_sqft(cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        return round(cov, 2) if cov > 0 else 1.0
-    except Exception:
-        return 1.0
-
-def calculate_boxes(sqft, cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        if cov <= 0:
-            cov = 1.0
-        return math.ceil(float(sqft) / cov)
-    except Exception:
-        return 0    
-def calculate_boxes(sqft, cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        if cov <= 0:
-            cov = 1.0
-        return math.ceil(float(sqft) / cov)
-    except Exception:
-        return 0
-
 # --- PDF GENERATOR ---
 def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
