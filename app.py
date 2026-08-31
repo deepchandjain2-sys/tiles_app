@@ -17,47 +17,27 @@ st.set_page_config(
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 DB_FILE = "jay_granite_master.db"
 
-# --- SMART TILE SIZE DETECTION (Accurate CF & Packing) ---
+# --- SMART TILE SIZE DETECTION ---
 def auto_detect_tile_specs(item_name):
-    """
-    Automatic standard industry specs based on tile name dimensions.
-    Returns: (con_factor_sqft_per_piece, packing_unit_pieces)
-    """
     name = str(item_name).upper()
-    
-    # 2x4 feet (600x1200 mm) -> 8 sqft per pc, 2 pcs per box = 16 sqft/box
-    if "2X4" in name or "2*4" in name or "600X1200" in name or "60X120" in name:
+    if "ALFERDO" in name or ("4X6" in name and "9MM" in name):
+        return 23.25, 2.0
+    elif "2X4" in name or "2*4" in name or "600X1200" in name or "60X120" in name:
         return 8.0, 2.0
-    
-    # 2x2 feet (600x600 mm) -> 4 sqft per pc, 4 pcs per box = 16 sqft/box
     elif "2X2" in name or "2*2" in name or "600X600" in name:
         return 4.0, 4.0
-        
-    # 12x18 inch (1x1.5 feet) -> 1.5 sqft per pc, 6 pcs per box = 9 sqft/box
     elif "12X18" in name or "12*18" in name or "300X450" in name:
         return 1.5, 6.0
-        
-    # 16x16 inch -> 1.73 sqft per pc, 5 pcs per box = 8.65 sqft/box
     elif "16X16" in name or "16*16" in name:
         return 1.73, 5.0
-        
-    # 12x12 inch (1x1 foot) -> 1 sqft per pc, 10 pcs per box = 10 sqft/box
     elif "1X1" in name or "12X12" in name:
         return 1.0, 10.0
-        
-    # 2x1 feet (12x24 inch) -> 2 sqft per pc, 6 pcs per box = 12 sqft/box
     elif "2X1" in name or "12X24" in name or "300X600" in name:
         return 2.0, 6.0
-        
-    # 4x2 feet
     elif "4X2" in name or "4*2" in name:
         return 8.0, 2.0
-        
-    # 32x64 inch -> 14.22 sqft per pc, 2 pcs per box = 28.44 sqft/box
     elif "32X64" in name or "800X1600" in name:
         return 14.22, 2.0
-
-    # Default standard
     return 8.0, 2.0
 
 # --- SQLITE DATABASE ENGINE ---
@@ -84,7 +64,6 @@ def init_database():
         )
     """)
     conn.commit()
-    
     try:
         c.execute("ALTER TABLE customers_master ADD COLUMN branch TEXT DEFAULT 'Hiriyur'")
         conn.commit()
@@ -180,7 +159,7 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER (FIXED COLUMN MAPPING) ---
+# --- DIRECT GOOGLE SHEET STOCK LOADER ---
 @st.cache_data(ttl=15)
 def get_master_df():
     try:
@@ -195,7 +174,6 @@ def get_master_df():
         data_rows = raw_df.iloc[h_idx + 1:].copy()
         parsed_stock = []
         for _, r in data_rows.iterrows():
-            # Column B (Index 1) ya Column A (Index 0) jisme actual tile name ho
             item_name = ""
             for col_idx in [1, 0, 2]:
                 if len(r) > col_idx and pd.notna(r[col_idx]):
@@ -203,13 +181,10 @@ def get_master_df():
                     if val and val.upper() not in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", "PCS", "BOX", "BOXES"]:
                         item_name = val
                         break
-            
             if not item_name:
                 continue
             
             auto_cf, auto_pu = auto_detect_tile_specs(item_name)
-            
-            # Con factor extraction (Column E / Index 4)
             try:
                 cf_val = float(str(r[4]).replace(',', '').strip()) if len(r) > 4 and pd.notna(r[4]) else auto_cf
                 if cf_val <= 0 or cf_val == 1.0: 
@@ -217,7 +192,6 @@ def get_master_df():
             except Exception:
                 cf_val = auto_cf
                 
-            # Packing unit extraction (Column F / Index 5)
             try:
                 pu_val = float(str(r[5]).replace(',', '').strip()) if len(r) > 5 and pd.notna(r[5]) else auto_pu
                 if pu_val <= 0 or pu_val == 1.0: 
@@ -238,45 +212,15 @@ def get_master_df():
             return df
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
-        
     return pd.DataFrame()
-def auto_detect_tile_specs(item_name):
-    """
-    Automatic standard industry specs based on tile name dimensions.
-    Returns: (con_factor_sqft_per_piece, packing_unit_pieces)
-    """
-    name = str(item_name).upper()
-    
-    # 1. Custom exact match for ALFERDO BIANCO SPA 4X6
-    if "ALFERDO" in name or ("4X6" in name and "9MM" in name):
-        return 23.25, 2.0
-    
-    # 2x4 feet (600x1200 mm) -> 8 sqft per pc, 2 pcs per box = 16 sqft/box
-    elif "2X4" in name or "2*4" in name or "600X1200" in name or "60X120" in name:
-        return 8.0, 2.0
-    
-    # 2x2 feet (600x600 mm) -> 4 sqft per pc, 4 pcs per box = 16 sqft/box
-    elif "2X2" in name or "2*2" in name or "600X600" in name:
-        return 4.0, 4.0
-        
-    # 12x18 inch (1x1.5 feet) -> 1.5 sqft per pc, 6 pcs per box = 9 sqft/box
-    elif "12X18" in name or "12*18" in name or "300X450" in name:
-        return 1.5, 6.0
-        
-    # 16x16 inch -> 1.73 sqft per pc, 5 pcs per box = 8.65 sqft/box
-    elif "16X16" in name or "16*16" in name:
-        return 1.73, 5.0
-        
-    # 12x12 inch (1x1 foot) -> 1 sqft per pc, 10 pcs per box = 10 sqft/box
-    elif "1X1" in name or "12X12" in name:
-        return 1.0, 10.0
-        
-    # 2x1 feet (12x24 inch) -> 2 sqft per pc, 6 pcs per box = 12 sqft/box
-    elif "2X1" in name or "12X24" in name or "300X600" in name:
-        return 2.0, 6.0
-        
-    # Default standard fallback
-    return 8.0, 2.0
+
+def calculate_box_sqft(cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        return round(cov, 2) if cov > 0 else 16.0
+    except Exception:
+        return 16.0
+
 def calculate_boxes(sqft, cf, pu):
     try:
         cov = float(cf) * float(pu)
@@ -365,7 +309,6 @@ if not st.session_state.auth:
         st.subheader("🔐 Staff Sign In")
         with st.form("login_form"):
             role_type = st.radio("Account Role", ["Salesman", "Admin"], horizontal=True)
-            
             if role_type == "Salesman":
                 branch_choice = st.selectbox("Select Branch / Showroom", ["Hiriyur", "Davangere"])
             else:
@@ -422,10 +365,9 @@ if st.session_state.role == "admin":
 nav = st.sidebar.radio("Navigation Flow", nav_list)
 master_df = get_master_df()
 
-# --- PAGE 1: CUSTOMER REGISTRATION & RESUME ---
+# --- PAGE 1: CUSTOMER REGISTRATION & HISTORY ---
 if nav == "1️⃣ Customer Registration & History":
     st.title("👥 Customer Registration & Selection History")
-    
     all_clients = get_all_customers_db()
     if st.session_state.role == "salesman":
         filtered_clients = [c for c in all_clients if c.get("branch") == st.session_state.branch]
@@ -442,7 +384,6 @@ if nav == "1️⃣ Customer Registration & History":
             c_mob = st.text_input("Mobile Number *")
             c_site = st.text_area("Site Address / City")
             c_eng = st.text_input("Contractor / Architect Name (Optional)")
-            
             assigned_branch = st.session_state.branch if st.session_state.branch != "All Showrooms" else "Hiriyur"
             st.info(f"Showroom Branch: **{assigned_branch}**")
             
@@ -480,13 +421,13 @@ if nav == "1️⃣ Customer Registration & History":
             with b_load:
                 if st.button("📂 Load Selected Customer Profile", type="primary", use_container_width=True):
                     st.session_state.current_customer = chosen_cust
-                    st.success(f"**{chosen_cust['name']}** load ho gaya! Ab aap selection continue kar sakte hain ya measurement daal sakte hain.")
+                    st.success(f"**{chosen_cust['name']}** load ho gaya!")
             with b_del:
                 if st.button("🗑️ Delete Customer", type="secondary", use_container_width=True):
                     delete_customer_db(chosen_cust['id'])
                     if st.session_state.get("current_customer") and st.session_state.current_customer.get("id") == chosen_cust['id']:
                         st.session_state.current_customer = None
-                    st.success(f"Customer **{chosen_cust['name']}** permanently delete kar diya gaya hai!")
+                    st.success(f"Customer delete kar diya gaya hai!")
                     st.rerun()
         else:
             st.info("Abhi koi saved customer nahi hai.")
@@ -525,17 +466,10 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         
     chosen_tile = st.selectbox("Select Tile Item", filtered_df["item_name"].tolist())
     
-    # Accurate specs extraction
     matched_row = filtered_df[filtered_df["item_name"] == chosen_tile].iloc[0]
     auto_cf, auto_pu = auto_detect_tile_specs(chosen_tile)
     cf = float(matched_row.get("con_factor", auto_cf))
     pu = float(matched_row.get("packing_unit", auto_pu))
-   def calculate_box_sqft(cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        return round(cov, 2) if cov > 0 else 16.0
-    except Exception:
-        return 16.0       return 16.0
     box_cov = calculate_box_sqft(cf, pu)
     
     st.success(f"📐 **Tile Specs:** Con Factor (`{cf:.2f} Sq.Ft/Pc`) × Packing (`{pu:.0f} Pcs`) = **{box_cov:.2f} Sq.Ft / Box**")
@@ -582,7 +516,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     st.info(f"👤 Active Client: **{curr_c['name']}** (#{curr_c['id']} - {curr_c['mobile']}) | 🏢 Branch: `{curr_c.get('branch', 'Hiriyur')}` | 🏷️ Status: `{curr_c.get('status', 'SELECTION ONLY')}`")
     
     saved_items = curr_c.get("selections", [])
-    
     if not saved_items:
         st.warning("Is customer ke paas abhi koi tile item nahi hai.")
         st.stop()
@@ -599,8 +532,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     updated_items = []
     for it in saved_items:
         tile_name = it.get("tile")
-        
-        # Pull accurate specs
         auto_cf, auto_pu = auto_detect_tile_specs(tile_name)
         matched_tile = master_df[master_df["item_name"] == tile_name]
         if not matched_tile.empty:
@@ -616,7 +547,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         current_sqft = float(it.get("sqft", 100.0))
 
         c1, c2, c3, c4 = st.columns([5, 2.5, 2.5, 1.5])
-        
         with c1:
             st.markdown(f"**{it['area']}** ({it['floor']} - {it['surface']})")
             st.caption(f"🧱 *{tile_name}* \n*(1 Box = {cov_per_box:.2f} Sq.Ft | CF: {cf:.2f} Sq.Ft/Pc, Pack: {pu:.0f} Pcs)*")
@@ -630,7 +560,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
                 label_visibility="collapsed"
             )
             
-        # Standard Formula: ceil(Sq.Ft / Coverage per Box)
         calc_bx = math.ceil(new_sqft / cov_per_box)
         
         with c3:
@@ -685,8 +614,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         wa_msg += f"🔹 *{it['area']}* ({it['floor']} - {it['surface']})\n"
         wa_msg += f"   • Tile: {it['tile']}\n"
         wa_msg += f"   • Area: {it['sqft']:.2f} Sq.Ft\n"
-        wa_msg += f"   • Required: *{it['boxes']:.0f} Boxes*\n"
-        wa_msg += f"   • Enter Physical Stock: [         ]\n\n"
+        wa_msg += f"   • Required: *{it['boxes']:.0f} Boxes*\n\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
     wa_msg += f"📊 *Grand Total Area:* {tot_sq:.2f} Sq.Ft\n"
     wa_msg += f"📦 *Grand Total Boxes:* {tot_bx:.0f} Boxes\n\n"
@@ -720,14 +648,13 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             curr_c["total_boxes"] = tot_bx
             update_customer_db(curr_c)
             st.session_state.current_customer = None
-            st.success(f"🎉 **{curr_c['name']}** finalize ho gaya! Screen agle customer ke liye clear hai.")
+            st.success(f"🎉 **{curr_c['name']}** finalize ho gaya!")
             st.rerun()
 
 # --- PAGE 4: SALESMAN PROGRESS REPORT ---
 elif nav == "📈 Salesman Progress Report":
     st.title("📈 Salesman Progress & Performance Tracking")
     all_clients = get_all_customers_db()
-    
     curr_user = st.session_state.username
     curr_role = st.session_state.role
     curr_branch = st.session_state.branch
@@ -735,7 +662,6 @@ elif nav == "📈 Salesman Progress Report":
     if curr_role == "salesman":
         my_clients = [c for c in all_clients if c.get("salesman", "").lower() == curr_user.lower()]
         st.info(f"👤 Salesman: **{curr_user}** | 🏢 Showroom: **{curr_branch}**")
-        
         my_total_quotes = len(my_clients)
         my_finalized = sum(1 for c in my_clients if c.get("status") == "FINALIZED")
         my_total_boxes = sum(float(c.get("total_boxes", 0.0)) for c in my_clients)
@@ -750,32 +676,12 @@ elif nav == "📈 Salesman Progress Report":
 
         st.write("🎯 **Monthly Target Progress:**")
         st.progress(progress_pct / 100)
-        
-        st.subheader("📋 My Recent Customer History")
-        my_records = []
-        for c in my_clients:
-            my_records.append({
-                "ID": f"#{c['id']}",
-                "Customer": c['name'],
-                "Mobile": c['mobile'],
-                "Status": c.get('status', 'SELECTION ONLY'),
-                "Tiles": len(c.get('selections', [])),
-                "Boxes": f"{float(c.get('total_boxes', 0)):.0f}",
-                "Date": c.get('created_at', '-')
-            })
-        if my_records:
-            st.dataframe(pd.DataFrame(my_records), use_container_width=True)
-        else:
-            st.caption("Aapka koi customer data abhi record nahi hua hai.")
-
     else:
-        # Admin View for Salesman Progress
         st.subheader(f"📊 All Staff Performance ({curr_branch})")
         df_clients = pd.DataFrame(all_clients)
         if not df_clients.empty:
             if curr_branch != "All Showrooms":
                 df_clients = df_clients[df_clients["branch"] == curr_branch]
-            
             if not df_clients.empty:
                 summary = df_clients.groupby(["salesman", "branch"]).agg(
                     Total_Clients=("id", "count"),
@@ -783,29 +689,17 @@ elif nav == "📈 Salesman Progress Report":
                     Total_SqFt=("total_sqft", "sum")
                 ).reset_index()
                 st.dataframe(summary, use_container_width=True)
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.caption("📊 **Clients by Salesman**")
-                    st.bar_chart(data=summary, x="salesman", y="Total_Clients")
-                with c2:
-                    st.caption("📦 **Boxes Estimated by Salesman**")
-                    st.bar_chart(data=summary, x="salesman", y="Total_Boxes")
-            else:
-                st.info(f"{curr_branch} showroom mein abhi koi data nahi hai.")
 
 # --- PAGE 5: EXECUTIVE DASHBOARD ---
 elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
     st.title("📊 Executive Business & Showroom Comparison Dashboard")
     all_clients = get_all_customers_db()
-    
     if not all_clients:
         st.info("Abhi koi customer data record nahi hua hai.")
         st.stop()
 
     curr_branch = st.session_state.branch
     view_clients = all_clients if curr_branch == "All Showrooms" else [c for c in all_clients if c.get("branch") == curr_branch]
-    
     total_customers = len(view_clients)
     draft_count = sum(1 for c in view_clients if c.get("status") == "SELECTION ONLY" and len(c.get("selections", [])) > 0)
     final_count = sum(1 for c in view_clients if c.get("status") == "FINALIZED")
@@ -819,9 +713,7 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
     
     st.divider()
     d_tab1, d_tab2, d_tab3 = st.tabs(["🏢 Showroom vs Showroom Comparison", "📋 Customer Status Log", "📦 Item-wise Selection Frequency"])
-    
     with d_tab1:
-        st.subheader("🏢 Showroom Business Comparison (Hiriyur vs Davangere)")
         df_all = pd.DataFrame(all_clients)
         if "branch" in df_all.columns:
             branch_summary = df_all.groupby("branch").agg(
@@ -829,55 +721,24 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
                 Total_SqFt=("total_sqft", "sum"),
                 Total_Boxes=("total_boxes", "sum")
             ).reset_index()
-            
-            st.dataframe(branch_summary.rename(columns={
-                "branch": "Showroom Branch",
-                "Total_Customers": "Total Footfall / Customers",
-                "Total_SqFt": "Total Sq.Ft",
-                "Total_Boxes": "Total Boxes"
-            }), use_container_width=True)
-            
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                st.caption("📈 **Customer Footfall by Branch**")
-                st.bar_chart(data=branch_summary, x="branch", y="Total_Customers")
-            with col_b2:
-                st.caption("📦 **Total Estimated Boxes by Branch**")
-                st.bar_chart(data=branch_summary, x="branch", y="Total_Boxes")
-            
+            st.dataframe(branch_summary, use_container_width=True)
     with d_tab2:
-        st.subheader("📋 Customer Deal Lifecycle Status")
         cust_list_view = []
         for c in view_clients:
-            it_cnt = len(c.get("selections", []))
-            sq = float(c.get("total_sqft", 0.0))
-            bx = float(c.get("total_boxes", 0.0))
             cust_list_view.append({
                 "ID": f"#{c.get('id')}",
                 "Customer": c.get("name"),
                 "Mobile": c.get("mobile"),
                 "Branch": c.get("branch", "Hiriyur"),
-                "Salesman": c.get("salesman", "Admin"),
-                "Status": f"🟢 FINALIZED" if c.get("status") == "FINALIZED" else "🟡 SELECTION ONLY",
-                "Items Selected": it_cnt,
-                "Total Sq.Ft": f"{sq:.2f}",
-                "Required Boxes": f"{bx:.0f}",
-                "Date": c.get("created_at", "-")
+                "Status": c.get("status", "SELECTION ONLY")
             })
         st.dataframe(pd.DataFrame(cust_list_view), use_container_width=True)
-
     with d_tab3:
-        st.subheader("📦 Most Selected Tiles (Demand Analysis)")
-        all_items_flat = []
-        for c in view_clients:
-            for it in c.get("selections", []):
-                all_items_flat.append(it.get("tile"))
+        all_items_flat = [it.get("tile") for c in view_clients for it in c.get("selections", [])]
         if all_items_flat:
             freq_df = pd.Series(all_items_flat).value_counts().reset_index()
             freq_df.columns = ["Tile Item Name", "Times Selected"]
             st.dataframe(freq_df, use_container_width=True)
-        else:
-            st.caption("No selections data available.")
 
 # --- PAGE 6: STOCK MASTER ---
 elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin":
