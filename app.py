@@ -180,7 +180,7 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER ---
+# --- DIRECT GOOGLE SHEET STOCK LOADER (FIXED COLUMN MAPPING) ---
 @st.cache_data(ttl=15)
 def get_master_df():
     try:
@@ -195,13 +195,21 @@ def get_master_df():
         data_rows = raw_df.iloc[h_idx + 1:].copy()
         parsed_stock = []
         for _, r in data_rows.iterrows():
-            item_name = str(r[1]).strip() if len(r) > 1 and pd.notna(r[1]) else str(r[0]).strip()
-            if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
+            # Column B (Index 1) ya Column A (Index 0) jisme actual tile name ho
+            item_name = ""
+            for col_idx in [1, 0, 2]:
+                if len(r) > col_idx and pd.notna(r[col_idx]):
+                    val = str(r[col_idx]).strip()
+                    if val and val.upper() not in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", "PCS", "BOX", "BOXES"]:
+                        item_name = val
+                        break
+            
+            if not item_name:
                 continue
             
             auto_cf, auto_pu = auto_detect_tile_specs(item_name)
             
-            # Con factor extraction
+            # Con factor extraction (Column E / Index 4)
             try:
                 cf_val = float(str(r[4]).replace(',', '').strip()) if len(r) > 4 and pd.notna(r[4]) else auto_cf
                 if cf_val <= 0 or cf_val == 1.0: 
@@ -209,7 +217,7 @@ def get_master_df():
             except Exception:
                 cf_val = auto_cf
                 
-            # Packing unit extraction
+            # Packing unit extraction (Column F / Index 5)
             try:
                 pu_val = float(str(r[5]).replace(',', '').strip()) if len(r) > 5 and pd.notna(r[5]) else auto_pu
                 if pu_val <= 0 or pu_val == 1.0: 
@@ -232,7 +240,6 @@ def get_master_df():
         st.error(f"Google Sheet Sync Error: {str(ex)}")
         
     return pd.DataFrame()
-
 def calculate_box_sqft(cf, pu):
     try:
         cov = float(cf) * float(pu)
