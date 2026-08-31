@@ -159,7 +159,7 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER ---
+# --- DIRECT GOOGLE SHEET STOCK LOADER (COLUMN H & I FIX) ---
 @st.cache_data(ttl=15)
 def get_master_df():
     try:
@@ -174,30 +174,24 @@ def get_master_df():
         data_rows = raw_df.iloc[h_idx + 1:].copy()
         parsed_stock = []
         for _, r in data_rows.iterrows():
-            item_name = ""
-            for col_idx in [1, 0, 2]:
-                if len(r) > col_idx and pd.notna(r[col_idx]):
-                    val = str(r[col_idx]).strip()
-                    if val and val.upper() not in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", "PCS", "BOX", "BOXES"]:
-                        item_name = val
-                        break
-            if not item_name:
+            # Column A (Index 0) se Item Name uthayega
+            item_name = str(r[0]).strip() if len(r) > 0 and pd.notna(r[0]) else ""
+            if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            auto_cf, auto_pu = auto_detect_tile_specs(item_name)
+            # Column H (Index 7) = Con Factor
             try:
-                cf_val = float(str(r[4]).replace(',', '').strip()) if len(r) > 4 and pd.notna(r[4]) else auto_cf
-                if cf_val <= 0 or cf_val == 1.0: 
-                    cf_val = auto_cf
+                cf_val = float(str(r[7]).replace(',', '').strip()) if len(r) > 7 and pd.notna(r[7]) else 1.0
+                if cf_val <= 0: cf_val = 1.0
             except Exception:
-                cf_val = auto_cf
+                cf_val = 1.0
                 
+            # Column I (Index 8) = Packing Unit
             try:
-                pu_val = float(str(r[5]).replace(',', '').strip()) if len(r) > 5 and pd.notna(r[5]) else auto_pu
-                if pu_val <= 0 or pu_val == 1.0: 
-                    pu_val = auto_pu
+                pu_val = float(str(r[8]).replace(',', '').strip()) if len(r) > 8 and pd.notna(r[8]) else 1.0
+                if pu_val <= 0: pu_val = 1.0
             except Exception:
-                pu_val = auto_pu
+                pu_val = 1.0
                 
             box_cov = round(cf_val * pu_val, 2)
             parsed_stock.append({
@@ -213,7 +207,6 @@ def get_master_df():
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
     return pd.DataFrame()
-
 def calculate_box_sqft(cf, pu):
     try:
         cov = float(cf) * float(pu)
