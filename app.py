@@ -136,13 +136,28 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER (HEADER NAME MATCHING) ---
+# --- HELPER CALCULATION FUNCTIONS ---
+def calculate_box_sqft(cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        return round(cov, 2) if cov > 0 else 1.0
+    except Exception:
+        return 1.0
+
+def calculate_boxes(sqft, cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        if cov <= 0:
+            cov = 1.0
+        return math.ceil(float(sqft) / cov)
+    except Exception:
+        return 0
+
+# --- DIRECT GOOGLE SHEET STOCK LOADER (EXACT COLUMN H & I) ---
 @st.cache_data(ttl=5)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
-        
-        # Header row (ITEM NAME, CON FACTOR, PACKING UNIT) dhoondhein
         h_idx = 0
         for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
@@ -153,7 +168,6 @@ def get_master_df():
         headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
         data_rows = raw_df.iloc[h_idx + 1:].copy()
         
-        # Columns ke exact index pata lagayein
         item_col = 0
         cf_col = None
         pu_col = None
@@ -162,7 +176,7 @@ def get_master_df():
             if "ITEM" in h:
                 item_col = idx
             elif "CON FACTOR" in h:
-                if cf_col is None:  # Pehla wala Con Factor (Column H)
+                if cf_col is None:
                     cf_col = idx
             elif "PACKING" in h:
                 pu_col = idx
@@ -205,6 +219,7 @@ def get_master_df():
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
     return pd.DataFrame()
+
 # --- PDF GENERATOR ---
 def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
@@ -534,7 +549,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
                 label_visibility="collapsed"
             )
             
-        # Calculation: Sq.Ft / (Con Factor * Packing Unit) -> Rounded up in Bold
         calc_bx = math.ceil(new_sqft / cov_per_box)
         
         with c3:
@@ -674,7 +688,7 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
         st.stop()
 
     curr_branch = st.session_state.branch
-    view_clients = all_clients if curr_branch == "All Showrooms" else [c for c in all_clients if c.get("branch") == curr_branch]
+    view_clients = all_clients if curr_branch == "All Showrooms" else [c for c in all_clients if c.get("branch"] == curr_branch]
     total_customers = len(view_clients)
     draft_count = sum(1 for c in view_clients if c.get("status") == "SELECTION ONLY" and len(c.get("selections", [])) > 0)
     final_count = sum(1 for c in view_clients if c.get("status") == "FINALIZED")
@@ -724,7 +738,7 @@ elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin
         st.rerun()
     st.dataframe(master_df.rename(columns={
         "item_name": "Tile Item Name",
-        "con_factor": "Con Factor (Col H)",
-        "packing_unit": "Packing Unit (Col I)",
+        "con_factor": "Con Factor (H)",
+        "packing_unit": "Packing (I)",
         "sqft_per_box": "Coverage SqFt/Box"
     }), use_container_width=True)
