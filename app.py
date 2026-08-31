@@ -136,34 +136,15 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- HELPER CALCULATION FUNCTIONS ---
-def calculate_box_sqft(cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        return round(cov, 2) if cov > 0 else 1.0
-    except Exception:
-        return 1.0
-
-def calculate_boxes(sqft, cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        if cov <= 0:
-            cov = 1.0
-        return math.ceil(float(sqft) / cov)
-    except Exception:
-        return 0
-
-# --- DIRECT GOOGLE SHEET STOCK LOADER (DIRECT INDEX 7 & 8) ---
+# --- UNIVERSAL GOOGLE SHEET LOADER (COLUMN H × COLUMN I) ---
 @st.cache_data(ttl=5)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
-        
-        # Data rows row index 1 (yani 2nd row) se shuru hoti hain
         h_idx = 0
-        for i in range(min(10, len(raw_df))):
+        for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
-            if any("ITEM NAME" in s for s in row_vals):
+            if any("ITEM NAME" in s for s in row_vals) or any("ITEM" in s for s in row_vals):
                 h_idx = i
                 break
                 
@@ -194,6 +175,7 @@ def get_master_df():
                     pu_val = 1.0
             if pu_val <= 0: pu_val = 1.0
                 
+            # Universal Box Coverage = Con Factor (Col H) * Packing Unit (Col I)
             box_cov = round(cf_val * pu_val, 2)
             parsed_stock.append({
                 "item_name": item_name,
@@ -207,7 +189,25 @@ def get_master_df():
             return df
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
-    return pd.DataFrame()# --- PDF GENERATOR ---
+    return pd.DataFrame()
+
+def calculate_box_sqft(cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        return round(cov, 2) if cov > 0 else 1.0
+    except Exception:
+        return 1.0
+
+def calculate_boxes(sqft, cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        if cov <= 0:
+            cov = 1.0
+        return math.ceil(float(sqft) / cov)
+    except Exception:
+        return 0
+
+# --- PDF GENERATOR ---
 def generate_pdf_quotation(customer_info, items_list):
     pdf = FPDF()
     pdf.add_page()
@@ -448,7 +448,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     pu = float(matched_row.get("packing_unit", 1.0))
     box_cov = calculate_box_sqft(cf, pu)
     
-    st.success(f"📐 **Sheet Specs (Col H & I):** Con Factor (`{cf}`) × Packing (`{pu}`) = **{box_cov:.2f} Sq.Ft / Box**")
+    st.success(f"📐 **Sheet Specs (Col H × Col I):** {cf} × {pu} = **{box_cov:.2f} Sq.Ft / Box**")
     
     if st.button("➕ Select & Add Tile (Save to Database)", type="primary", use_container_width=True):
         new_item = {
@@ -525,7 +525,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         c1, c2, c3, c4 = st.columns([5, 2.5, 2.5, 1.5])
         with c1:
             st.markdown(f"**{it['area']}** ({it['floor']} - {it['surface']})")
-            st.caption(f"🧱 *{tile_name}* \n*(1 Box = {cov_per_box:.2f} Sq.Ft | Col H (CF): {cf} × Col I (Pack): {pu})*")
+            st.caption(f"🧱 *{tile_name}* \n*(1 Box = {cov_per_box:.2f} Sq.Ft | Col H: {cf} × Col I: {pu})*")
             
         with c2:
             new_sqft = st.number_input(
@@ -725,7 +725,7 @@ elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin
         st.rerun()
     st.dataframe(master_df.rename(columns={
         "item_name": "Tile Item Name",
-        "con_factor": "Con Factor (H)",
-        "packing_unit": "Packing (I)",
+        "con_factor": "Con Factor (Col H)",
+        "packing_unit": "Packing (Col I)",
         "sqft_per_box": "Coverage SqFt/Box"
     }), use_container_width=True)
