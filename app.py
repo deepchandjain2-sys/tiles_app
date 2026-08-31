@@ -613,8 +613,9 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         curr_c["total_sqft"] = sum(x["sqft"] for x in updated_items)
         curr_c["total_boxes"] = sum(x["boxes"] for x in updated_items)
         update_customer_db(curr_c)
-        st.session_state.current_customer = curr_c    st.markdown("### 📋 Final Bill of Quantities (BOQ)")
-    summary_df = pd.DataFrame(curr_c["selections"])[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
+      st.session_state.current_customer = curr_c
+
+    st.markdown("### 📋 Final Bill of Quantities (BOQ)")    summary_df = pd.DataFrame(curr_c["selections"])[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
     st.dataframe(summary_df.rename(columns={
         "floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item Name",
         "con_factor": "Con Factor", "packing_unit": "Packing Unit",
