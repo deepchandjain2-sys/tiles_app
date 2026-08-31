@@ -240,13 +240,43 @@ def get_master_df():
         st.error(f"Google Sheet Sync Error: {str(ex)}")
         
     return pd.DataFrame()
-def calculate_box_sqft(cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        return round(cov, 2) if cov > 0 else 16.0
-    except Exception:
-        return 16.0
-
+def auto_detect_tile_specs(item_name):
+    """
+    Automatic standard industry specs based on tile name dimensions.
+    Returns: (con_factor_sqft_per_piece, packing_unit_pieces)
+    """
+    name = str(item_name).upper()
+    
+    # 1. Custom exact match for ALFERDO BIANCO SPA 4X6
+    if "ALFERDO" in name or ("4X6" in name and "9MM" in name):
+        return 23.25, 2.0
+    
+    # 2x4 feet (600x1200 mm) -> 8 sqft per pc, 2 pcs per box = 16 sqft/box
+    elif "2X4" in name or "2*4" in name or "600X1200" in name or "60X120" in name:
+        return 8.0, 2.0
+    
+    # 2x2 feet (600x600 mm) -> 4 sqft per pc, 4 pcs per box = 16 sqft/box
+    elif "2X2" in name or "2*2" in name or "600X600" in name:
+        return 4.0, 4.0
+        
+    # 12x18 inch (1x1.5 feet) -> 1.5 sqft per pc, 6 pcs per box = 9 sqft/box
+    elif "12X18" in name or "12*18" in name or "300X450" in name:
+        return 1.5, 6.0
+        
+    # 16x16 inch -> 1.73 sqft per pc, 5 pcs per box = 8.65 sqft/box
+    elif "16X16" in name or "16*16" in name:
+        return 1.73, 5.0
+        
+    # 12x12 inch (1x1 foot) -> 1 sqft per pc, 10 pcs per box = 10 sqft/box
+    elif "1X1" in name or "12X12" in name:
+        return 1.0, 10.0
+        
+    # 2x1 feet (12x24 inch) -> 2 sqft per pc, 6 pcs per box = 12 sqft/box
+    elif "2X1" in name or "12X24" in name or "300X600" in name:
+        return 2.0, 6.0
+        
+    # Default standard fallback
+    return 8.0, 2.0
 def calculate_boxes(sqft, cf, pu):
     try:
         cov = float(cf) * float(pu)
