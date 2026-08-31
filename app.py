@@ -17,6 +17,49 @@ st.set_page_config(
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 DB_FILE = "jay_granite_master.db"
 
+# --- SMART TILE SIZE DETECTION (Accurate CF & Packing) ---
+def auto_detect_tile_specs(item_name):
+    """
+    Automatic standard industry specs based on tile name dimensions.
+    Returns: (con_factor_sqft_per_piece, packing_unit_pieces)
+    """
+    name = str(item_name).upper()
+    
+    # 2x4 feet (600x1200 mm) -> 8 sqft per pc, 2 pcs per box = 16 sqft/box
+    if "2X4" in name or "2*4" in name or "600X1200" in name or "60X120" in name:
+        return 8.0, 2.0
+    
+    # 2x2 feet (600x600 mm) -> 4 sqft per pc, 4 pcs per box = 16 sqft/box
+    elif "2X2" in name or "2*2" in name or "600X600" in name:
+        return 4.0, 4.0
+        
+    # 12x18 inch (1x1.5 feet) -> 1.5 sqft per pc, 6 pcs per box = 9 sqft/box
+    elif "12X18" in name or "12*18" in name or "300X450" in name:
+        return 1.5, 6.0
+        
+    # 16x16 inch -> 1.73 sqft per pc, 5 pcs per box = 8.65 sqft/box
+    elif "16X16" in name or "16*16" in name:
+        return 1.73, 5.0
+        
+    # 12x12 inch (1x1 foot) -> 1 sqft per pc, 10 pcs per box = 10 sqft/box
+    elif "1X1" in name or "12X12" in name:
+        return 1.0, 10.0
+        
+    # 2x1 feet (12x24 inch) -> 2 sqft per pc, 6 pcs per box = 12 sqft/box
+    elif "2X1" in name or "12X24" in name or "300X600" in name:
+        return 2.0, 6.0
+        
+    # 4x2 feet
+    elif "4X2" in name or "4*2" in name:
+        return 8.0, 2.0
+        
+    # 32x64 inch -> 14.22 sqft per pc, 2 pcs per box = 28.44 sqft/box
+    elif "32X64" in name or "800X1600" in name:
+        return 14.22, 2.0
+
+    # Default standard
+    return 8.0, 2.0
+
 # --- SQLITE DATABASE ENGINE ---
 def get_db():
     return sqlite3.connect(DB_FILE, check_same_thread=False)
@@ -42,7 +85,6 @@ def init_database():
     """)
     conn.commit()
     
-    # Auto-migrate table if branch column doesn't exist in existing db
     try:
         c.execute("ALTER TABLE customers_master ADD COLUMN branch TEXT DEFAULT 'Hiriyur'")
         conn.commit()
@@ -138,8 +180,8 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- EXACT GOOGLE SHEET STOCK LOADER FIX ---
-@st.cache_data(ttl=30)
+# --- DIRECT GOOGLE SHEET STOCK LOADER ---
+@st.cache_data(ttl=15)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
@@ -150,55 +192,31 @@ def get_master_df():
                 h_idx = i
                 break
                 
-        # Header row extraction
-        headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
         data_rows = raw_df.iloc[h_idx + 1:].copy()
-        
-        # Detect exact column positions dynamically
-        col_item = 1 if len(headers) > 1 and "NAME" in headers[1] else 0
-        col_cf = None
-        col_pu = None
-        
-        for idx, h in enumerate(headers):
-            if "CON FACTOR" in h or "CONVERSION" in h:
-                col_cf = idx
-            elif "PACKING" in h or "UNIT" in h:
-                col_pu = idx
-
         parsed_stock = []
         for _, r in data_rows.iterrows():
-            item_name = str(r[col_item]).strip() if pd.notna(r[col_item]) else ""
+            item_name = str(r[1]).strip() if len(r) > 1 and pd.notna(r[1]) else str(r[0]).strip()
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Con Factor extraction
-            cf_val = 1.0
-            if col_cf is not None and len(r) > col_cf and pd.notna(r[col_cf]):
-                cf_raw = str(r[col_cf]).replace(',', '').strip()
-                try:
-                    cf_val = float(cf_raw)
-                except Exception:
-                    cf_val = 1.0
-            elif len(r) > 5 and pd.notna(r[5]): # Fallback to standard 6th column
-                try:
-                    cf_val = float(str(r[5]).replace(',', '').strip())
-                except Exception:
-                    cf_val = 1.0
-
-            # Packing Unit extraction
-            pu_val = 1.0
-            if col_pu is not None and len(r) > col_pu and pd.notna(r[col_pu]):
-                pu_raw = str(r[col_pu]).replace(',', '').strip()
-                try:
-                    pu_val = float(pu_raw)
-                except Exception:
-                    pu_val = 1.0
-            elif len(r) > 6 and pd.notna(r[6]): # Fallback to standard 7th column
-                try:
-                    pu_val = float(str(r[6]).replace(',', '').strip())
-                except Exception:
-                    pu_val = 1.0
-
+            auto_cf, auto_pu = auto_detect_tile_specs(item_name)
+            
+            # Con factor extraction
+            try:
+                cf_val = float(str(r[4]).replace(',', '').strip()) if len(r) > 4 and pd.notna(r[4]) else auto_cf
+                if cf_val <= 0 or cf_val == 1.0: 
+                    cf_val = auto_cf
+            except Exception:
+                cf_val = auto_cf
+                
+            # Packing unit extraction
+            try:
+                pu_val = float(str(r[5]).replace(',', '').strip()) if len(r) > 5 and pd.notna(r[5]) else auto_pu
+                if pu_val <= 0 or pu_val == 1.0: 
+                    pu_val = auto_pu
+            except Exception:
+                pu_val = auto_pu
+                
             box_cov = round(cf_val * pu_val, 2)
             parsed_stock.append({
                 "item_name": item_name,
@@ -215,30 +233,10 @@ def get_master_df():
         
     return pd.DataFrame()
 
-# --- ACCURATE CALCULATION FORMULA ---
 def calculate_box_sqft(cf, pu):
     try:
-        cf_f = float(cf)
-        pu_f = float(pu)
-        cov = cf_f * pu_f
+        cov = float(cf) * float(pu)
         return round(cov, 2) if cov > 0 else 16.0
-    except Exception:
-        return 16.0
-
-def calculate_boxes(sqft, cf, pu):
-    try:
-        sqft_f = float(sqft)
-        cf_f = float(cf)
-        pu_f = float(pu)
-        cov = cf_f * pu_f
-        if cov <= 0:
-            cov = 16.0
-        return math.ceil(sqft_f / cov)
-    except Exception:
-        return 0
-def calculate_box_sqft(cf, pu):
-    try:
-        return round(float(cf) * float(pu), 2)
     except Exception:
         return 16.0
 
@@ -246,7 +244,7 @@ def calculate_boxes(sqft, cf, pu):
     try:
         cov = float(cf) * float(pu)
         if cov <= 0:
-            return 0
+            cov = 16.0
         return math.ceil(float(sqft) / cov)
     except Exception:
         return 0
@@ -260,7 +258,8 @@ def generate_pdf_quotation(customer_info, items_list):
     
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 15)
-    pdf.cell(0, 8, f"JAY GRANITE & TILES - {customer_info.get('branch', 'HIRIYUR').upper()} SHOWROOM", ln=True, align="C")
+    branch_name = customer_info.get('branch', 'HIRIYUR').upper()
+    pdf.cell(0, 8, f"JAY GRANITE & TILES - {branch_name} SHOWROOM", ln=True, align="C")
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(0, 5, "Tile Selection & Final BOQ Estimate", ln=True, align="C")
     pdf.ln(7)
@@ -278,7 +277,7 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.cell(22, 7, "Floor", 1, 0, "C", fill=True)
     pdf.cell(32, 7, "Area", 1, 0, "C", fill=True)
     pdf.cell(62, 7, "Tile Item", 1, 0, "L", fill=True)
-    pdf.cell(18, 7, "Con Fac", 1, 0, "C", fill=True)
+    pdf.cell(18, 7, "CF (SqFt)", 1, 0, "C", fill=True)
     pdf.cell(16, 7, "Packing", 1, 0, "C", fill=True)
     pdf.cell(20, 7, "Total Sq.Ft", 1, 0, "R", fill=True)
     pdf.cell(20, 7, "Req. Boxes", 1, 1, "R", fill=True)
@@ -295,8 +294,8 @@ def generate_pdf_quotation(customer_info, items_list):
         pdf.cell(22, 6, str(it.get("floor", "-"))[:12], 1, 0, "C")
         pdf.cell(32, 6, str(it.get("area", "-"))[:18], 1, 0, "L")
         pdf.cell(62, 6, str(it.get("tile", "-"))[:34], 1, 0, "L")
-        pdf.cell(18, 6, f"{float(it.get('con_factor', 1.0)):.2f}", 1, 0, "C")
-        pdf.cell(16, 6, f"{float(it.get('packing_unit', 1.0)):.0f}", 1, 0, "C")
+        pdf.cell(18, 6, f"{float(it.get('con_factor', 8.0)):.2f}", 1, 0, "C")
+        pdf.cell(16, 6, f"{float(it.get('packing_unit', 2.0)):.0f} Pcs", 1, 0, "C")
         pdf.cell(20, 6, f"{sq:.2f}", 1, 0, "R")
         pdf.cell(20, 6, f"{bx:.0f}", 1, 1, "R")
         
@@ -391,7 +390,6 @@ if nav == "1️⃣ Customer Registration & History":
     st.title("👥 Customer Registration & Selection History")
     
     all_clients = get_all_customers_db()
-    # Filter for salesman
     if st.session_state.role == "salesman":
         filtered_clients = [c for c in all_clients if c.get("branch") == st.session_state.branch]
     elif st.session_state.branch != "All Showrooms":
@@ -408,7 +406,6 @@ if nav == "1️⃣ Customer Registration & History":
             c_site = st.text_area("Site Address / City")
             c_eng = st.text_input("Contractor / Architect Name (Optional)")
             
-            # Showroom assignment
             assigned_branch = st.session_state.branch if st.session_state.branch != "All Showrooms" else "Hiriyur"
             st.info(f"Showroom Branch: **{assigned_branch}**")
             
@@ -491,12 +488,14 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         
     chosen_tile = st.selectbox("Select Tile Item", filtered_df["item_name"].tolist())
     
+    # Accurate specs extraction
     matched_row = filtered_df[filtered_df["item_name"] == chosen_tile].iloc[0]
-    cf = float(matched_row.get("con_factor", 1.0))
-    pu = float(matched_row.get("packing_unit", 1.0))
+    auto_cf, auto_pu = auto_detect_tile_specs(chosen_tile)
+    cf = float(matched_row.get("con_factor", auto_cf))
+    pu = float(matched_row.get("packing_unit", auto_pu))
     box_cov = calculate_box_sqft(cf, pu)
     
-    st.success(f"📐 **Live Sheet Data:** Con Factor (`{cf}`) × Packing Unit (`{pu}`) = **{box_cov:.2f} Sq.Ft / Box**")
+    st.success(f"📐 **Tile Specs:** Con Factor (`{cf:.2f} Sq.Ft/Pc`) × Packing (`{pu:.0f} Pcs`) = **{box_cov:.2f} Sq.Ft / Box**")
     
     if st.button("➕ Select & Add Tile (Save to Database)", type="primary", use_container_width=True):
         new_item = {
@@ -524,7 +523,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     
     if saved_items:
         disp_df = pd.DataFrame(saved_items)[["floor", "surface", "area", "tile", "con_factor", "packing_unit"]]
-        st.dataframe(disp_df.rename(columns={"floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item", "con_factor": "Con Factor", "packing_unit": "Packing Unit"}), use_container_width=True)
+        st.dataframe(disp_df.rename(columns={"floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item", "con_factor": "CF (Sq.Ft)", "packing_unit": "Packing (Pcs)"}), use_container_width=True)
         st.info("👉 Selection ke baad sidebar se **'3️⃣ Sq.Ft Entry & Final Estimate'** page par jayein.")
     else:
         st.caption("Abhi koi tile select nahi hui hai.")
@@ -557,13 +556,15 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     updated_items = []
     for it in saved_items:
         tile_name = it.get("tile")
+        
+        # Pull accurate specs
+        auto_cf, auto_pu = auto_detect_tile_specs(tile_name)
         matched_tile = master_df[master_df["item_name"] == tile_name]
         if not matched_tile.empty:
             cf = float(matched_tile.iloc[0]["con_factor"])
             pu = float(matched_tile.iloc[0]["packing_unit"])
         else:
-            cf = float(it.get("con_factor", 1.0))
-            pu = float(it.get("packing_unit", 1.0))
+            cf, pu = auto_cf, auto_pu
 
         cov_per_box = round(cf * pu, 2)
         if cov_per_box <= 0:
@@ -575,7 +576,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         
         with c1:
             st.markdown(f"**{it['area']}** ({it['floor']} - {it['surface']})")
-            st.caption(f"🧱 *{tile_name}*  \n*(1 Box = {cov_per_box:.2f} Sq.Ft | CF: {cf}, Pack: {pu:.0f})*")
+            st.caption(f"🧱 *{tile_name}* \n*(1 Box = {cov_per_box:.2f} Sq.Ft | CF: {cf:.2f} Sq.Ft/Pc, Pack: {pu:.0f} Pcs)*")
             
         with c2:
             new_sqft = st.number_input(
@@ -586,7 +587,8 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
                 label_visibility="collapsed"
             )
             
-        calc_bx = math.ceil(new_sqft / cov_per_box) if cov_per_box > 0 else 0
+        # Standard Formula: ceil(Sq.Ft / Coverage per Box)
+        calc_bx = math.ceil(new_sqft / cov_per_box)
         
         with c3:
             st.markdown(f"### **{calc_bx}** Boxes")
@@ -617,7 +619,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     summary_df = pd.DataFrame(curr_c["selections"])[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
     st.dataframe(summary_df.rename(columns={
         "floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item Name",
-        "con_factor": "Con Factor", "packing_unit": "Packing Unit",
+        "con_factor": "CF (Sq.Ft/Pc)", "packing_unit": "Packing (Pcs)",
         "sqft": "Total Sq.Ft", "boxes": "Required Boxes"
     }), use_container_width=True)
     
@@ -677,6 +679,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             st.session_state.current_customer = None
             st.success(f"🎉 **{curr_c['name']}** finalize ho gaya! Screen agle customer ke liye clear hai.")
             st.rerun()
+
 # --- PAGE 4: SALESMAN PROGRESS REPORT ---
 elif nav == "📈 Salesman Progress Report":
     st.title("📈 Salesman Progress & Performance Tracking")
@@ -842,7 +845,7 @@ elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin
         st.rerun()
     st.dataframe(master_df.rename(columns={
         "item_name": "Tile Item Name",
-        "con_factor": "Con Factor (Col H)",
-        "packing_unit": "Packing Unit (Col I)",
+        "con_factor": "Con Factor (Sq.Ft/Pc)",
+        "packing_unit": "Packing Unit (Pcs/Box)",
         "sqft_per_box": "Coverage SqFt/Box"
     }), use_container_width=True)
