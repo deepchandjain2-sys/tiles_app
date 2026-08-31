@@ -529,7 +529,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     else:
         st.caption("Abhi koi tile select nahi hui hai.")
 
-# --- PAGE 3 CALCULATION FIX ---
+# --- PAGE 3: SQFT ENTRY & FINAL ESTIMATE ---
 elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     if not st.session_state.current_customer:
         st.warning("Pehle Customer Registration page se koi customer select karein.")
@@ -557,7 +557,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     updated_items = []
     for it in saved_items:
         tile_name = it.get("tile")
-        # Live lookup from master sheet to ensure CF & PU are always correct
         matched_tile = master_df[master_df["item_name"] == tile_name]
         if not matched_tile.empty:
             cf = float(matched_tile.iloc[0]["con_factor"])
@@ -587,7 +586,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
                 label_visibility="collapsed"
             )
             
-        # Exact Formula: Total Sq.Ft / (CF * PU)
         calc_bx = math.ceil(new_sqft / cov_per_box) if cov_per_box > 0 else 0
         
         with c3:
@@ -608,14 +606,15 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         updated_items.append(it_copy)
         st.divider()
 
-  if updated_items != curr_c.get("selections", []):
+    if updated_items != curr_c.get("selections", []):
         curr_c["selections"] = updated_items
         curr_c["total_sqft"] = sum(x["sqft"] for x in updated_items)
         curr_c["total_boxes"] = sum(x["boxes"] for x in updated_items)
         update_customer_db(curr_c)
         st.session_state.current_customer = curr_c
 
-    st.markdown("### 📋 Final Bill of Quantities (BOQ)")   summary_df = pd.DataFrame(curr_c["selections"])[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
+    st.markdown("### 📋 Final Bill of Quantities (BOQ)")
+    summary_df = pd.DataFrame(curr_c["selections"])[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
     st.dataframe(summary_df.rename(columns={
         "floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item Name",
         "con_factor": "Con Factor", "packing_unit": "Packing Unit",
@@ -678,7 +677,6 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             st.session_state.current_customer = None
             st.success(f"🎉 **{curr_c['name']}** finalize ho gaya! Screen agle customer ke liye clear hai.")
             st.rerun()
-
 # --- PAGE 4: SALESMAN PROGRESS REPORT ---
 elif nav == "📈 Salesman Progress Report":
     st.title("📈 Salesman Progress & Performance Tracking")
