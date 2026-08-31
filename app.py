@@ -138,7 +138,7 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER ---
+# --- EXACT GOOGLE SHEET STOCK LOADER FIX ---
 @st.cache_data(ttl=30)
 def get_master_df():
     try:
@@ -146,39 +146,65 @@ def get_master_df():
         h_idx = 0
         for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
-            if any("ITEM NAME" in s for s in row_vals):
+            if any("ITEM NAME" in s for s in row_vals) or any("ITEM" in s for s in row_vals):
                 h_idx = i
                 break
                 
+        # Header row extraction
+        headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
         data_rows = raw_df.iloc[h_idx + 1:].copy()
+        
+        # Detect exact column positions dynamically
+        col_item = 1 if len(headers) > 1 and "NAME" in headers[1] else 0
+        col_cf = None
+        col_pu = None
+        
+        for idx, h in enumerate(headers):
+            if "CON FACTOR" in h or "CONVERSION" in h:
+                col_cf = idx
+            elif "PACKING" in h or "UNIT" in h:
+                col_pu = idx
+
         parsed_stock = []
         for _, r in data_rows.iterrows():
-            item_name = str(r[0]).strip() if pd.notna(r[0]) else ""
+            item_name = str(r[col_item]).strip() if pd.notna(r[col_item]) else ""
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            try:
-                cf_raw = str(r[7]).replace(',', '').strip() if len(r) > 7 and pd.notna(r[7]) else "1.0"
-                cf = float(pd.to_numeric(cf_raw, errors='coerce')) if cf_raw else 1.0
-                if pd.isna(cf) or cf <= 0:
-                    cf = 1.0
-            except Exception:
-                cf = 1.0
-                
-            try:
-                pu_raw = str(r[8]).replace(',', '').strip() if len(r) > 8 and pd.notna(r[8]) else "1.0"
-                pu = float(pd.to_numeric(pu_raw, errors='coerce')) if pu_raw else 1.0
-                if pd.isna(pu) or pu <= 0:
-                    pu = 1.0
-            except Exception:
-                pu = 1.0
-                
-            box_sqft = round(cf * pu, 2)
+            # Con Factor extraction
+            cf_val = 1.0
+            if col_cf is not None and len(r) > col_cf and pd.notna(r[col_cf]):
+                cf_raw = str(r[col_cf]).replace(',', '').strip()
+                try:
+                    cf_val = float(cf_raw)
+                except Exception:
+                    cf_val = 1.0
+            elif len(r) > 5 and pd.notna(r[5]): # Fallback to standard 6th column
+                try:
+                    cf_val = float(str(r[5]).replace(',', '').strip())
+                except Exception:
+                    cf_val = 1.0
+
+            # Packing Unit extraction
+            pu_val = 1.0
+            if col_pu is not None and len(r) > col_pu and pd.notna(r[col_pu]):
+                pu_raw = str(r[col_pu]).replace(',', '').strip()
+                try:
+                    pu_val = float(pu_raw)
+                except Exception:
+                    pu_val = 1.0
+            elif len(r) > 6 and pd.notna(r[6]): # Fallback to standard 7th column
+                try:
+                    pu_val = float(str(r[6]).replace(',', '').strip())
+                except Exception:
+                    pu_val = 1.0
+
+            box_cov = round(cf_val * pu_val, 2)
             parsed_stock.append({
                 "item_name": item_name,
-                "con_factor": cf,
-                "packing_unit": pu,
-                "sqft_per_box": box_sqft
+                "con_factor": cf_val,
+                "packing_unit": pu_val,
+                "sqft_per_box": box_cov if box_cov > 0 else 16.0
             })
             
         df = pd.DataFrame(parsed_stock).drop_duplicates(subset=["item_name"])
@@ -189,6 +215,27 @@ def get_master_df():
         
     return pd.DataFrame()
 
+# --- ACCURATE CALCULATION FORMULA ---
+def calculate_box_sqft(cf, pu):
+    try:
+        cf_f = float(cf)
+        pu_f = float(pu)
+        cov = cf_f * pu_f
+        return round(cov, 2) if cov > 0 else 16.0
+    except Exception:
+        return 16.0
+
+def calculate_boxes(sqft, cf, pu):
+    try:
+        sqft_f = float(sqft)
+        cf_f = float(cf)
+        pu_f = float(pu)
+        cov = cf_f * pu_f
+        if cov <= 0:
+            cov = 16.0
+        return math.ceil(sqft_f / cov)
+    except Exception:
+        return 0
 def calculate_box_sqft(cf, pu):
     try:
         return round(float(cf) * float(pu), 2)
