@@ -136,35 +136,39 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- DIRECT GOOGLE SHEET STOCK LOADER (COLUMN H & I) ---
-@st.cache_data(ttl=15)
+# --- DIRECT GOOGLE SHEET STOCK LOADER (EXACT COLUMN H & I INDEX FIX) ---
+@st.cache_data(ttl=5)
 def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
+        
+        # Row 1 (Index 0 ya 1) ke baad data shuru hota hai
         h_idx = 0
         for i in range(min(15, len(raw_df))):
             row_vals = [str(x).upper() for x in raw_df.iloc[i].values if pd.notna(x)]
-            if any("ITEM NAME" in s for s in row_vals) or any("ITEM" in s for s in row_vals):
+            if any("ITEM NAME" in s for s in row_vals):
                 h_idx = i
                 break
                 
         data_rows = raw_df.iloc[h_idx + 1:].copy()
         parsed_stock = []
+        
         for _, r in data_rows.iterrows():
-            item_name = str(r[0]).strip() if len(r) > 0 and pd.notna(r[0]) else ""
+            # Column A (Index 0) = Item Name
+            item_name = str(r.iloc[0]).strip() if len(r) > 0 and pd.notna(r.iloc[0]) else ""
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
             # Column H (Index 7) = Con Factor
             try:
-                cf_val = float(str(r[7]).replace(',', '').strip()) if len(r) > 7 and pd.notna(r[7]) else 1.0
+                cf_val = float(str(r.iloc[7]).replace(',', '').strip()) if len(r) > 7 and pd.notna(r.iloc[7]) else 1.0
                 if cf_val <= 0: cf_val = 1.0
             except Exception:
                 cf_val = 1.0
-                
+
             # Column I (Index 8) = Packing Unit
             try:
-                pu_val = float(str(r[8]).replace(',', '').strip()) if len(r) > 8 and pd.notna(r[8]) else 1.0
+                pu_val = float(str(r.iloc[8]).replace(',', '').strip()) if len(r) > 8 and pd.notna(r.iloc[8]) else 1.0
                 if pu_val <= 0: pu_val = 1.0
             except Exception:
                 pu_val = 1.0
@@ -183,14 +187,6 @@ def get_master_df():
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
     return pd.DataFrame()
-
-def calculate_box_sqft(cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        return round(cov, 2) if cov > 0 else 1.0
-    except Exception:
-        return 1.0
-
 def calculate_boxes(sqft, cf, pu):
     try:
         cov = float(cf) * float(pu)
