@@ -529,7 +529,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     else:
         st.caption("Abhi koi tile select nahi hui hai.")
 
-# --- PAGE 3: SQFT ENTRY & FINAL ESTIMATE ---
+# --- PAGE 3 CALCULATION FIX ---
 elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     if not st.session_state.current_customer:
         st.warning("Pehle Customer Registration page se koi customer select karein.")
@@ -556,16 +556,27 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
 
     updated_items = []
     for it in saved_items:
-        cf = float(it.get("con_factor", 1.0))
-        pu = float(it.get("packing_unit", 1.0))
-        cov_per_box = calculate_box_sqft(cf, pu)
+        tile_name = it.get("tile")
+        # Live lookup from master sheet to ensure CF & PU are always correct
+        matched_tile = master_df[master_df["item_name"] == tile_name]
+        if not matched_tile.empty:
+            cf = float(matched_tile.iloc[0]["con_factor"])
+            pu = float(matched_tile.iloc[0]["packing_unit"])
+        else:
+            cf = float(it.get("con_factor", 1.0))
+            pu = float(it.get("packing_unit", 1.0))
+
+        cov_per_box = round(cf * pu, 2)
+        if cov_per_box <= 0:
+            cov_per_box = 16.0
+
         current_sqft = float(it.get("sqft", 100.0))
 
         c1, c2, c3, c4 = st.columns([5, 2.5, 2.5, 1.5])
         
         with c1:
             st.markdown(f"**{it['area']}** ({it['floor']} - {it['surface']})")
-            st.caption(f"🧱 *{it['tile']}*  \n*(1 Box = {cov_per_box:.2f} Sq.Ft | CF: {cf}, Pack: {pu:.0f})*")
+            st.caption(f"🧱 *{tile_name}*  \n*(1 Box = {cov_per_box:.2f} Sq.Ft | CF: {cf}, Pack: {pu:.0f})*")
             
         with c2:
             new_sqft = st.number_input(
@@ -576,7 +587,8 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
                 label_visibility="collapsed"
             )
             
-        calc_bx = calculate_boxes(new_sqft, cf, pu)
+        # Exact Formula: Total Sq.Ft / (CF * PU)
+        calc_bx = math.ceil(new_sqft / cov_per_box) if cov_per_box > 0 else 0
         
         with c3:
             st.markdown(f"### **{calc_bx}** Boxes")
@@ -589,6 +601,8 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
                 st.rerun()
 
         it_copy = dict(it)
+        it_copy["con_factor"] = cf
+        it_copy["packing_unit"] = pu
         it_copy["sqft"] = new_sqft
         it_copy["boxes"] = calc_bx
         updated_items.append(it_copy)
@@ -599,9 +613,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         curr_c["total_sqft"] = sum(x["sqft"] for x in updated_items)
         curr_c["total_boxes"] = sum(x["boxes"] for x in updated_items)
         update_customer_db(curr_c)
-        st.session_state.current_customer = curr_c
-
-    st.markdown("### 📋 Final Bill of Quantities (BOQ)")
+        st.session_state.current_customer = curr_c    st.markdown("### 📋 Final Bill of Quantities (BOQ)")
     summary_df = pd.DataFrame(curr_c["selections"])[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
     st.dataframe(summary_df.rename(columns={
         "floor": "Floor", "surface": "Type", "area": "Area", "tile": "Tile Item Name",
