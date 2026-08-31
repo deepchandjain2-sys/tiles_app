@@ -530,6 +530,12 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
     auto_cf, auto_pu = auto_detect_tile_specs(chosen_tile)
     cf = float(matched_row.get("con_factor", auto_cf))
     pu = float(matched_row.get("packing_unit", auto_pu))
+    def calculate_box_sqft(cf, pu):
+    try:
+        cov = float(cf) * float(pu)
+        return round(cov, 2) if cov > 0 else 16.0
+    except Exception:
+        return 16.0
     box_cov = calculate_box_sqft(cf, pu)
     
     st.success(f"📐 **Tile Specs:** Con Factor (`{cf:.2f} Sq.Ft/Pc`) × Packing (`{pu:.0f} Pcs`) = **{box_cov:.2f} Sq.Ft / Box**")
