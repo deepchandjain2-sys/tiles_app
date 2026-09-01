@@ -685,6 +685,7 @@ elif nav == "📈 Salesman Progress Report":
                 st.dataframe(summary, use_container_width=True)
 
 # --- PAGE 5: EXECUTIVE DASHBOARD ---
+# --- PAGE 5: EXECUTIVE DASHBOARD ---
 elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
     st.title("📊 Executive Business & Showroom Comparison Dashboard")
     all_clients = get_all_customers_db()
@@ -709,13 +710,18 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
     d_tab1, d_tab2, d_tab3 = st.tabs(["🏢 Showroom vs Showroom Comparison", "📋 Customer Status Log", "📦 Item-wise Selection Frequency"])
     with d_tab1:
         df_all = pd.DataFrame(all_clients)
-        if "branch" in df_all.columns:
-            branch_summary = df_all.groupby("branch").agg(
-                Total_Customers=("id", "count"),
-                Total_SqFt=("total_sqft", "sum"),
-                Total_Boxes=("total_boxes", "sum")
-            ).reset_index()
-            st.dataframe(branch_summary, use_container_width=True)
+        if not df_all.empty and "branch" in df_all.columns:
+            if curr_branch != "All Showrooms":
+                df_all = df_all[df_all["branch"] == curr_branch]
+            if not df_all.empty:
+                branch_summary = df_all.groupby("branch").agg(
+                    Total_Customers=("id", "count"),
+                    Total_SqFt=("total_sqft", "sum"),
+                    Total_Boxes=("total_boxes", "sum")
+                ).reset_index()
+                st.dataframe(branch_summary, use_container_width=True)
+            else:
+                st.info(f"'{curr_branch}' showroom ke liye abhi koi data nahi hai.")
     with d_tab2:
         cust_list_view = []
         for c in view_clients:
@@ -733,7 +739,6 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
             freq_df = pd.Series(all_items_flat).value_counts().reset_index()
             freq_df.columns = ["Tile Item Name", "Times Selected"]
             st.dataframe(freq_df, use_container_width=True)
-
 # --- PAGE 6: STOCK MASTER ---
 elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin":
     st.title("⚙️ Live Stock Master (Google Sheet Linked)")
