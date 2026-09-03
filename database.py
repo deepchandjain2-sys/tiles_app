@@ -57,7 +57,7 @@ def save_db_to_github():
     except:
         pass
 
-# App shuru hote hi GitHub se latest DB fetch karein
+# App khulte hi GitHub se latest data fetch ho jayega
 fetch_db_from_github()
 
 def get_db():
@@ -84,5 +84,4 @@ def init_database():
     """)
     conn.commit()
     conn.close()
-    # Database initialize hone ke baad GitHub par sync karein
     save_db_to_github()
