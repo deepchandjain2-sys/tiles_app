@@ -1,50 +1,88 @@
+import sqlite3
 import os
-import pandas as pd
-import json
+import base64
+import requests
+import streamlit as st
 
-CUST_CSV = "customers_saved.csv"
-STOCK_CSV = "stock_saved.csv"
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
+REPO_NAME = st.secrets.get("REPO_NAME", "deepchandjain2-sys/tiles_app")
+DB_FILE = "jay_granite_master.db"
 
-def save_customers_to_disk(customers_list):
+def fetch_db_from_github():
+    if not GITHUB_TOKEN:
+        return
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github+json"}
     try:
-        if customers_list:
-            df = pd.DataFrame(customers_list)
-            df.to_csv(CUST_CSV, index=False)
-    except Exception as e:
-        print(f"Error saving customers: {e}")
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            content_encoded = response.json().get("content", "")
+            decoded_bytes = base64.b64decode(content_encoded)
+            with open(DB_FILE, "wb") as f:
+                f.write(decoded_bytes)
+    except:
+        pass
 
-def load_customers_from_disk():
+def save_db_to_github():
+    if not GITHUB_TOKEN:
+        return
+    if not os.path.exists(DB_FILE):
+        return
+    
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github+json"}
+    
+    sha = None
     try:
-        if os.path.exists(CUST_CSV):
-            df = pd.read_csv(CUST_CSV)
-            return df.to_dict("records")
-    except Exception as e:
-        print(f"Error loading customers: {e}")
-    return []
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            sha = res.json().get("sha")
+    except:
+        pass
+        
+    with open(DB_FILE, "rb") as f:
+        db_bytes = f.read()
+    encoded_content = base64.b64encode(db_bytes).decode('utf-8')
+    
+    payload = {
+        "message": f"Auto-update SQLite database {DB_FILE} from Streamlit App",
+        "content": encoded_content,
+        "branch": "main"
+    }
+    if sha:
+        payload["sha"] = sha
+        
+    try:
+        requests.put(url, headers=headers, json=payload, timeout=10)
+    except:
+        pass
 
-def load_stock_from_disk():
-    try:
-        if os.path.exists(STOCK_CSV):
-            return pd.read_csv(STOCK_CSV)
-    except Exception as e:
-        print(f"Error loading stock from disk: {e}")
-    return None
+# App shuru hote hi GitHub se latest DB fetch karein
+fetch_db_from_github()
 
-def load_stock_from_upload(uploaded_file):
-    try:
-        if uploaded_file is not None:
-            if isinstance(uploaded_file, str):
-                if uploaded_file.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                else:
-                    df = pd.read_excel(uploaded_file)
-            else:
-                if uploaded_file.name.endswith('.csv'):
-                    df = pd.read_csv(uploaded_file)
-                else:
-                    df = pd.read_excel(uploaded_file)
-            df.to_csv(STOCK_CSV, index=False)
-            return df
-    except Exception as e:
-        print(f"Error processing uploaded file: {e}")
-    return None
+def get_db():
+    return sqlite3.connect(DB_FILE, check_same_thread=False)
+
+def init_database():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS customers_master (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        mobile TEXT,
+        address TEXT,
+        engineer TEXT,
+        salesman TEXT,
+        branch TEXT DEFAULT 'Hiriyur',
+        status TEXT DEFAULT 'SELECTION ONLY',
+        selections_json TEXT DEFAULT '[]',
+        total_sqft REAL DEFAULT 0.0,
+        total_boxes REAL DEFAULT 0.0,
+        created_at TEXT
+    )
+    """)
+    conn.commit()
+    conn.close()
+    # Database initialize hone ke baad GitHub par sync karein
+    save_db_to_github()
