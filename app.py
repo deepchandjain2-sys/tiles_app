@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 from datetime import datetime
-from database import push_db_to_github
+from database import push_db_to_github, get_all_customers_db, insert_new_customer, update_customer_db, delete_customer_db, get_master_df, calculate_box_sqft, calculate_boxes
 
 st.set_page_config(
     page_title="Jay Granite & Tiles Hub",
@@ -18,209 +18,7 @@ st.set_page_config(
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 DB_FILE = "jay_granite_master.db"
 
-# --- SQLITE DATABASE ENGINE ---
-def get_db():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
-
-def init_database():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS customers_master (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            mobile TEXT,
-            address TEXT,
-            engineer TEXT,
-            salesman TEXT,
-            branch TEXT DEFAULT 'Hiriyur',
-            status TEXT DEFAULT 'SELECTION ONLY',
-            selections_json TEXT DEFAULT '[]',
-            total_sqft REAL DEFAULT 0.0,
-            total_boxes REAL DEFAULT 0.0,
-            created_at TEXT
-        )
-    """)
-    conn.commit()
-    try:
-        c.execute("ALTER TABLE customers_master ADD COLUMN branch TEXT DEFAULT 'Hiriyur'")
-        conn.commit()
-    except Exception:
-        pass
-    conn.close()
-
-init_database()
-
-def get_all_customers_db():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT id, name, mobile, address, engineer, salesman, status, selections_json, total_sqft, total_boxes, created_at, branch FROM customers_master ORDER BY id DESC")
-    rows = c.fetchall()
-    conn.close()
-    
-    clients = []
-    for r in rows:
-        try:
-            sels = json.loads(r[7])
-        except Exception:
-            sels = []
-        clients.append({
-            "id": r[0],
-            "name": r[1],
-            "mobile": r[2],
-            "address": r[3],
-            "engineer": r[4],
-            "salesman": r[5],
-            "status": r[6],
-            "selections": sels,
-            "total_sqft": r[8],
-            "total_boxes": r[9],
-            "created_at": r[10],
-            "branch": r[11] if len(r) > 11 and r[11] else "Hiriyur"
-        })
-    return clients
-
-def insert_new_customer(name, mobile, address, engineer, salesman, branch):
-    conn = get_db()
-    c = conn.cursor()
-    now_str = datetime.now().strftime("%d-%m-%Y %H:%M")
-    c.execute("""
-        INSERT INTO customers_master (name, mobile, address, engineer, salesman, branch, status, selections_json, total_sqft, total_boxes, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'SELECTION ONLY', '[]', 0.0, 0.0, ?)
-    """, (name, mobile, address, engineer, salesman, branch, now_str))
-    new_id = c.lastrowid
-    conn.commit()
-    conn.close()
-    return {
-        "id": new_id,
-        "name": name,
-        "mobile": mobile,
-        "address": address,
-        "engineer": engineer,
-        "salesman": salesman,
-        "branch": branch,
-        "status": "SELECTION ONLY",
-        "selections": [],
-        "total_sqft": 0.0,
-        "total_boxes": 0.0,
-        "created_at": now_str
-    }
-
-def update_customer_db(cust_dict):
-    conn = get_db()
-    c = conn.cursor()
-    sels_json = json.dumps(cust_dict.get("selections", []), ensure_ascii=False)
-    c.execute("""
-        UPDATE customers_master 
-        SET name = ?, mobile = ?, address = ?, engineer = ?, salesman = ?, branch = ?, status = ?, selections_json = ?, total_sqft = ?, total_boxes = ?
-        WHERE id = ?
-    """, (
-        cust_dict.get("name"),
-        cust_dict.get("mobile"),
-        cust_dict.get("address"),
-        cust_dict.get("engineer"),
-        cust_dict.get("salesman"),
-        cust_dict.get("branch", "Hiriyur"),
-        cust_dict.get("status", "SELECTION ONLY"),
-        sels_json,
-        float(cust_dict.get("total_sqft", 0.0)),
-        float(cust_dict.get("total_boxes", 0.0)),
-        cust_dict.get("id")
-    ))
-    conn.commit()
-    conn.close()
-
-def delete_customer_db(cust_id):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("DELETE FROM customers_master WHERE id = ?", (cust_id,))
-    conn.commit()
-    conn.close()
-
-# --- UNIVERSAL GOOGLE SHEET LOADER (EXACT HEADER MATCH) ---
-@st.cache_data(ttl=5)
-def get_master_df():
-    try:
-        raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
-        h_idx = 0
-        for i in range(min(15, len(raw_df))):
-            row_vals = [str(x).upper().strip() for x in raw_df.iloc[i].values if pd.notna(x)]
-            if "ITEM NAME" in row_vals:
-                h_idx = i
-                break
-                
-        headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
-        data_rows = raw_df.iloc[h_idx + 1:].copy()
-        
-        item_col = 0
-        cf_col = None
-        pu_col = None
-        
-        for idx, h in enumerate(headers):
-            if h == "ITEM NAME":
-                item_col = idx
-            elif h == "CON FACTOR":
-                cf_col = idx
-            elif "PACKING" in h:
-                pu_col = idx
-
-        if cf_col is None: cf_col = 7
-        if pu_col is None: pu_col = 8
-
-        parsed_stock = []
-        for _, r in data_rows.iterrows():
-            if item_col >= len(r) or not pd.notna(r.iloc[item_col]): 
-                continue
-            item_name = str(r.iloc[item_col]).strip()
-            if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
-                continue
-            
-            cf_val = 1.0
-            if cf_col < len(r) and pd.notna(r.iloc[cf_col]):
-                try:
-                    cf_val = float(str(r.iloc[cf_col]).replace(',', '').strip())
-                except Exception:
-                    cf_val = 1.0
-            if cf_val <= 0: cf_val = 1.0
-
-            pu_val = 1.0
-            if pu_col < len(r) and pd.notna(r.iloc[pu_col]):
-                try:
-                    pu_val = float(str(r.iloc[pu_col]).replace(',', '').strip())
-                except Exception:
-                    pu_val = 1.0
-            if pu_val <= 0: pu_val = 1.0
-                
-            box_cov = round(cf_val * pu_val, 2)
-            parsed_stock.append({
-                "item_name": item_name,
-                "con_factor": cf_val,
-                "packing_unit": pu_val,
-                "sqft_per_box": box_cov if box_cov > 0 else 1.0
-            })
-            
-        df = pd.DataFrame(parsed_stock).drop_duplicates(subset=["item_name"])
-        if not df.empty:
-            return df
-    except Exception as ex:
-        st.error(f"Google Sheet Sync Error: {str(ex)}")
-    return pd.DataFrame()
-
-def calculate_box_sqft(cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        return round(cov, 2) if cov > 0 else 1.0
-    except Exception:
-        return 1.0
-
-def calculate_boxes(sqft, cf, pu):
-    try:
-        cov = float(cf) * float(pu)
-        if cov <= 0:
-            cov = 1.0
-        return math.ceil(float(sqft) / cov)
-    except Exception:
-        return 0
+master_df = get_master_df()
 
 # --- PDF GENERATOR ---
 def generate_pdf_quotation(customer_info, items_list):
@@ -355,7 +153,6 @@ if st.session_state.role == "admin":
     nav_list.extend(["📊 Executive Dashboard", "⚙️ Stock Master & Settings"])
 
 nav = st.sidebar.radio("Navigation Flow", nav_list)
-master_df = get_master_df()
 
 # --- PAGE 1: CUSTOMER REGISTRATION & HISTORY ---
 if nav == "1️⃣ Customer Registration & History":
@@ -382,6 +179,7 @@ if nav == "1️⃣ Customer Registration & History":
             if st.form_submit_button("💾 Save Customer & Start Selection", type="primary"):
                 if c_name.strip() and c_mob.strip():
                     new_cust = insert_new_customer(c_name.strip(), c_mob.strip(), c_site.strip(), c_eng.strip(), st.session_state.username, assigned_branch)
+                    push_db_to_github()
                     st.session_state.current_customer = new_cust
                     st.success(f"🎉 Customer **{c_name}** (#ID: {new_cust['id']}) register ho gaya! Sidebar se **'2️⃣ Tile Selection'** par jayein.")
                 else:
@@ -417,6 +215,7 @@ if nav == "1️⃣ Customer Registration & History":
             with b_del:
                 if st.button("🗑️ Delete Customer", type="secondary", use_container_width=True):
                     delete_customer_db(chosen_cust['id'])
+                    push_db_to_github()
                     if st.session_state.get("current_customer") and st.session_state.current_customer.get("id") == chosen_cust['id']:
                         st.session_state.current_customer = None
                     st.success(f"Customer delete kar diya gaya hai!")
@@ -481,6 +280,7 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         curr_c.setdefault("selections", []).append(new_item)
         curr_c["status"] = "SELECTION ONLY"
         update_customer_db(curr_c)
+        push_db_to_github()
         st.session_state.current_customer = curr_c
         st.success(f"✅ **{chosen_tile}** permanently save ho gayi!")
         st.rerun()
@@ -560,6 +360,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             if st.button("❌ Remove", key=f"btn_del_{it['id']}", type="secondary"):
                 curr_c["selections"] = [x for x in curr_c["selections"] if x.get("id") != it.get("id")]
                 update_customer_db(curr_c)
+                push_db_to_github()
                 st.session_state.current_customer = curr_c
                 st.rerun()
 
@@ -576,6 +377,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         curr_c["total_sqft"] = sum(x["sqft"] for x in updated_items)
         curr_c["total_boxes"] = sum(x["boxes"] for x in updated_items)
         update_customer_db(curr_c)
+        push_db_to_github()
         st.session_state.current_customer = curr_c
 
     st.markdown("### 📋 Final Bill of Quantities (BOQ)")
@@ -638,6 +440,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             curr_c["total_sqft"] = tot_sq
             curr_c["total_boxes"] = tot_bx
             update_customer_db(curr_c)
+            push_db_to_github()
             st.session_state.current_customer = None
             st.success(f"🎉 **{curr_c['name']}** finalize ho gaya!")
             st.rerun()
@@ -766,7 +569,7 @@ with st.sidebar.expander("💾 Customer Data Backup"):
     if uploaded_backup is not None:
         try:
             restored_data = json.load(uploaded_backup)
-            conn = get_db()
+            conn = sqlite3.connect(DB_FILE, check_same_thread=False)
             c = conn.cursor()
             for rc in restored_data:
                 c.execute("""
@@ -782,6 +585,7 @@ with st.sidebar.expander("💾 Customer Data Backup"):
                 ))
             conn.commit()
             conn.close()
+            push_db_to_github()
             st.success("✅ Database successfully restore ho gaya!")
             st.rerun()
         except Exception as e:
