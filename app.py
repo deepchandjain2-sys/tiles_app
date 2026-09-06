@@ -594,25 +594,25 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     k2.metric("Total Area", f"{tot_sq:.2f} Sq.Ft")
     k3.metric("Total Required Boxes", f"{tot_bx:.0f} Boxes")
     
-    wa_msg = f"🏛️ *JAY GRANITE & TILES - {curr_c.get('branch', 'HIRIYUR').upper()} SHOWROOM*\n"
-    wa_msg += f"ESTIMATE & BOQ QUOTATION\n\n"
+    wa_msg = f"🏢 *JAY GRANITE & TILES - {curr.get('branch', 'HIRIYUR').upper()} SHOWROOM*\n"
+    wa_msg += f" ESTIMATE & BOQ QUOTATION\n\n"
     wa_msg += f"👤 *Client Name:* {curr_c['name']}\n"
     wa_msg += f"📱 *Mobile:* {curr_c['mobile']}\n"
-    wa_msg += f"👔 *Staff:* {curr_c.get('salesman', 'Admin')} ({curr_c.get('branch', 'Hiriyur')})\n"
+    wa_msg += f"👨‍💼 *Staff:* {curr_c.get('salesman', 'Admin')} ({curr_c.get('branch', 'Hiriyur')})\n"
     wa_msg += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
-    wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
-    for it in curr_c["selections"]:
-        wa_msg += f" floor: {it.get('area')} | {it.get('surface')}\n"
-        wa_msg += f" Tile: {it.get('tile')}\n"
-        wa_msg += f" Area: {it.get('sqft'):.2f} Sq.Ft\n"
-        wa_msg += f" Required: {it.get('boxes'):.0f} Boxes\n"
-        wa_msg += f" Physical Stock: [      ]\n"  # Yeh manager ke liye stock enter karne ki jagah jod dega
-        wa_msg += f"\n"
-        wa_msg += f"📦 *Grand Total Area:* {tot_sq:.2f} Sq.Ft\n"
-        wa_msg += f"📦 *Grand Total Boxes:* {tot_bx:.0f} Boxes\n"
-        wa_msg += f"📦 *Grand Total Boxes:* {tot_bx:.0f} Boxes\n\n"
-        wa_msg += f"Thank you for choosing Jay Granite & Tiles!"
+    wa_msg += f"----------------------------------------\n"
 
+    for it in curr_c["selections"]:
+        wa_msg += f"📍 Floor: {it.get('area')} | {it.get('surface')}\n"
+        wa_msg += f"🧱 Tile: {it.get('tile')}\n"
+        wa_msg += f"📐 Area: {it.get('sqft'):.2f} Sq.Ft\n"
+        wa_msg += f"📦 Required: {it.get('boxes'):.0f} Boxes\n"
+        wa_msg += f"📝 Physical Stock: [      ]\n"
+        wa_msg += f"----------------------------------------\n"
+
+    wa_msg += f"📦 *Grand Total Area:* {tot_sq:.2f} Sq.Ft\n"
+    wa_msg += f"📦 *Grand Total Boxes:* {tot_bx:.0f} Boxes\n"
+    wa_msg += f"Thank you for choosing Jay Granite & Tiles!"
     with st.expander("👁️ View / Copy WhatsApp Message Text"):
         st.text_area("Message Preview:", value=wa_msg, height=180)
 
