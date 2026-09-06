@@ -1720,5 +1720,12 @@
         "board": 6,
         "design": "TOURMALINE SILVER TECH 80X160 ITALICA",
         "status": "Available"
+    },
+    {
+        "location": "Davangere",
+        "stand": 2,
+        "board": 7,
+        "design": "TOURMALINE SILVER TECH 80X160 ITALICA",
+        "status": "Available"
     }
 ]
