@@ -1741,5 +1741,12 @@
         "board": 23,
         "design": "PALIDO WHITE 80X160 ITALICA",
         "status": "Available"
+    },
+    {
+        "location": "Davangere",
+        "stand": 3,
+        "board": 1,
+        "design": "COSMO LIGHT GLAMOUR 4X6 9MM ITALICA",
+        "status": "Available"
     }
 ]
