@@ -1734,5 +1734,12 @@
         "board": 11,
         "design": "CRYSTELLA ORO GLIT FUSION 80X160 ITALICA",
         "status": "Available"
+    },
+    {
+        "location": "Davangere",
+        "stand": 2,
+        "board": 23,
+        "design": "PALIDO WHITE 80X160 ITALICA",
+        "status": "Available"
     }
 ]
