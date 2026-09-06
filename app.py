@@ -426,6 +426,42 @@ if nav == "1️⃣ Customer Registration & History":
                     st.rerun()
         else:
             st.info("Abhi koi saved customer nahi hai.")
+            # --- CUSTOMER DATA BACKUP & RESTORE (JSON) ---
+with st.sidebar.expander("💾 Customer Data Backup"):
+    all_clients_backup = get_all_customers_db()
+    json_data = json.dumps(all_clients_backup, ensure_ascii=False, indent=4)
+    st.download_button(
+        label="📥 Download Database Backup",
+        data=json_data,
+        file_name=f"jay_granite_backup_{datetime.now().strftime('%Y%m%d')}.json",
+        mime="application/json",
+        use_container_width=True
+    )
+    
+    uploaded_backup = st.file_uploader("📤 Restore Database", type=["json"])
+    if uploaded_backup is not None:
+        try:
+            restored_data = json.load(uploaded_backup)
+            conn = get_db()
+            c = conn.cursor()
+            for rc in restored_data:
+                c.execute("""
+                    INSERT OR REPLACE INTO customers_master 
+                    (id, name, mobile, address, engineer, salesman, branch, status, selections_json, total_sqft, total_boxes, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    rc.get("id"), rc.get("name"), rc.get("mobile"), rc.get("address"),
+                    rc.get("engineer"), rc.get("salesman"), rc.get("branch", "Hiriyur"),
+                    rc.get("status", "SELECTION ONLY"), json.dumps(rc.get("selections", [])),
+                    float(rc.get("total_sqft", 0.0)), float(rc.get("total_boxes", 0.0)),
+                    rc.get("created_at", datetime.now().strftime("%d-%m-%Y %H:%M"))
+                ))
+            conn.commit()
+            conn.close()
+            st.success("✅ Database successfully restore ho gaya!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Restore error: {str(e)}")
 
 # --- PAGE 2: TILE SELECTION ---
 elif nav == "2️⃣ Tile Selection (Showroom)":
