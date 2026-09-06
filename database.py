@@ -49,6 +49,6 @@ def push_db_to_github():
     except Exception:
         pass
 
-# Automatically pull DB on startup
+# Pull database from GitHub when app starts
 if not os.path.exists(DB_FILE):
     fetch_db_from_github()
