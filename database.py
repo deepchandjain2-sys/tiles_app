@@ -4,7 +4,7 @@ import requests
 import pandas as pd
 import streamlit as st
 
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_URL = st.secrets.get("sb_publishable_oi8gTy66MV8CTq-DasQHAA_M1Wvgg-g "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
