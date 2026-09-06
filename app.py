@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 from datetime import datetime
+from database import push_db_to_github
 
 st.set_page_config(
     page_title="Jay Granite & Tiles Hub",
@@ -136,7 +137,7 @@ def delete_customer_db(cust_id):
     conn.commit()
     conn.close()
 
-# --- UNIVERSAL GOOGLE SHEET LOADER (EXACT HEADER MATCH FIX) ---
+# --- UNIVERSAL GOOGLE SHEET LOADER (EXACT HEADER MATCH) ---
 @st.cache_data(ttl=5)
 def get_master_df():
     try:
@@ -155,16 +156,14 @@ def get_master_df():
         cf_col = None
         pu_col = None
         
-        # EXACT Match lagaya hai taaki galti se 'CON FACTOR TYPE' na uth jaye
         for idx, h in enumerate(headers):
             if h == "ITEM NAME":
                 item_col = idx
-            elif h == "CON FACTOR":  # Sirf aur sirf exact H column match hoga
+            elif h == "CON FACTOR":
                 cf_col = idx
             elif "PACKING" in h:
                 pu_col = idx
 
-        # Agar header naam match na ho, tab hi default 7 aur 8 lega
         if cf_col is None: cf_col = 7
         if pu_col is None: pu_col = 8
 
@@ -176,7 +175,6 @@ def get_master_df():
             if not item_name or item_name.upper() in ["NAN", "ITEM NAME", "TOTAL", "NONE", "NULL", "UNNAMED", ""]:
                 continue
             
-            # Con Factor
             cf_val = 1.0
             if cf_col < len(r) and pd.notna(r.iloc[cf_col]):
                 try:
@@ -185,7 +183,6 @@ def get_master_df():
                     cf_val = 1.0
             if cf_val <= 0: cf_val = 1.0
 
-            # Packing Unit
             pu_val = 1.0
             if pu_col < len(r) and pd.notna(r.iloc[pu_col]):
                 try:
@@ -426,42 +423,6 @@ if nav == "1️⃣ Customer Registration & History":
                     st.rerun()
         else:
             st.info("Abhi koi saved customer nahi hai.")
-            # --- CUSTOMER DATA BACKUP & RESTORE (JSON) ---
-with st.sidebar.expander("💾 Customer Data Backup"):
-    all_clients_backup = get_all_customers_db()
-    json_data = json.dumps(all_clients_backup, ensure_ascii=False, indent=4)
-    st.download_button(
-        label="📥 Download Database Backup",
-        data=json_data,
-        file_name=f"jay_granite_backup_{datetime.now().strftime('%Y%m%d')}.json",
-        mime="application/json",
-        use_container_width=True
-    )
-    
-    uploaded_backup = st.file_uploader("📤 Restore Database", type=["json"])
-    if uploaded_backup is not None:
-        try:
-            restored_data = json.load(uploaded_backup)
-            conn = get_db()
-            c = conn.cursor()
-            for rc in restored_data:
-                c.execute("""
-                    INSERT OR REPLACE INTO customers_master 
-                    (id, name, mobile, address, engineer, salesman, branch, status, selections_json, total_sqft, total_boxes, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    rc.get("id"), rc.get("name"), rc.get("mobile"), rc.get("address"),
-                    rc.get("engineer"), rc.get("salesman"), rc.get("branch", "Hiriyur"),
-                    rc.get("status", "SELECTION ONLY"), json.dumps(rc.get("selections", [])),
-                    float(rc.get("total_sqft", 0.0)), float(rc.get("total_boxes", 0.0)),
-                    rc.get("created_at", datetime.now().strftime("%d-%m-%Y %H:%M"))
-                ))
-            conn.commit()
-            conn.close()
-            st.success("✅ Database successfully restore ho gaya!")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Restore error: {str(e)}")
 
 # --- PAGE 2: TILE SELECTION ---
 elif nav == "2️⃣ Tile Selection (Showroom)":
@@ -534,7 +495,6 @@ elif nav == "2️⃣ Tile Selection (Showroom)":
         st.info("👉 Selection ke baad sidebar se **'3️⃣ Sq.Ft Entry & Final Estimate'** page par jayein.")
     else:
         st.caption("Abhi koi tile select nahi hui hai.")
-        
 
 # --- PAGE 3: SQFT ENTRY & FINAL ESTIMATE ---
 elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
@@ -722,7 +682,6 @@ elif nav == "📈 Salesman Progress Report":
                 st.dataframe(summary, use_container_width=True)
 
 # --- PAGE 5: EXECUTIVE DASHBOARD ---
-# --- PAGE 5: EXECUTIVE DASHBOARD ---
 elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
     st.title("📊 Executive Business & Showroom Comparison Dashboard")
     all_clients = get_all_customers_db()
@@ -776,6 +735,7 @@ elif nav == "📊 Executive Dashboard" and st.session_state.role == "admin":
             freq_df = pd.Series(all_items_flat).value_counts().reset_index()
             freq_df.columns = ["Tile Item Name", "Times Selected"]
             st.dataframe(freq_df, use_container_width=True)
+
 # --- PAGE 6: STOCK MASTER ---
 elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin":
     st.title("⚙️ Live Stock Master (Google Sheet Linked)")
@@ -789,7 +749,8 @@ elif nav == "⚙️ Stock Master & Settings" and st.session_state.role == "admin
         "packing_unit": "Packing (Col I)",
         "sqft_per_box": "Coverage SqFt/Box"
     }), use_container_width=True)
-# --- CUSTOMER DATA BACKUP & RESTORE ---
+
+# --- CUSTOMER DATA BACKUP & RESTORE (SIDEBAR) ---
 with st.sidebar.expander("💾 Customer Data Backup"):
     all_clients_backup = get_all_customers_db()
     json_data = json.dumps(all_clients_backup, ensure_ascii=False, indent=4)
