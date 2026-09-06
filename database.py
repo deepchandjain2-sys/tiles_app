@@ -4,10 +4,8 @@ import base64
 import requests
 import streamlit as st
 
-GITHUB_TOKEN = 
-REPO_NAME = GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
-DB_FILE = "jay_granite_master.db"
-
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
+REPO_NAME = st.secrets.get("REPO_NAME", "deepchandjain2-sys/tiles_app")
 def fetch_db_from_github():
     if not GITHUB_TOKEN:
         return
