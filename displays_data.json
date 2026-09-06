@@ -1762,5 +1762,19 @@
         "board": 2,
         "design": "RHODIUM BROWN MATT 2X4 ITALICA",
         "status": "Available"
+    },
+    {
+        "location": "Davangere",
+        "stand": 3,
+        "board": 3,
+        "design": "KOLAN BEIGE MAGNUM 2X4 VARMORA",
+        "status": "Available"
+    },
+    {
+        "location": "Davangere",
+        "stand": 3,
+        "board": 3,
+        "design": "KOLAN BEIGE DECOR MAGNUM 2X4 VARMORA",
+        "status": "Available"
     }
 ]
