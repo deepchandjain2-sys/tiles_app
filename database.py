@@ -1,136 +1,60 @@
-import sqlite3
 import os
-import base64
+import json
 import requests
 import pandas as pd
 import streamlit as st
 
-GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")
-REPO_NAME = st.secrets.get("REPO_NAME", "deepchandjain2-sys/tiles_app")
-DB_FILE = "jay_granite_master.db"
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
-def get_db():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
-
-def init_database():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS customers_master (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            mobile TEXT,
-            address TEXT,
-            engineer TEXT,
-            salesman TEXT,
-            branch TEXT DEFAULT 'Hiriyur',
-            status TEXT DEFAULT 'SELECTION ONLY',
-            selections_json TEXT DEFAULT '[]',
-            total_sqft REAL DEFAULT 0.0,
-            total_boxes REAL DEFAULT 0.0,
-            created_at TEXT
-        )
-    """)
-    conn.commit()
-    try:
-        c.execute("ALTER TABLE customers_master ADD COLUMN branch TEXT DEFAULT 'Hiriyur'")
-        conn.commit()
-    except Exception:
-        pass
-    conn.close()
-
-init_database()
-
-def fetch_db_from_github():
-    if not GITHUB_TOKEN or not REPO_NAME:
-        return
-    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
-    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github+json"}
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            content_encoded = response.json().get("content", "")
-            decoded_bytes = base64.b64decode(content_encoded)
-            with open(DB_FILE, "wb") as f:
-                f.write(decoded_bytes)
-    except Exception:
-        pass
-
-def push_db_to_github():
-    if not GITHUB_TOKEN or not REPO_NAME:
-        return
-    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{DB_FILE}"
-    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github+json"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        sha = r.json().get("sha") if r.status_code == 200 else None
-
-        if os.path.exists(DB_FILE):
-            with open(DB_FILE, "rb") as f:
-                content_bytes = f.read()
-            content_encoded = base64.b64encode(content_bytes).decode("utf-8")
-
-            payload = {
-                "message": "Auto-sync SQLite database [skip ci]",
-                "content": content_encoded,
-                "branch": "main"
-            }
-            if sha:
-                payload["sha"] = sha
-
-            requests.put(url, headers=headers, json=payload, timeout=10)
-    except Exception:
-        pass
-
-if not os.path.exists(DB_FILE):
-    fetch_db_from_github()
+def get_supabase_headers():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
 
 def get_all_customers_db():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT id, name, mobile, address, engineer, salesman, status, selections_json, total_sqft, total_boxes, created_at, branch FROM customers_master ORDER BY id DESC")
-    rows = c.fetchall()
-    conn.close()
-    
-    import json
-    clients = []
-    for r in rows:
-        try:
-            sels = json.loads(r[7])
-        except Exception:
-            sels = []
-        clients.append({
-            "id": r[0],
-            "name": r[1],
-            "mobile": r[2],
-            "address": r[3],
-            "engineer": r[4],
-            "salesman": r[5],
-            "status": r[6],
-            "selections": sels,
-            "total_sqft": r[8],
-            "total_boxes": r[9],
-            "created_at": r[10],
-            "branch": r[11] if len(r) > 11 and r[11] else "Hiriyur"
-        })
-    return clients
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return []
+    url = f"{SUPABASE_URL}/rest/v1/customers_master?select=*"
+    try:
+        response = requests.get(url, headers=get_supabase_headers(), timeout=10)
+        if response.status_code == 200:
+            rows = response.json()
+            clients = []
+            for r in rows:
+                try:
+                    sels = json.loads(r.get("selections_json", "[]"))
+                except Exception:
+                    sels = []
+                clients.append({
+                    "id": r.get("id"),
+                    "name": r.get("name"),
+                    "mobile": r.get("mobile"),
+                    "address": r.get("address"),
+                    "engineer": r.get("engineer"),
+                    "salesman": r.get("salesman"),
+                    "status": r.get("status", "SELECTION ONLY"),
+                    "selections": sels,
+                    "total_sqft": float(r.get("total_sqft", 0.0) or 0.0),
+                    "total_boxes": float(r.get("total_boxes", 0.0) or 0.0),
+                    "created_at": r.get("created_at"),
+                    "branch": r.get("branch", "Hiriyur")
+                })
+            # Sort by ID descending so newest are on top
+            clients.sort(key=lambda x: x["id"], reverse=True)
+            return clients
+    except Exception:
+        pass
+    return []
 
 def insert_new_customer(name, mobile, address, engineer, salesman, branch):
-    conn = get_db()
-    c = conn.cursor()
     from datetime import datetime
     now_str = datetime.now().strftime("%d-%m-%Y %H:%M")
-    c.execute("""
-        INSERT INTO customers_master (name, mobile, address, engineer, salesman, branch, status, selections_json, total_sqft, total_boxes, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'SELECTION ONLY', '[]', 0.0, 0.0, ?)
-    """, (name, mobile, address, engineer, salesman, branch, now_str))
-    new_id = c.lastrowid
-    conn.commit()
-    conn.close()
-    push_db_to_github()
-    return {
-        "id": new_id,
+    payload = {
         "name": name,
         "mobile": mobile,
         "address": address,
@@ -138,45 +62,71 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch):
         "salesman": salesman,
         "branch": branch,
         "status": "SELECTION ONLY",
-        "selections": [],
+        "selections_json": "[]",
         "total_sqft": 0.0,
         "total_boxes": 0.0,
         "created_at": now_str
     }
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return {"id": int(datetime.now().timestamp()), **payload, "selections": []}
+    
+    url = f"{SUPABASE_URL}/rest/v1/customers_master"
+    try:
+        response = requests.post(url, headers=get_supabase_headers(), json=payload, timeout=10)
+        if response.status_code in [200, 201]:
+            data = response.json()
+            if data and len(data) > 0:
+                inserted = data[0]
+                return {
+                    "id": inserted.get("id"),
+                    "name": inserted.get("name"),
+                    "mobile": inserted.get("mobile"),
+                    "address": inserted.get("address"),
+                    "engineer": inserted.get("engineer"),
+                    "salesman": inserted.get("salesman"),
+                    "branch": inserted.get("branch", "Hiriyur"),
+                    "status": inserted.get("status", "SELECTION ONLY"),
+                    "selections": [],
+                    "total_sqft": 0.0,
+                    "total_boxes": 0.0,
+                    "created_at": inserted.get("created_at")
+                }
+    except Exception:
+        pass
+    return {"id": int(datetime.now().timestamp()), **payload, "selections": []}
 
 def update_customer_db(cust_dict):
-    conn = get_db()
-    c = conn.cursor()
-    import json
-    sels_json = json.dumps(cust_dict.get("selections", []), ensure_ascii=False)
-    c.execute("""
-        UPDATE customers_master 
-        SET name = ?, mobile = ?, address = ?, engineer = ?, salesman = ?, branch = ?, status = ?, selections_json = ?, total_sqft = ?, total_boxes = ?
-        WHERE id = ?
-    """, (
-        cust_dict.get("name"),
-        cust_dict.get("mobile"),
-        cust_dict.get("address"),
-        cust_dict.get("engineer"),
-        cust_dict.get("salesman"),
-        cust_dict.get("branch", "Hiriyur"),
-        cust_dict.get("status", "SELECTION ONLY"),
-        sels_json,
-        float(cust_dict.get("total_sqft", 0.0)),
-        float(cust_dict.get("total_boxes", 0.0)),
-        cust_dict.get("id")
-    ))
-    conn.commit()
-    conn.close()
-    push_db_to_github()
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    cust_id = cust_dict.get("id")
+    if not cust_id:
+        return
+    url = f"{SUPABASE_URL}/rest/v1/customers_master?id=eq.{cust_id}"
+    payload = {
+        "name": cust_dict.get("name"),
+        "mobile": cust_dict.get("mobile"),
+        "address": cust_dict.get("address"),
+        "engineer": cust_dict.get("engineer"),
+        "salesman": cust_dict.get("salesman"),
+        "branch": cust_dict.get("branch", "Hiriyur"),
+        "status": cust_dict.get("status", "SELECTION ONLY"),
+        "selections_json": json.dumps(cust_dict.get("selections", []), ensure_ascii=False),
+        "total_sqft": float(cust_dict.get("total_sqft", 0.0)),
+        "total_boxes": float(cust_dict.get("total_boxes", 0.0))
+    }
+    try:
+        requests.patch(url, headers=get_supabase_headers(), json=payload, timeout=10)
+    except Exception:
+        pass
 
 def delete_customer_db(cust_id):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("DELETE FROM customers_master WHERE id = ?", (cust_id,))
-    conn.commit()
-    conn.close()
-    push_db_to_github()
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    url = f"{SUPABASE_URL}/rest/v1/customers_master?id=eq.{cust_id}"
+    try:
+        requests.delete(url, headers=get_supabase_headers(), timeout=10)
+    except Exception:
+        pass
 
 @st.cache_data(ttl=5)
 def get_master_df():
