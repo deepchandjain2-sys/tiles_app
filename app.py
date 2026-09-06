@@ -601,7 +601,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     wa_msg += f"👔 *Staff:* {curr_c.get('salesman', 'Admin')} ({curr_c.get('branch', 'Hiriyur')})\n"
     wa_msg += f"📅 *Date:* {datetime.now().strftime('%d-%m-%Y')}\n"
     wa_msg += f"━━━━━━━━━━━━━━━━━━━━\n"
-   for it in curr_c["selections"]:
+    for it in curr_c["selections"]:
         wa_msg += f" floor: {it.get('area')} | {it.get('surface')}\n"
         wa_msg += f" Tile: {it.get('tile')}\n"
         wa_msg += f" Area: {it.get('sqft'):.2f} Sq.Ft\n"
