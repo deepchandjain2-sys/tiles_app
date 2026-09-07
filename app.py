@@ -261,18 +261,17 @@ def generate_pdf_quotation(customer_info, items_list):
     for it in items_list:
         sq = float(it.get("sqft", 0.0))
         bx = float(it.get("boxes", 0.0))
-        tot_sqft += sq
+        tot_sq += sq
         tot_boxes += bx
-        
-        pdf.cell(22, 6, str(it.get("floor", "-"))[:12], 1, 0, "C")
-        pdf.cell(32, 6, str(it.get("area", "-"))[:18], 1, 0, "L")
-        pdf.cell(62, 6, str(it.get("tile", "-"))[:34], 1, 0, "L")
-        pdf.cell(18, 6, f"{float(it.get('con_factor', 1.0)):.2f}", 1, 0, "C")
-        pdf.cell(16, 6, f"{float(it.get('packing_unit', 1.0)):.0f}", 1, 0, "C")
-        pdf.cell(20, 6, f"{sq:.2f}", 1, 0, "R")
-        pdf.cell(20, 6, f"{bx:.0f}", 1, 1, "R")
-        pdf.cell(25, 7, "Phys. Stock", 1, 1, "R", fill=True)
-        
+
+        pdf.cell(20, 6, str(it.get("floor", "-")), 1, 0, "C")
+        pdf.cell(28, 6, str(it.get("area", "-")), 1, 0, "L")
+        pdf.cell(54, 6, str(it.get("tile", "-")), 1, 0, "L")
+        pdf.cell(16, 6, f"{float(it.get('con_factor', 1.0)):.2f}", 1, 0, "R")
+        pdf.cell(14, 6, f"{float(it.get('packing', 1.0)):.0f}", 1, 0, "R")
+        pdf.cell(18, 6, f"{sq:.2f}", 1, 0, "R")
+        pdf.cell(18, 6, f"{bx:.0f}", 1, 0, "R")
+        pdf.cell(22, 6, "", 1, 1, "R")    
     pdf.set_font("Helvetica", "B", 8)
     pdf.cell(150, 7, "Grand Total", 1, 0, "R", fill=True)
     pdf.cell(20, 7, f"{tot_sqft:.2f}", 1, 0, "R", fill=True)
