@@ -193,6 +193,43 @@ def get_master_df():
     except Exception as ex:
         st.error(f"Google Sheet Sync Error: {str(ex)}")
     return pd.DataFrame()
+    def get_staff_users_db():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return []
+    url = f"{SUPABASE_URL}/rest/v1/staff_users?select=*"
+    try:
+        response = requests.get(url, headers=get_supabase_headers(), timeout=10)
+        if response.status_code == 200:
+            return response.json()
+    except Exception:
+        pass
+    return []
+
+def insert_staff_user_db(username, password, branch, role):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return False
+    url = f"{SUPABASE_URL}/rest/v1/staff_users"
+    payload = {
+        "username": username,
+        "password": password,
+        "branch": branch,
+        "role": role
+    }
+    try:
+        response = requests.post(url, headers=get_supabase_headers(), json=payload, timeout=10)
+        return response.status_code in [200, 201]
+    except Exception:
+        return False
+
+def delete_staff_user_db(user_id):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return False
+    url = f"{SUPABASE_URL}/rest/v1/staff_users?id=eq.{user_id}"
+    try:
+        response = requests.delete(url, headers=get_supabase_headers(), timeout=10)
+        return response.status_code in [200, 204]
+    except Exception:
+        return False
 
 def calculate_box_sqft(cf, pu):
     try:
