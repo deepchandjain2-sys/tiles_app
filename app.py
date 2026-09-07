@@ -327,6 +327,48 @@ if not st.session_state.auth:
                 else:
                     st.error("Credentials enter karein.")
     st.stop()
+    # Staff Management Panel (Admin Only)
+if st.session_state.get("role") == "Admin":
+    with st.expander("👥 Staff Management (Add / Remove Salesmen)", expanded=False):
+        st.subheader("Create New Salesman Credential")
+        new_username = st.text_input("New Salesman Username", key="new_staff_username")
+        new_password = st.text_input("New Salesman Password", type="password", key="new_staff_password")
+        new_branch = st.selectbox("Branch / Showroom", ["Hiriyur"], key="new_staff_branch")
+        
+        if st.button("Add Salesman"):
+            if new_username and new_password:
+                success = insert_staff_user_db(new_username, new_password, new_branch, "Salesman")
+                if success:
+                    st.success(f"Salesman '{new_username}' added successfully!")
+                    st.rerun()
+                else:
+                    st.error("Failed to add staff member. Try again.")
+            else:
+                st.warning("Please enter both username and password.")
+        
+        st.divider()
+        st.subheader("Existing Staff List")
+        staff_list = get_staff_users_db()
+        if staff_list:
+            for staff in staff_list:
+                col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+                with col1:
+                    st.write(f"**User:** {staff.get('username')}")
+                with col2:
+                    st.write(f"**Role:** {staff.get('role')}")
+                with col3:
+                    st.write(f"**Branch:** {staff.get('branch')}")
+                with col4:
+                    if staff.get('role') != "Admin": # Prevent deleting admin accidentally
+                        if st.button("Delete", key=f"del_staff_{staff.get('id')}"):
+                            del_success = delete_staff_user_db(staff.get('id'))
+                            if del_success:
+                                st.success("Staff removed successfully!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to remove staff.")
+        else:
+            st.info("No staff members found.")
 
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.title(f"👤 {st.session_state.username.upper()}")
