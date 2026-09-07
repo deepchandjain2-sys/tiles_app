@@ -247,12 +247,13 @@ def generate_pdf_quotation(customer_info, items_list):
     
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(22, 7, "Floor", 1, 0, "C", fill=True)
-    pdf.cell(32, 7, "Area", 1, 0, "C", fill=True)
-    pdf.cell(62, 7, "Tile Item", 1, 0, "L", fill=True)
-    pdf.cell(18, 7, "Con Fac (H)", 1, 0, "C", fill=True)
-    pdf.cell(16, 7, "Pack (I)", 1, 0, "C", fill=True)
-    pdf.cell(20, 7, "Req. Boxes", 1, 0, "R", fill=True)
+    pdf.cell(20, 7, "Floor", 1, 0, "C", fill=True)
+    pdf.cell(28, 7, "Area", 1, 0, "C", fill=True)
+    pdf.cell(50, 7, "Tile Item", 1, 0, "L", fill=True)
+    pdf.cell(16, 7, "Con Fac (H)", 1, 0, "C", fill=True)
+    pdf.cell(14, 7, "Pack (I)", 1, 0, "C", fill=True)
+    pdf.cell(20, 7, "Total Sq.Ft", 1, 0, "R", fill=True)
+    pdf.cell(18, 7, "Req. Boxes", 1, 0, "R", fill=True)
     pdf.cell(22, 7, "Stock Avail.", 1, 1, "R", fill=True)
    
     tot_sq = 0.0
@@ -263,22 +264,20 @@ def generate_pdf_quotation(customer_info, items_list):
         tot_sq += sq
         tot_boxes += bx
 
-        pdf.cell(22, 6, str(it.get("floor", "-")), 1, 0, "C")
+        pdf.cell(20, 6, str(it.get("floor", "-")), 1, 0, "C")
         pdf.cell(28, 6, str(it.get("area", "-")), 1, 0, "L")
-        pdf.cell(54, 6, str(it.get("tile", "-")), 1, 0, "L")
+        pdf.cell(50, 6, str(it.get("tile", "-")), 1, 0, "L")
         pdf.cell(16, 6, f"{float(it.get('con_factor', 1.0)):.2f}", 1, 0, "R")
-        pdf.cell(14, 6, f"{float(it.get('packing', 1.0)):.0f}", 1, 0, "R")
-        pdf.cell(18, 6, f"{sq:.2f}", 1, 0, "R")
+        pdf.cell(14, 6, f"{float(it.get('packing', it.get('pack', 1.0))):.0f}", 1, 0, "R")
+        pdf.cell(20, 6, f"{sq:.2f}", 1, 0, "R")
         pdf.cell(18, 6, f"{bx:.0f}", 1, 0, "R")
         pdf.cell(22, 6, "", 1, 1, "R")
-
     # Grand Total Row at the bottom
     pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(138, 7, "Grand Total", 1, 0, "R", fill=True)
-    pdf.cell(18, 7, f"{tot_sq:.2f}", 1, 0, "R", fill=True)
+    pdf.cell(128, 7, "Grand Total", 1, 0, "R", fill=True)
+    pdf.cell(20, 7, f"{tot_sq:.2f}", 1, 0, "R", fill=True)
     pdf.cell(18, 7, f"{tot_boxes:.0f}", 1, 0, "R", fill=True)
-    pdf.cell(22, 7, "", 1, 1, "R", fill=True)
-    return bytes(pdf.output())
+    pdf.cell(22, 7, "", 1, 1, "R", fill=True)return bytes(pdf.output())
 
 # --- SESSION INITIALIZATION ---
 if "auth" not in st.session_state:
