@@ -268,7 +268,7 @@ def generate_pdf_quotation(customer_info, items_list):
         pdf.cell(28, 6, str(it.get("area", "-")), 1, 0, "L")
         pdf.cell(50, 6, str(it.get("tile", "-")), 1, 0, "L")
         pdf.cell(16, 6, f"{float(it.get('con_factor', 1.0)):.2f}", 1, 0, "R")
-        pdf.cell(14, 6, f"{float(it.get('packing', it.get('pack', 1.0))):.0f}", 1, 0, "R")
+        pdf.cell(14, 6, f"{float(it.get('packing', it.get('pack', it.get('packing_unit', 1.0)))):.0f}", 1, 0, "R")       
         pdf.cell(20, 6, f"{sq:.2f}", 1, 0, "R")
         pdf.cell(18, 6, f"{bx:.0f}", 1, 0, "R")
         pdf.cell(22, 6, "", 1, 1, "R")
