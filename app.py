@@ -265,7 +265,7 @@ def generate_pdf_quotation(customer_info, items_list):
         tot_sq += sq
         tot_boxes += bx
 
-        pdf.cell(20, 6, str(it.get("floor", "-")), 1, 0, "C")
+        pdf.cell(22, 6, str(it.get("floor", "-")), 1, 0, "C")
         pdf.cell(28, 6, str(it.get("area", "-")), 1, 0, "L")
         pdf.cell(54, 6, str(it.get("tile", "-")), 1, 0, "L")
         pdf.cell(16, 6, f"{float(it.get('con_factor', 1.0)):.2f}", 1, 0, "R")
