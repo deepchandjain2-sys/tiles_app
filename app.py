@@ -252,9 +252,8 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.cell(62, 7, "Tile Item", 1, 0, "L", fill=True)
     pdf.cell(18, 7, "Con Fac (H)", 1, 0, "C", fill=True)
     pdf.cell(16, 7, "Pack (I)", 1, 0, "C", fill=True)
-    pdf.cell(20, 7, ""Req. Boxes Total Sq.Ft", 1, 0, "R", fill=True)
-    pdf.cell(20, 7, "physical box," 1, 0, "R", fill=True)
-    pdf.cell(22, 7, "Phys. Stock", 1, 1, "R", fill=True)
+    pdf.cell(20, 7, "Req. Boxes", 1, 0, "R", fill=True)
+    pdf.cell(22, 7, "Stock Avail.", 1, 1, "R", fill=True)pdf.cell(22, 7, "Phys. Stock", 1, 1, "R", fill=True)
     tot_sq = 0.0
     tot_boxes = 0.0
     tot_boxes = 0.0
