@@ -254,7 +254,8 @@ def generate_pdf_quotation(customer_info, items_list):
     pdf.cell(16, 7, "Pack (I)", 1, 0, "C", fill=True)
     pdf.cell(20, 7, "Total Sq.Ft", 1, 0, "R", fill=True)
     pdf.cell(20, 7, "Req. Boxes", 1, 1, "R", fill=True)
-    
+    tot_sq = 0.0
+    tot_boxes = 0.0
     pdf.set_font("Helvetica", "", 8)
     for it in items_list:
         sq = float(it.get("sqft", 0.0))
