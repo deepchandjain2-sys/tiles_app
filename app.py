@@ -279,11 +279,11 @@ def generate_pdf_quotation(customer_info, items_list):
         pdf.cell(18, 6, f"{sq:.2f}", 1, 0, "R")
         pdf.cell(18, 6, f"{bx:.0f}", 1, 0, "R")
         pdf.cell(22, 6, "", 1, 1, "R")    
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(150, 7, "Grand Total", 1, 0, "R", fill=True)
-    pdf.cell(20, 7, f"{tot_sqft:.2f}", 1, 0, "R", fill=True)
-    pdf.cell(20, 7, f"{tot_boxes:.0f}", 1, 1, "R", fill=True)
-    
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(138, 7, "Grand Total", 1, 0, "R", fill=True)
+    pdf.cell(18, 7, f"{tot_sq:.2f}", 1, 0, "R", fill=True)
+    pdf.cell(18, 7, f"{tot_boxes:.0f}", 1, 0, "R", fill=True)
+    pdf.cell(22, 7, "", 1, 1, "R", fill=True) 
     return bytes(pdf.output())
 
 # --- SESSION INITIALIZATION ---
