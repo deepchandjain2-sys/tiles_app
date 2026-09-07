@@ -271,6 +271,7 @@ def generate_pdf_quotation(customer_info, items_list):
         pdf.cell(16, 6, f"{float(it.get('packing_unit', 1.0)):.0f}", 1, 0, "C")
         pdf.cell(20, 6, f"{sq:.2f}", 1, 0, "R")
         pdf.cell(20, 6, f"{bx:.0f}", 1, 1, "R")
+        pdf.cell(25, 7, "Phys. Stock", 1, 1, "R", fill=True)
         
     pdf.set_font("Helvetica", "B", 8)
     pdf.cell(150, 7, "Grand Total", 1, 0, "R", fill=True)
