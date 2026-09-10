@@ -108,7 +108,6 @@ if menu == "1. Customer Registration":
             else:
                 st.error("Please fill Customer Name and Mobile Number.")
 
-
 # --- PAGE 2: TILE SELECTION & BOQ ---
 elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
@@ -121,25 +120,21 @@ elif menu == "2. Tile Selection & BOQ":
         
         st.markdown("### 🏢 Building Area Selection")
         
-        # Single Building Area Classification
         area_category = st.selectbox("Select Building Area (Floor, Wall & Custom)", [
-            "-- Select Floor Area --",
+            "-- Select Building Area --",
             "Ground Floor", "1st Floor", "2nd Floor", "3rd Floor",
             "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
             "3rd Bedroom Floor", "4th Bedroom Floor", "Attached Bathroom Floor", 
             "Common Bathroom Floor", "Parking Area", "Front Area", "Pooja Room Floor",
-            "-- Select Wall Area --",
             "Kitchen Wall", "Bathroom Wall", "Living Room Wall", "Elevation Wall", "Balcony Wall",
-            "-- Custom Area --",
             "Custom Building Area"
         ])
         
-        custom_area_name = ""
-        if area_category == "-- Custom Area --" or area_category == "Custom Building Area":
-            custom_area_name = st.text_input("Enter Custom Area Name (e.g. Staircase Floor, Passage Wall)")
-            area_category = f"Custom: {custom_area_name}" if custom_area_name else "Custom Area"
+        if area_category == "Custom Building Area":
+            custom_area_name = st.text_input("Enter Custom Area Name (e.g. Staircase, Passage)")
+            if custom_area_name:
+                area_category = f"Custom: {custom_area_name}"
 
-        # Design Search from Google Sheet Catalog
         st.markdown("#### Search Tile Design from Catalog")
         search_query = st.text_input("Search Design by Name / Code / Size")
         
@@ -175,15 +170,17 @@ elif menu == "2. Tile Selection & BOQ":
         else:
             st.warning("Master catalog loading or empty. Check Google Sheet URL.")
 
-            if cust['selections']:
+        if cust['selections']:
             st.markdown("### Selected Items Queue")
             st.dataframe(pd.DataFrame(cust['selections']))
-    elif menu == "3. Calculation & Final Estimate":
-       st.title("Step 3: Calculation & Order Finalization")
+
+# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
+elif menu == "3. Calculation & Final Estimate":
+    st.title("Step 3: Calculation & Order Finalization")
     
-       if not st.session_state['customer'] or not st.session_state['customer']['selections']:
+    if not st.session_state['customer'] or not st.session_state['customer']['selections']:
         st.warning("No active customer selections found. Please complete Step 1 & Step 2 first.")
-       else:
+    else:
         cust = st.session_state['customer']
         st.write(f"**Customer:** {cust['name']} | **Mobile:** {cust['mobile']}")
         
@@ -222,33 +219,6 @@ elif menu == "Dashboard & Salesman Summary":
         "Total Sq.Ft Finalized": [5200, 4100, 3100],
         "Status": ["Active", "Active", "Active"]
     }))
-# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
-elif menu == "3. Calculation & Final Estimate":
-    st.title("Step 3: Calculation & Order Finalization")
-    
-    if not st.session_state['customer'] or not st.session_state['customer']['selections']:
-        st.warning("No active customer selections found. Please complete Step 1 & Step 2 first.")
-    else:
-        cust = st.session_state['customer']
-        st.write(f"**Customer:** {cust['name']} | **Mobile:** {cust['mobile']}")
-        
-        st.dataframe(pd.DataFrame(cust['selections']))
-        
-        sqft_tot, box_tot = calculate_totals(cust['selections'])
-        st.metric("Total Billable Area", f"{sqft_tot} Sq.Ft")
-        st.metric("Total Boxes Required", f"{box_tot} Boxes")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("✅ Finalize Deal & Save to Supabase"):
-                cust['status'] = "FINALIZED"
-                if save_customer_to_db(cust):
-                    st.success("Order finalized and securely archived to Supabase cloud!")
-                else:
-                    st.error("Cloud sync failed. Please check connection.")
-        with col2:
-            wa_link = generate_whatsapp_link(cust['mobile'], cust['name'], cust['selections'], sqft_tot, box_tot)
-            st.markdown(f"### [📲 Send Estimate via WhatsApp]({wa_link})", unsafe_allow_html=True)
 
 # --- ADMIN USER MANAGEMENT ---
 elif menu == "Admin User Management":
