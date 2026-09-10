@@ -80,7 +80,7 @@ if st.sidebar.button("Sign Out"):
 if menu == "1. Customer Registration":
     st.title("Step 1: Customer & Party Management")
     
-    # Session state mein saved customers ki list maintain karne ke liye
+    # Session state initialization check
     if 'saved_customers' not in st.session_state:
         st.session_state['saved_customers'] = []
 
@@ -114,8 +114,10 @@ if menu == "1. Customer Registration":
                         "total_boxes": 0.0
                     }
                     st.session_state['customer'] = new_cust
-                    # List mein bhi add kar dete hain taaki yahin dikhe
-                    if new_cust not in st.session_state['saved_customers']:
+                    
+                    # Check if already exists in saved list to avoid duplicates
+                    exists = any(c['mobile'] == c_mobile for c in st.session_state['saved_customers'])
+                    if not exists:
                         st.session_state['saved_customers'].append(new_cust)
                         
                     st.success("Customer registered successfully! Now click on '2. Tile Selection & BOQ' from the left menu.")
@@ -124,9 +126,8 @@ if menu == "1. Customer Registration":
     else:
         st.markdown("### 📋 Existing Customers / Parties List")
         if not st.session_state['saved_customers']:
-            st.info("No customers registered yet in this session. Please register a new customer first.")
+            st.info("No customers registered yet. Please register a new customer first.")
         else:
-            # Customers ki list dropdown ya selectbox ke liye
             cust_names = [f"{c['name']} ({c['mobile']})" for c in st.session_state['saved_customers']]
             selected_party = st.selectbox("Select Party / Customer to Modify", cust_names)
             
@@ -139,7 +140,7 @@ if menu == "1. Customer Registration":
                 st.write(f"**Current Selections Count:** {len(active_c['selections'])} items")
                 
                 if st.button("Load this Customer for Tile Modification"):
-                    st.success(f"Customer '{active_c['name']}' loaded! Now go to '2. Tile Selection & BOQ' to change or add tiles.")# --- PAGE 2: TILE SELECTION & BOQ ---
+                    st.success(f"Customer '{active_c['name']}' loaded! Now go to '2. Tile Selection & BOQ' to change or add tiles.")                    # --- PAGE 2: TILE SELECTION & BOQ ---
 elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
     
