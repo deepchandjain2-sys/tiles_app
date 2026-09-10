@@ -48,13 +48,22 @@ master_df = get_master_df()
 st.sidebar.title(f"User: {st.session_state['user']}")
 st.sidebar.markdown(f"**Role:** {st.session_state['role']}")
 
-# Yahan par aap apni current aur future branches add kar sakte hain
-branch = st.sidebar.selectbox("Showroom Branch", [
+# --- SIDEBAR BRANCH SELECTION ---
+st.sidebar.title(f"User: {st.session_state['user']}")
+st.sidebar.markdown(f"**Role:** {st.session_state['role']}")
+
+branch_option = st.sidebar.selectbox("Showroom Branch", [
     "Hiriyur", 
     "Davangere", 
-    "Add New Branch..." # Future ke liye placeholder ya aur branches yahan jod sakte hain
+    "Add New Branch..."
 ])
-menu = st.sidebar.radio("Navigation Flow", [
+
+if branch_option == "Add New Branch...":
+    branch = st.sidebar.text_input("Enter New Branch Name")
+    if not branch:
+        branch = "Hiriyur" # Default if empty
+else:
+    branch = branch_optionmenu = st.sidebar.radio("Navigation Flow", [
     "1. Customer Registration", 
     "2. Tile Selection & BOQ", 
     "3. Calculation & Final Estimate", 
