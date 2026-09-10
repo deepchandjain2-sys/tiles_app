@@ -700,8 +700,8 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     with b3:
         if st.button("Finalize Deal & Archive Customer", type="primary", use_container_width=True):
             curr_c["status"] = "FINALIZED"
-            curr_c["total_sqft"] = tot_sqft
-            curr_c["total_boxes"] = tot_boxes
+            curr_c["total_sqft"] = tot_sq
+            curr_c["total_boxes"] = tot_bx
             success, err_msg = update_customer_db(curr_c)
             if success:
                 st.success(f"**{curr_c.get('name', 'Customer')}** finalize ho gaya!")
