@@ -80,9 +80,10 @@ if st.sidebar.button("Sign Out"):
 if menu == "1. Customer Registration":
     st.title("Step 1: Customer & Party Management")
     
-    # Session state initialization check
-    if 'saved_customers' not in st.session_state:
-        st.session_state['saved_customers'] = []
+    # Supabase se existing customers fetch karenge taaki data permanent rahe
+    from database import get_all_customers_from_db, delete_customer_from_db
+    
+    saved_db_customers = get_all_customers_from_db()
 
     reg_mode = st.radio("Select Mode", ["Register New Customer", "Select Existing Customer / Party"])
 
@@ -115,33 +116,40 @@ if menu == "1. Customer Registration":
                     }
                     st.session_state['customer'] = new_cust
                     
-                    # Check if already exists in saved list to avoid duplicates
-                    exists = any(c['mobile'] == c_mobile for c in st.session_state['saved_customers'])
-                    if not exists:
-                        st.session_state['saved_customers'].append(new_cust)
-                        
-                    st.success("Customer registered successfully! Now click on '2. Tile Selection & BOQ' from the left menu.")
+                    # Supabase database mein save kar rahe hain taaki permanent rahe
+                    if save_customer_to_db(new_cust):
+                        st.success("Customer registered & saved permanently to database!")
+                    else:
+                        st.warning("Registered in session, but database sync pending. Check Supabase connection.")
                 else:
                     st.error("Please fill Customer Name and Mobile Number.")
     else:
-        st.markdown("### 📋 Existing Customers / Parties List")
-        if not st.session_state['saved_customers']:
-            st.info("No customers registered yet. Please register a new customer first.")
+        st.markdown("### 📋 Permanent Existing Customers / Parties List")
+        if not saved_db_customers:
+            st.info("No customers found in database yet. Please register a new customer.")
         else:
-            cust_names = [f"{c['name']} ({c['mobile']})" for c in st.session_state['saved_customers']]
+            cust_names = [f"{c['name']} ({c['mobile']})" for c in saved_db_customers]
             selected_party = st.selectbox("Select Party / Customer to Modify", cust_names)
             
             if selected_party:
                 idx = cust_names.index(selected_party)
-                active_c = st.session_state['saved_customers'][idx]
+                active_c = saved_db_customers[idx]
                 st.session_state['customer'] = active_c
                 
                 st.write(f"**Active Party Selected:** {active_c['name']} | **Mobile:** {active_c['mobile']}")
-                st.write(f"**Current Selections Count:** {len(active_c['selections'])} items")
+                st.write(f"**Current Selections Count:** {len(active_c.get('selections', []))} items")
                 
-                if st.button("Load this Customer for Tile Modification"):
-                    st.success(f"Customer '{active_c['name']}' loaded! Now go to '2. Tile Selection & BOQ' to change or add tiles.")                    # --- PAGE 2: TILE SELECTION & BOQ ---
-elif menu == "2. Tile Selection & BOQ":
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("Load this Customer for Tile Modification"):
+                        st.success(f"Customer '{active_c['name']}' loaded! Now go to '2. Tile Selection & BOQ'.")
+                with col_btn2:
+                    if st.button("🗑️ Delete Customer Permanently"):
+                        if delete_customer_from_db(active_c['mobile']):
+                            st.success("Customer deleted successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete customer.")elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
     
     if not st.session_state['customer']:
