@@ -112,13 +112,9 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
 
 def update_customer_db(cust_dict):
     if not SUPABASE_URL or not SUPABASE_KEY:
-        return
-    cust_id = cust_dict.get("id")
-    if not cust_id:
-        print("Error: Customer ID missing for update")
-        return
+        return False
         
-    url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
+    cust_id = cust_dict.get("id")
     payload = {
         "name": cust_dict.get("name"),
         "mobile": cust_dict.get("mobile"),
@@ -131,14 +127,25 @@ def update_customer_db(cust_dict):
         "total_sqft": float(cust_dict.get("total_sqft", 0.0)),
         "total_boxes": float(cust_dict.get("total_boxes", 0.0))
     }
+    
+    # Agar ID nahi hai ya update fail ho, toh insert kar do
+    if cust_id:
+        url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
+        try:
+            response = requests.patch(url, headers=get_supabase_headers(), json=payload, timeout=10)
+            if response.status_code in [200, 204]:
+                return True
+        except Exception as e:
+            print(f"Update error: {e}")
+            
+    # Fallback: Agar ID na ho ya patch kaam na kare toh naya row insert kar do
+    insert_url = f"{SUPABASE_URL}/rest/v1/customer_master"
     try:
-        response = requests.patch(url, headers=get_supabase_headers(), json=payload, timeout=10)
-        print("Update Response:", response.status_code, response.text)
-        return response.status_code in [200, 204]
+        response = requests.post(insert_url, headers=get_supabase_headers(), json=payload, timeout=10)
+        return response.status_code in [200, 201]
     except Exception as e:
-        print(f"Error updating customer: {e}")
-    return False
-def delete_customer_db(cust_id):
+        print(f"Insert fallback error: {e}")
+    return Falsedef delete_customer_db(cust_id):
     if not SUPABASE_URL or not SUPABASE_KEY:
         return
     url = f"{SUPABASE_URL}/rest/v1/customers_master?id=eq.{cust_id}"
