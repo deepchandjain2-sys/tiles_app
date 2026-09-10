@@ -65,6 +65,17 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
         "total_boxes": total_boxes,
         "created_at": now_str
     }
+    def update_customer_db(customer):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    cust_id = customer.get("id")
+    url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
+    try:
+        response = requests.patch(url, headers=get_supabase_headers(), json=customer, timeout=10)
+        return response.status_code in [200, 204]
+    except Exception as e:
+        print(f"Error updating customer: {e}")
+    return False
     if not SUPABASE_URL or not SUPABASE_KEY:
         return {"id": int(datetime.now().timestamp()), **payload, "selections": []}
         
