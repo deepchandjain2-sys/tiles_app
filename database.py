@@ -70,7 +70,7 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
         
     url = f"{SUPABASE_URL}/rest/v1/customer_master"
     try:
-        response = requests.post(url, headers=get_supabase_headers(), json=payload, timeout=10)
+        response = requests.post(url, headers=get_supabase_headers(), json-payload, timeout=10)
         if response.status_code in [200, 201]:
             return response.json()
     except Exception as e:
