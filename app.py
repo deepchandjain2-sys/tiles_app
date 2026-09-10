@@ -620,6 +620,25 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         curr_c["total_boxes"] = sum(x["boxes"] for x in updated_items)
         update_customer_db(curr_c)
         st.session_state.current_customer = curr_c
+        if st.button("💾 Save Selection & Finalize Deal", use_container_width=True):
+    try:
+        # Apke database.py ke function ko call karna
+        insert_new_customer(
+            name=client_name,
+            mobile=mobile,
+            address=client_address,
+            engineer=engineer_name,
+            salesman=st.session_state.username,
+            branch="Hiriyur", # ya jo bhi branch selected ho
+            status="FINALIZED",
+            selections_json=st.session_state.selected_tiles,
+            total_sqft=st.session_state.total_sqft,
+            total_boxes=st.session_state.total_boxes
+        )
+        st.success("Customer selection and estimate successfully saved to Supabase cloud!")
+    except Exception as e:
+        st.error(f"Error saving data: {e}")
+        
 
     st.markdown("### 📋 Final Bill of Quantities (BOQ)")
     summary_df = pd.DataFrame(curr_c["selections"])[["floor", "surface", "area", "tile", "con_factor", "packing_unit", "sqft", "boxes"]]
