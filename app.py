@@ -150,7 +150,7 @@ if menu == "1. Customer Registration":
                             st.rerun()
                         else:
                             st.error("Failed to delete customer.")
-                        elif menu == "2. Tile Selection & BOQ":
+              elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
     
     if not st.session_state['customer']:
