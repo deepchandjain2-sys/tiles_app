@@ -6,13 +6,17 @@ from calculations import calculate_totals, generate_whatsapp_link
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub - Hiriyur", layout="wide")
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWP3S6r7Ujwm-kczX8OGevw4yXWTPbMLvL87PGTR_0w#JK5O0W8Ky"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
-# --- SESSION STATE SETUP ---
-for key, default in [('logged_in', False), ('user', None), ('role', None), ('customer', None)]:
-    if key not in st.session_state:
-        st.session_state[key] = default
+# --- LOAD MASTER CATALOG ---
+@st.cache_data(ttl=3600)
+def get_master_df():
+    try:
+        return pd.read_csv(GOOGLE_SHEET_CSV_URL)
+    except Exception:
+        return pd.DataFrame()
 
+master_df = get_master_df()
 # --- 1. LOGIN PAGE ---
 if not st.session_state['logged_in']:
     st.title("🔐 Jay Granite & Tiles Hub - Secure Login")
