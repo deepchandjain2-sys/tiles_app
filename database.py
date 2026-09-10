@@ -65,16 +65,42 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
         "total_boxes": total_boxes,
         "created_at": now_str
     }
-    def update_customer_db(customer):
+    def update_customer_db(cust_dict):
     if not SUPABASE_URL or not SUPABASE_KEY:
-        return
-    cust_id = customer.get("id")
-    url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
+        return False
+        
+    cust_id = cust_dict.get("id")
+    payload = {
+        "name": cust_dict.get("name"),
+        "mobile": cust_dict.get("mobile"),
+        "address": cust_dict.get("address"),
+        "engineer": cust_dict.get("engineer"),
+        "salesman": cust_dict.get("salesman"),
+        "branch": cust_dict.get("branch", "Hiriyur"),
+        "status": cust_dict.get("status", "FINALIZED"),
+        "selections_json": json.dumps(cust_dict.get("selections", []), ensure_ascii=False),
+        "total_sqft": float(cust_dict.get("total_sqft", 0.0)),
+        "total_boxes": float(cust_dict.get("total_boxes", 0.0))
+    }
+    
+    # Agar ID available hai toh pehle PATCH (update) try karo
+    if cust_id:
+        url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
+        try:
+            res = requests.patch(url, headers=get_supabase_headers(), json=payload, timeout=10)
+            if res.status_code in [200, 204]:
+                return True
+        except Exception as e:
+            print(f"Patch error: {e}")
+            
+    # Fallback: Agar update fail ho ya ID na ho toh POST (insert) karo
+    url = f"{SUPABASE_URL}/rest/v1/customer_master"
     try:
-        response = requests.patch(url, headers=get_supabase_headers(), json=customer, timeout=10)
-        return response.status_code in [200, 204]
+        res = requests.post(url, headers=get_supabase_headers(), json=payload, timeout=10)
+        print("Supabase Insert Response:", res.status_code, res.text)
+        return res.status_code in [200, 201]
     except Exception as e:
-        print(f"Error updating customer: {e}")
+        print(f"Post error: {e}")
     return False
     if not SUPABASE_URL or not SUPABASE_KEY:
         return {"id": int(datetime.now().timestamp()), **payload, "selections": []}
