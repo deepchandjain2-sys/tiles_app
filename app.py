@@ -1,13 +1,17 @@
 import os
 import json
 import requests
-import streamlit as st
-import sqlite3
-import pandas as pd
-from datetime import datetime
 
 SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHppemlyd3hheGFibnBjaGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyMzg2ODMsImV4cCI6MjA1NjgxNDY4M30.YOUR_ANON_KEY_HERE"
+
+def get_supabase_headers():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
 
 def update_customer_db(cust_dict):
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -27,12 +31,7 @@ def update_customer_db(cust_dict):
         "total_boxes": float(cust_dict.get("total_boxes", 0.0))
     }
     
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=representation"
-    }
+    headers = get_supabase_headers()
     
     if cust_id:
         url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
@@ -42,8 +41,7 @@ def update_customer_db(cust_dict):
             
     url = f"{SUPABASE_URL}/rest/v1/customer_master"
     res = requests.post(url, headers=headers, json=payload, timeout=10)
-    return res.status_code in [200, 201]
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+    return res.status_code in [200, 201]GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 DB_FILE = "jay_granite_master.db"
 
 # --- SQLITE DATABASE ENGINE ---
