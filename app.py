@@ -38,7 +38,7 @@ if not st.session_state['logged_in']:
 @st.cache_data(ttl=3600)
 def get_master_df():
     try:
-        return pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        return pd.read_csv(GOOGLE_SHEET_CSV_URL)="https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
     except:
         return pd.DataFrame()
 
