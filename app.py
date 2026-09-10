@@ -38,12 +38,14 @@ if not st.session_state['logged_in']:
 @st.cache_data(ttl=3600)
 def get_master_df():
     try:
-        return pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        # Column names ke aage-peeche ke spaces hata kar uppercase kar denge
+        df.columns = df.columns.str.strip().str.upper()
+        return df
     except Exception:
         return pd.DataFrame()
 
 master_df = get_master_df()
-
 # --- SIDEBAR NAVIGATION & BRANCH ---
 st.sidebar.title(f"User: {st.session_state['user']}")
 st.sidebar.markdown(f"**Role:** {st.session_state['role']}")
