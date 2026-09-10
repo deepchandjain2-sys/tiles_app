@@ -109,29 +109,36 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch):
     }
 
 def update_customer_db(cust_dict):
-    conn = get_db()
-    c = conn.cursor()
-    sels_json = json.dumps(cust_dict.get("selections", []), ensure_ascii=False)
-    c.execute("""
-        UPDATE customers_master 
-        SET name = ?, mobile = ?, address = ?, engineer = ?, salesman = ?, branch = ?, status = ?, selections_json = ?, total_sqft = ?, total_boxes = ?
-        WHERE id = ?
-    """, (
-        cust_dict.get("name"),
-        cust_dict.get("mobile"),
-        cust_dict.get("address"),
-        cust_dict.get("engineer"),
-        cust_dict.get("salesman"),
-        cust_dict.get("branch", "Hiriyur"),
-        cust_dict.get("status", "SELECTION ONLY"),
-        sels_json,
-        float(cust_dict.get("total_sqft", 0.0)),
-        float(cust_dict.get("total_boxes", 0.0)),
-        cust_dict.get("id")
-    ))
-    conn.commit()
-    conn.close()
-
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return False
+        
+    cust_id = cust_dict.get("id")
+    payload = {
+        "name": cust_dict.get("name"),
+        "mobile": cust_dict.get("mobile"),
+        "address": cust_dict.get("address"),
+        "engineer": cust_dict.get("engineer"),
+        "salesman": cust_dict.get("salesman"),
+        "branch": cust_dict.get("branch", "Hiriyur"),
+        "status": cust_dict.get("status", "FINALIZED"),
+        "selections_json": json.dumps(cust_dict.get("selections", []), ensure_ascii=False),
+        "total_sqft": float(cust_dict.get("total_sqft", 0.0)),
+        "total_boxes": float(cust_dict.get("total_boxes", 0.0))
+    }
+    
+    headers = get_supabase_headers()
+    headers["Prefer"] = "return=representation"
+    
+    if cust_id:
+        url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
+        res = requests.patch(url, headers=headers, json=payload, timeout=10)
+        if res.status_code in [200, 204]:
+            return True
+            
+    url = f"{SUPABASE_URL}/rest/v1/customer_master"
+    res = requests.post(url, headers=headers, json=payload, timeout=10)
+    print("Supabase Response:", res.status_code, res.text)
+    return res.status_code in [200, 201]
 def delete_customer_db(cust_id):
     conn = get_db()
     c = conn.cursor()
