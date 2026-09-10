@@ -6,7 +6,7 @@ from calculations import calculate_totals, generate_whatsapp_link
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub - Hiriyur", layout="wide")
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWP3S6r7Ujwm-kczX8OGevw4yXWTPbMLvL87PGTR_0w/pub?gid=1816738640&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
 # --- SESSION STATE SETUP ---
 for key, default in [('logged_in', False), ('user', None), ('role', None), ('customer', None)]:
