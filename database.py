@@ -16,7 +16,8 @@ supabase = init_supabase()
 def save_customer_to_db(cust_data):
     try:
         if supabase:
-            data = supabase.table("customers").upsert({
+            # Pehle check karein ki record pehle se toh nahi hai, agar hai toh delete/update karein ya direct insert karein
+            response = supabase.table("customers").upsert({
                 "mobile": str(cust_data['mobile']),
                 "name": str(cust_data['name']),
                 "address": str(cust_data.get('address', '')),
@@ -31,9 +32,10 @@ def save_customer_to_db(cust_data):
             }, on_conflict="mobile").execute()
             return True
     except Exception as e:
-        st.error(f"Supabase Error: {e}")
+        # Agar koi bhi error aayega toh ab wo seedha screen par dikhega
+        st.error(f"DB Error Details: {e}")
         return False
-def get_all_customers_from_db():
+    return Falsedef get_all_customers_from_db():
     try:
         if supabase:
             response = supabase.table("customers").select("*").execute()
