@@ -620,8 +620,8 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
         curr_c["total_boxes"] = sum(x["boxes"] for x in updated_items)
         update_customer_db(curr_c)
         st.session_state.current_customer = curr_c
-        if st.button("💾 Save Selection & Finalize Deal", use_container_width=True):
-    try:
+    if st.button("💾 Save Selection & Finalize Deal", use_container_width=True):
+       try:
         # Apke database.py ke function ko call karna
         insert_new_customer(
             name=client_name,
