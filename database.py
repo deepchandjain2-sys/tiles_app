@@ -1,22 +1,21 @@
 import streamlit as st
 from supabase import create_client, Client
-SUPABASE_URL = "gedzazirwxaxabnppchc"
-SUPABASE_KEY = "sb_publishable_oi8gTy66MV8CTq-DasQHAA_M1Wvgg-g"
+
+SUPABASE_URL = "https://gedzazriwvaxabnppchc.supabase.co"
+SUPABASE_KEY = "sb_publishable_o18gTy66MVBCtq-DasQHAA_MlWvg_g"
 
 @st.cache_resource
 def init_supabase():
     try:
-        client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        return client
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
-        st.error(f"Supabase Init Error: {e}")
         return None
+
 supabase = init_supabase()
 
 def save_customer_to_db(cust_data):
     try:
         if supabase:
-            # Pehle check karein ki record pehle se toh nahi hai, agar hai toh delete/update karein ya direct insert karein
             response = supabase.table("customers").upsert({
                 "mobile": str(cust_data['mobile']),
                 "name": str(cust_data['name']),
@@ -32,23 +31,23 @@ def save_customer_to_db(cust_data):
             }, on_conflict="mobile").execute()
             return True
     except Exception as e:
-        # Agar koi bhi error aayega toh ab wo seedha screen par dikhega
-        st.error(f"DB Error Details: {e}")
-        return False
-    return Falsedef get_all_customers_from_db():
+        st.error(f"Supabase Error: {e}")
+    return False
+
+def get_all_customers_from_db():
     try:
         if supabase:
             response = supabase.table("customers").select("*").execute()
             return response.data if response.data else []
     except Exception as e:
-        print(e)
+        pass
     return []
 
 def delete_customer_from_db(mobile):
     try:
         if supabase:
-            supabase.table("customers").delete().eq("mobile", mobile).execute()
+            supabase.table("customers").delete().eq("mobile", str(mobile)).execute()
             return True
     except Exception as e:
-        print(e)
+        pass
     return False
