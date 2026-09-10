@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import streamlit as st
+import sqlite3
 
 SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHppemlyd3hheGFibnBjaGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyMzg2ODMsImV4cCI6MjA1NjgxNDY4M30.YOUR_ANON_KEY_HERE"
