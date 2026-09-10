@@ -118,16 +118,27 @@ elif menu == "2. Tile Selection & BOQ":
         cust = st.session_state['customer']
         st.info(f"**Active Customer:** {cust['name']} | **Mobile:** {cust['mobile']} | **Branch:** {cust['branch']}")
         
-        area_category = st.selectbox("Select Application Area Type", [
-            "Ground Floor", "1st Floor", "2nd Floor", "3rd Floor",
-            "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
-            "Bathroom Floor", "Pooja Room Floor", "Kitchen Wall", "Bathroom Wall", "Custom Area"
-        ])
+        # Category Type: Floor Area ya Wall Area
+        category_type = st.radio("Select Area Category", ["Floor Area", "Wall Area", "Custom Area Type"])
         
-        custom_area_name = ""
-        if area_category == "Custom Area":
-            custom_area_name = st.text_input("Enter Custom Area Name (e.g. Balcony, Parking)")
+        area_category = ""
+        if category_type == "Floor Area":
+            area_category = st.selectbox("Select Floor Area Type", [
+                "Ground Floor", "1st Floor", "2nd Floor", "3rd Floor",
+                "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
+                "3rd Bedroom Floor", "4th Bedroom Floor", "Attached Bathroom Floor", 
+                "Common Bathroom Floor", "Parking Area", "Front Area", "Pooja Room Floor"
+            ])
+        elif category_type == "Wall Area":
+            area_category = st.selectbox("Select Wall Area Type", [
+                "Kitchen Wall", "Bathroom Wall", "Living Room Wall", "Elevation Wall", "Balcony Wall"
+            ])
+        else:
+            custom_main_type = st.text_input("Enter Custom Category (e.g. Staircase, Utility)")
+            custom_sub_name = st.text_input("Enter Specific Area Name (e.g. Steps, Passage)")
+            area_category = f"{custom_main_type} - {custom_sub_name}" if custom_main_type and custom_sub_name else "Custom Area"
 
+        # Design Search from Google Sheet Catalog
         st.markdown("#### Search Tile Design from Catalog")
         search_query = st.text_input("Search Design by Name / Code / Size")
         
@@ -144,9 +155,8 @@ elif menu == "2. Tile Selection & BOQ":
                 boxes_input = st.number_input("Required Boxes", min_value=0.0, value=10.0)
                 
                 if st.button("Add Design to Queue"):
-                    target_area = custom_area_name if area_category == "Custom Area" else area_category
                     item_entry = {
-                        "area_type": target_area,
+                        "area_type": area_category,
                         "tile_name": selected_tile,
                         "sqft": sqft_input,
                         "boxes": boxes_input
@@ -155,7 +165,7 @@ elif menu == "2. Tile Selection & BOQ":
                     sqft_tot, box_tot = calculate_totals(cust['selections'])
                     cust['total_sqft'] = sqft_tot
                     cust['total_boxes'] = box_tot
-                    st.success(f"Added {selected_tile} for {target_area} successfully!")
+                    st.success(f"Added {selected_tile} for {area_category} successfully!")
             else:
                 st.info("No matching designs found in Google Sheet catalog.")
         else:
@@ -163,9 +173,7 @@ elif menu == "2. Tile Selection & BOQ":
 
         if cust['selections']:
             st.markdown("### Selected Items Queue")
-            st.dataframe(pd.DataFrame(cust['selections']))
-
-# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
+            st.dataframe(pd.DataFrame(cust['selections']))# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
 elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation & Order Finalization")
     
