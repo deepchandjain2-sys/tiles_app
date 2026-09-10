@@ -49,9 +49,9 @@ def get_all_customers_db():
         pass
     return []
 
-def insert_new_customer(name, mobile, address, engineer, salesman, branch):
+def insert_new_customer(name, mobile, address, engineer, salesman, branch, status="SELECTION ONLY", selections_json="[]", total_sqft=0.0, total_boxes=0.0):
     from datetime import datetime
-    now_str = datetime.now().strftime("%d-%m-%Y %H:%M")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
         "name": name,
         "mobile": mobile,
@@ -59,21 +59,23 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch):
         "engineer": engineer,
         "salesman": salesman,
         "branch": branch,
-        "status": "SELECTION ONLY",
-        "selections_json": "[]",
-        "total_sqft": 0.0,
-        "total_boxes": 0.0,
+        "status": status,
+        "selections_json": selections_json,
+        "total_sqft": total_sqft,
+        "total_boxes": total_boxes,
         "created_at": now_str
     }
     if not SUPABASE_URL or not SUPABASE_KEY:
         return {"id": int(datetime.now().timestamp()), **payload, "selections": []}
-    
-    url = f"{SUPABASE_URL}/rest/v1/customers_master"
+        
+    url = f"{SUPABASE_URL}/rest/v1/customer_master"
     try:
         response = requests.post(url, headers=get_supabase_headers(), json=payload, timeout=10)
         if response.status_code in [200, 201]:
-            data = response.json()
-            if data and len(data) > 0:
+            return response.json()
+    except Exception as e:
+        print(f"Error inserting customer: {e}")
+    return None            if data and len(data) > 0:
                 inserted = data[0]
                 return {
                     "id": inserted.get("id"),
