@@ -115,8 +115,10 @@ def update_customer_db(cust_dict):
         return
     cust_id = cust_dict.get("id")
     if not cust_id:
+        print("Error: Customer ID missing for update")
         return
-    url = f"{SUPABASE_URL}/rest/v1/customers_master?id=eq.{cust_id}"
+        
+    url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
     payload = {
         "name": cust_dict.get("name"),
         "mobile": cust_dict.get("mobile"),
@@ -130,10 +132,12 @@ def update_customer_db(cust_dict):
         "total_boxes": float(cust_dict.get("total_boxes", 0.0))
     }
     try:
-        requests.patch(url, headers=get_supabase_headers(), json=payload, timeout=10)
-    except Exception:
-        pass
-
+        response = requests.patch(url, headers=get_supabase_headers(), json=payload, timeout=10)
+        print("Update Response:", response.status_code, response.text)
+        return response.status_code in [200, 204]
+    except Exception as e:
+        print(f"Error updating customer: {e}")
+    return False
 def delete_customer_db(cust_id):
     if not SUPABASE_URL or not SUPABASE_KEY:
         return
