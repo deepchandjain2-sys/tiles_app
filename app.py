@@ -108,7 +108,7 @@ if menu == "1. Customer Registration":
             else:
                 st.error("Please fill Customer Name and Mobile Number.")
 
-# --- PAGE 2: TILE SELECTION & BOQ ---
+
 # --- PAGE 2: TILE SELECTION & BOQ ---
 elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
@@ -222,6 +222,33 @@ elif menu == "Dashboard & Salesman Summary":
         "Total Sq.Ft Finalized": [5200, 4100, 3100],
         "Status": ["Active", "Active", "Active"]
     }))
+# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
+elif menu == "3. Calculation & Final Estimate":
+    st.title("Step 3: Calculation & Order Finalization")
+    
+    if not st.session_state['customer'] or not st.session_state['customer']['selections']:
+        st.warning("No active customer selections found. Please complete Step 1 & Step 2 first.")
+    else:
+        cust = st.session_state['customer']
+        st.write(f"**Customer:** {cust['name']} | **Mobile:** {cust['mobile']}")
+        
+        st.dataframe(pd.DataFrame(cust['selections']))
+        
+        sqft_tot, box_tot = calculate_totals(cust['selections'])
+        st.metric("Total Billable Area", f"{sqft_tot} Sq.Ft")
+        st.metric("Total Boxes Required", f"{box_tot} Boxes")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Finalize Deal & Save to Supabase"):
+                cust['status'] = "FINALIZED"
+                if save_customer_to_db(cust):
+                    st.success("Order finalized and securely archived to Supabase cloud!")
+                else:
+                    st.error("Cloud sync failed. Please check connection.")
+        with col2:
+            wa_link = generate_whatsapp_link(cust['mobile'], cust['name'], cust['selections'], sqft_tot, box_tot)
+            st.markdown(f"### [📲 Send Estimate via WhatsApp]({wa_link})", unsafe_allow_html=True)
 
 # --- ADMIN USER MANAGEMENT ---
 elif menu == "Admin User Management":
