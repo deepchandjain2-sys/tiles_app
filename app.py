@@ -44,11 +44,7 @@ def get_master_df():
 
 master_df = get_master_df()
 
-# --- SIDEBAR NAVIGATION ---
-st.sidebar.title(f"User: {st.session_state['user']}")
-st.sidebar.markdown(f"**Role:** {st.session_state['role']}")
-
-# --- SIDEBAR BRANCH SELECTION ---
+# --- SIDEBAR NAVIGATION & BRANCH ---
 st.sidebar.title(f"User: {st.session_state['user']}")
 st.sidebar.markdown(f"**Role:** {st.session_state['role']}")
 
@@ -61,9 +57,11 @@ branch_option = st.sidebar.selectbox("Showroom Branch", [
 if branch_option == "Add New Branch...":
     branch = st.sidebar.text_input("Enter New Branch Name")
     if not branch:
-        branch = "Hiriyur" # Default if empty
+        branch = "Hiriyur"
 else:
-    branch = branch_optionmenu = st.sidebar.radio("Navigation Flow", [
+    branch = branch_option
+
+menu = st.sidebar.radio("Navigation Flow", [
     "1. Customer Registration", 
     "2. Tile Selection & BOQ", 
     "3. Calculation & Final Estimate", 
@@ -118,9 +116,8 @@ elif menu == "2. Tile Selection & BOQ":
         st.warning("Please register a customer first from '1. Customer Registration'.")
     else:
         cust = st.session_state['customer']
-        st.info(f"**Active Customer:** {cust['name']} | **Mobile:** {cust['mobile']} | **Engineer:** {cust['engineer'] or 'N/A'}")
+        st.info(f"**Active Customer:** {cust['name']} | **Mobile:** {cust['mobile']} | **Branch:** {cust['branch']}")
         
-        # Area Selection Dropdown
         area_category = st.selectbox("Select Application Area Type", [
             "Ground Floor", "1st Floor", "2nd Floor", "3rd Floor",
             "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
@@ -131,7 +128,6 @@ elif menu == "2. Tile Selection & BOQ":
         if area_category == "Custom Area":
             custom_area_name = st.text_input("Enter Custom Area Name (e.g. Balcony, Parking)")
 
-        # Design Search from Google Sheet Catalog
         st.markdown("#### Search Tile Design from Catalog")
         search_query = st.text_input("Search Design by Name / Code / Size")
         
@@ -165,7 +161,6 @@ elif menu == "2. Tile Selection & BOQ":
         else:
             st.warning("Master catalog loading or empty. Check Google Sheet URL.")
 
-        # Show Queue Table
         if cust['selections']:
             st.markdown("### Selected Items Queue")
             st.dataframe(pd.DataFrame(cust['selections']))
