@@ -636,7 +636,7 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             total_boxes=st.session_state.total_boxes
         )
         st.success("Customer selection and estimate successfully saved to Supabase cloud!")
-    except Exception as e:
+       except Exception as e:
         st.error(f"Error saving data: {e}")
         
 
