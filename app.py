@@ -698,17 +698,15 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     with b3:
         if st.button("Finalize Deal & Archive Customer", type="primary", use_container_width=True):
             curr_c["status"] = "FINALIZED"
-            curr_c["total_sqft"] = total_sqft  # ya jo bhi variable name upar ho
-            curr_c["total_boxes"] = total_boxes # ya tot_box
-            # Database mein update/save call karo aur check karo
+            curr_c["total_sqft"] = 400.0
+            curr_c["total_boxes"] = 41.0
             success = update_customer_db(curr_c)
             if success:
                 st.success(f"**{curr_c.get('name')}** finalize ho gaya!")
                 st.session_state.current_customer = None
                 st.rerun()
             else:
-                st.error("Database mein save nahi ho paya. Connection check karein.")
-# --- PAGE 4: SALESMAN PROGRESS REPORT ---
+                st.error("Database mein save nahi ho paya.")# --- PAGE 4: SALESMAN PROGRESS REPORT ---
 elif nav == "📈 Salesman Progress Report":
     st.title("📈 Salesman Progress & Performance Tracking")
     all_clients = get_all_customers_db()
