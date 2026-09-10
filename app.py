@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from database import save_customer_to_db
-from calculations import calculate_totals, generate_whatsapp_link
+from database import save_customer_to_db, get_all_customers_from_db, delete_customer_from_db
+from calculations import calculate_totals, calculate_boxes_dynamic, generate_whatsapp_link
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub - Hiriyur", layout="wide")
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWP3S6r7Ujwm-kczX8OGevw4yXWTPbMLvL87PGTR_0w/pub?gid=1816738640&single=true&output=csv"
 
 # --- SESSION STATE SETUP ---
 for key, default in [('logged_in', False), ('user', None), ('role', None), ('customer', None)]:
@@ -39,13 +39,13 @@ if not st.session_state['logged_in']:
 def get_master_df():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        # Column names ke aage-peeche ke spaces hata kar uppercase kar denge
         df.columns = df.columns.str.strip().str.upper()
         return df
     except Exception:
         return pd.DataFrame()
 
 master_df = get_master_df()
+
 # --- SIDEBAR NAVIGATION & BRANCH ---
 st.sidebar.title(f"User: {st.session_state['user']}")
 st.sidebar.markdown(f"**Role:** {st.session_state['role']}")
@@ -80,9 +80,6 @@ if st.sidebar.button("Sign Out"):
 if menu == "1. Customer Registration":
     st.title("Step 1: Customer & Party Management")
     
-    # Supabase se existing customers fetch karenge taaki data permanent rahe
-    from database import get_all_customers_from_db, delete_customer_from_db
-    
     saved_db_customers = get_all_customers_from_db()
 
     reg_mode = st.radio("Select Mode", ["Register New Customer", "Select Existing Customer / Party"])
@@ -116,7 +113,6 @@ if menu == "1. Customer Registration":
                     }
                     st.session_state['customer'] = new_cust
                     
-                    # Supabase database mein save kar rahe hain taaki permanent rahe
                     if save_customer_to_db(new_cust):
                         st.success("Customer registered & saved permanently to database!")
                     else:
@@ -149,8 +145,10 @@ if menu == "1. Customer Registration":
                             st.success("Customer deleted successfully!")
                             st.rerun()
                         else:
-                            st.error("Failed to delete customer.")        
-              elif menu == "2. Tile Selection & BOQ":
+                            st.error("Failed to delete customer.")
+
+# --- PAGE 2: TILE SELECTION & BOQ ---
+elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
     
     if not st.session_state['customer']:
@@ -163,31 +161,15 @@ if menu == "1. Customer Registration":
         
         floor_level = st.selectbox("Select Floor Level", [
             "-- Select Floor Level --",
-            "Ground Floor", 
-            "1st Floor", 
-            "2nd Floor", 
-            "3rd Floor",
-            "Other / Independent Area"
+            "Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Other / Independent Area"
         ])
         
         area_type = st.selectbox("Select Building Area / Room", [
             "-- Select Area Type --",
-            "Hall Floor", 
-            "Kitchen Floor", 
-            "Master Bedroom Floor", 
-            "Common Bedroom Floor",
-            "3rd Bedroom Floor", 
-            "4th Bedroom Floor", 
-            "Attached Bathroom Floor", 
-            "Common Bathroom Floor", 
-            "Parking Area", 
-            "Front Area", 
-            "Pooja Room Floor",
-            "Kitchen Wall", 
-            "Bathroom Wall", 
-            "Living Room Wall", 
-            "Elevation Wall", 
-            "Balcony Wall",
+            "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
+            "3rd Bedroom Floor", "4th Bedroom Floor", "Attached Bathroom Floor", 
+            "Common Bathroom Floor", "Parking Area", "Front Area", "Pooja Room Floor",
+            "Kitchen Wall", "Bathroom Wall", "Living Room Wall", "Elevation Wall", "Balcony Wall",
             "Custom Area"
         ])
         
@@ -220,10 +202,25 @@ if menu == "1. Customer Registration":
                 if tile_options:
                     selected_tile = st.selectbox("Select Matching Design", tile_options)
                     
-                    # Yahan se Sq.Ft aur Boxes inputs hata di gayi hain. 
-                    # Ab yeh direct queue mein add hoga aur final estimate page par calculate hoga.
-                    sqft_input = 100.0  # Default base value
-                    boxes_input = 10.0  # Default base value
+                    sqft_input = st.number_input("Required Sq.Ft", min_value=0.0, value=100.0)
+                    
+                    tile_row = master_df[master_df[name_col] == selected_tile]
+                    
+                    con_factor = 1.0
+                    packing_unit = 1.0
+                    
+                    if not tile_row.empty:
+                        try:
+                            cols = list(master_df.columns)
+                            if len(cols) >= 9:
+                                con_factor = float(tile_row.iloc[0].values[7])
+                                packing_unit = float(tile_row.iloc[0].values[8])
+                        except:
+                            con_factor = 1.0
+                            packing_unit = 1.0
+                    
+                    calculated_boxes = calculate_boxes_dynamic(sqft_input, con_factor, packing_unit)
+                    st.info(f"Calculated Boxes for {sqft_input} Sq.Ft: **{calculated_boxes} Boxes** (Con Factor: {con_factor}, Packing: {packing_unit})")
                     
                     if st.button("Add Design to Queue"):
                         if not final_area_name or "-- Select" in final_area_name:
@@ -233,7 +230,7 @@ if menu == "1. Customer Registration":
                                 "area_type": final_area_name,
                                 "tile_name": selected_tile,
                                 "sqft": sqft_input,
-                                "boxes": boxes_input
+                                "boxes": calculated_boxes
                             }
                             cust['selections'].append(item_entry)
                             sqft_tot, box_tot = calculate_totals(cust['selections'])
@@ -249,7 +246,8 @@ if menu == "1. Customer Registration":
 
         if cust['selections']:
             st.markdown("### Selected Items Queue")
-            st.dataframe(pd.DataFrame(cust['selections']))# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
+            st.dataframe(pd.DataFrame(cust['selections']))
+
 # --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
 elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation & Order Finalization")
@@ -264,7 +262,6 @@ elif menu == "3. Calculation & Final Estimate":
         
         sqft_tot, box_tot = calculate_totals(cust['selections'])
         
-        # Totals ek line mein aur normal font size mein
         col_m1, col_m2 = st.columns(2)
         with col_m1:
             st.markdown(f"**Total Billable Area:** {sqft_tot} Sq.Ft")
@@ -283,7 +280,9 @@ elif menu == "3. Calculation & Final Estimate":
                     st.error("Cloud sync failed. Please check connection.")
         with col2:
             wa_link = generate_whatsapp_link(cust['mobile'], cust['name'], cust['selections'], sqft_tot, box_tot)
-            st.markdown(f"### [📲 Send Estimate via WhatsApp]({wa_link})", unsafe_allow_html=True)# --- DASHBOARD & SALESMAN SUMMARY ---
+            st.markdown(f"### [📲 Send Estimate via WhatsApp]({wa_link})", unsafe_allow_html=True)
+
+# --- DASHBOARD & SALESMAN SUMMARY ---
 elif menu == "Dashboard & Salesman Summary":
     st.title("📊 Executive Dashboard & Salesman Summary")
     st.markdown("Track team performance, total selections, and finalized deals.")
