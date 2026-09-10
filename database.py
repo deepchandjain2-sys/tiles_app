@@ -68,14 +68,18 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
     if not SUPABASE_URL or not SUPABASE_KEY:
         return {"id": int(datetime.now().timestamp()), **payload, "selections": []}
         
-    url = f"{SUPABASE_URL}/rest/v1/customer_master"
+   url = f"{SUPABASE_URL}/rest/v1/customer_master"
     try:
-        response = requests.post(url, headers=get_supabase_headers(), json-payload, timeout=10)
+        response = requests.post(url, headers=get_supabase_headers(), json=payload, timeout=10)
+        print("Supabase Response:", response.status_code, response.text) # Yeh error print karega
         if response.status_code in [200, 201]:
             return response.json()
+        else:
+            st.error(f"DB Error {response.status_code}: {response.text}")
     except Exception as e:
         print(f"Error inserting customer: {e}")
-    return None            if data and len(data) > 0:
+        st.error(f"Connection Exception: {e}")
+    return None   if data and len(data) > 0:
                 inserted = data[0]
                 return {
                     "id": inserted.get("id"),
