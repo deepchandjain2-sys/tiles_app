@@ -702,13 +702,13 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
             curr_c["status"] = "FINALIZED"
             curr_c["total_sqft"] = tot_sq
             curr_c["total_boxes"] = tot_bx
-            success, err_msg = update_customer_db(curr_c)
+            success = update_customer_db(curr_c)
             if success:
                 st.success(f"**{curr_c.get('name', 'Customer')}** finalize ho gaya!")
                 st.session_state.current_customer = None
                 st.rerun()
             else:
-                st.error(f"Supabase Error: {err_msg}")# --- PAGE 4: SALESMAN PROGRESS REPORT ---
+                st.error("Database mein save nahi ho paya.")# --- PAGE 4: SALESMAN PROGRESS REPORT ---
 elif nav == "📈 Salesman Progress Report":
     st.title("📈 Salesman Progress & Performance Tracking")
     all_clients = get_all_customers_db()
