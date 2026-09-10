@@ -164,43 +164,53 @@ elif menu == "2. Tile Selection & BOQ":
         st.markdown("#### Search Tile Design from Catalog")
         search_query = st.text_input("Search Design by Name / Code / Size")
         
-        if not master_df.empty and 'ITEM NAME' in master_df.columns:
-            filtered_df = master_df
-            if search_query:
-                filtered_df = master_df[master_df['ITEM NAME'].str.contains(search_query, case=False, na=False)]
+        if not master_df.empty:
+            name_col = None
+            for col in ['ITEM NAME', 'ITEM', 'NAME', 'TILE NAME', 'DESIGN NAME']:
+                if col in master_df.columns:
+                    name_col = col
+                    break
             
-            tile_options = filtered_df['ITEM NAME'].dropna().unique().tolist() if not filtered_df.empty else []
-            
-            if tile_options:
-                selected_tile = st.selectbox("Select Matching Design", tile_options)
-                sqft_input = st.number_input("Required Sq.Ft", min_value=0.0, value=100.0)
-                boxes_input = st.number_input("Required Boxes", min_value=0.0, value=10.0)
+            if name_col:
+                filtered_df = master_df
+                if search_query:
+                    filtered_df = master_df[master_df[name_col].astype(str).str.contains(search_query, case=False, na=False)]
                 
-                if st.button("Add Design to Queue"):
-                    if not final_area_name or "-- Select" in final_area_name:
-                        st.error("Please select both Floor Level and Building Area properly.")
-                    else:
-                        item_entry = {
-                            "area_type": final_area_name,
-                            "tile_name": selected_tile,
-                            "sqft": sqft_input,
-                            "boxes": boxes_input
-                        }
-                        cust['selections'].append(item_entry)
-                        sqft_tot, box_tot = calculate_totals(cust['selections'])
-                        cust['total_sqft'] = sqft_tot
-                        cust['total_boxes'] = box_tot
-                        st.success(f"Added {selected_tile} for {final_area_name} successfully!")
+                tile_options = filtered_df[name_col].dropna().unique().tolist() if not filtered_df.empty else []
+                
+                if tile_options:
+                    selected_tile = st.selectbox("Select Matching Design", tile_options)
+                    
+                    # Yahan se Sq.Ft aur Boxes inputs hata di gayi hain. 
+                    # Ab yeh direct queue mein add hoga aur final estimate page par calculate hoga.
+                    sqft_input = 100.0  # Default base value
+                    boxes_input = 10.0  # Default base value
+                    
+                    if st.button("Add Design to Queue"):
+                        if not final_area_name or "-- Select" in final_area_name:
+                            st.error("Please select both Floor Level and Building Area properly.")
+                        else:
+                            item_entry = {
+                                "area_type": final_area_name,
+                                "tile_name": selected_tile,
+                                "sqft": sqft_input,
+                                "boxes": boxes_input
+                            }
+                            cust['selections'].append(item_entry)
+                            sqft_tot, box_tot = calculate_totals(cust['selections'])
+                            cust['total_sqft'] = sqft_tot
+                            cust['total_boxes'] = box_tot
+                            st.success(f"Added {selected_tile} for {final_area_name} successfully!")
+                else:
+                    st.info("No matching designs found in Google Sheet catalog.")
             else:
-                st.info("No matching designs found in Google Sheet catalog.")
+                st.warning("Master catalog column error. Ensure 'ITEM NAME' exists.")
         else:
-            st.warning("Master catalog loading or empty. Check Google Sheet URL.")
+            st.warning("Master catalog loading or empty. Check Google Sheet URL and Publishing status.")
 
         if cust['selections']:
             st.markdown("### Selected Items Queue")
-            st.dataframe(pd.DataFrame(cust['selections']))
-
-# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
+            st.dataframe(pd.DataFrame(cust['selections']))# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
 elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation & Order Finalization")
     
