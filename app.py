@@ -177,7 +177,8 @@ elif menu == "2. Tile Selection & BOQ":
 
         if cust['selections']:
             st.markdown("### Selected Items Queue")
-            st.dataframe(pd.DataFrame(cust['selections']))elif menu == "3. Calculation & Final Estimate":
+            st.dataframe(pd.DataFrame(cust['selections']))
+        elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation & Order Finalization")
     
     if not st.session_state['customer'] or not st.session_state['customer']['selections']:
