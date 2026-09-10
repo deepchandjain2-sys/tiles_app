@@ -689,9 +689,9 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     b1, b2, b3 = st.columns(3)
     with b1:
         st.download_button(
-            "📄 Download Estimate PDF",
+            "📥 Download Estimate PDF",
             data=pdf_bytes,
-            file_name=f"Estimate_{curr_c['name']}_{datetime.now().strftime('%Y%m%d')}.pdf",
+            file_name=f"Estimate_{curr_c.get('name', 'Customer')}_{datetime.now().strftime('%Y%m%d')}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
@@ -700,15 +700,15 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     with b3:
         if st.button("Finalize Deal & Archive Customer", type="primary", use_container_width=True):
             curr_c["status"] = "FINALIZED"
-            curr_c["total_sqft"] = 400.0
-            curr_c["total_boxes"] = 41.0
-            success = update_customer_db(curr_c)
+            curr_c["total_sqft"] = tot_sqft
+            curr_c["total_boxes"] = tot_boxes
+            success, err_msg = update_customer_db(curr_c)
             if success:
-                st.success(f"**{curr_c.get('name')}** finalize ho gaya!")
+                st.success(f"**{curr_c.get('name', 'Customer')}** finalize ho gaya!")
                 st.session_state.current_customer = None
                 st.rerun()
             else:
-                st.error("Database mein save nahi ho paya.")# --- PAGE 4: SALESMAN PROGRESS REPORT ---
+                st.error(f"Supabase Error: {err_msg}")# --- PAGE 4: SALESMAN PROGRESS REPORT ---
 elif nav == "📈 Salesman Progress Report":
     st.title("📈 Salesman Progress & Performance Tracking")
     all_clients = get_all_customers_db()
