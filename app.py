@@ -179,7 +179,7 @@ elif menu == "2. Tile Selection & BOQ":
             st.markdown("### Selected Items Queue")
             st.dataframe(pd.DataFrame(cust['selections']))
         elif menu == "3. Calculation & Final Estimate":
-    st.title("Step 3: Calculation & Order Finalization")
+        st.title("Step 3: Calculation & Order Finalization")
     
     if not st.session_state['customer'] or not st.session_state['customer']['selections']:
         st.warning("No active customer selections found. Please complete Step 1 & Step 2 first.")
