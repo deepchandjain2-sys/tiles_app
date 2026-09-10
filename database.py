@@ -4,7 +4,8 @@ import requests
 import pandas as pd
 import streamlit as st
 
-sb_secret_DycBY6LRWuiJd52XgFpBGg_K-FjTE4qGOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHphemlyd3hheGFibnBwY2hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2ODAyOTgsImV4cCI6MjEwNDI1NjI5OH0.CSCbuwInWJtGpL7w_nMFU6ElGWnXxr67bKeMWuTpMMM"
 
 def get_supabase_headers():
     return {
@@ -13,7 +14,6 @@ def get_supabase_headers():
         "Content-Type": "application/json",
         "Prefer": "return=representation"
     }
-
 def get_all_customers_db():
     if not SUPABASE_URL or not SUPABASE_KEY:
         return []
