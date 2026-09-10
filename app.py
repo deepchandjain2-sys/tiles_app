@@ -176,7 +176,8 @@ def delete_customer_db(cust_id):
     conn.close()
 
 # --- UNIVERSAL GOOGLE SHEET LOADER (EXACT HEADER MATCH) ---
-@st.cache_data(ttl=3600)def get_master_df():
+@st.cache_data(ttl=3600)
+def get_master_df():
     try:
         raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
         h_idx = 0
