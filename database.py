@@ -6,10 +6,11 @@ SUPABASE_KEY = "sb_publishable_oi8gTy66MV8CTq-DasQHAA_M1Wvgg-g"
 @st.cache_resource
 def init_supabase():
     try:
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except:
+        client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        return client
+    except Exception as e:
+        st.error(f"Supabase Init Error: {e}")
         return None
-
 supabase = init_supabase()
 
 def save_customer_to_db(cust_data):
