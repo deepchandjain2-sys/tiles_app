@@ -5,8 +5,10 @@ from database import save_customer_to_db
 from calculations import calculate_totals, generate_whatsapp_link
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub - Hiriyur", layout="wide")
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
-if not st.session_state['logged_in']:
+File "/mount/src/tiles_app/app.py", line 33
+          return pd.read_csv(GOOGLE_SHEET_CSV_URL)="https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+                                                  ^
+SyntaxError: invalid syntaxif not st.session_state['logged_in']:
     st.title("🔐 Jay Granite & Tiles Hub - Secure Login")
     u_name = st.text_input("Username")
     u_pass = st.text_input("Password", type="password")
