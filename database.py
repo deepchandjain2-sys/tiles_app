@@ -16,23 +16,22 @@ def save_customer_to_db(cust_data):
     try:
         if supabase:
             data = supabase.table("customers").upsert({
-                "mobile": cust_data['mobile'],
-                "name": cust_data['name'],
-                "address": cust_data['address'],
-                "engineer": cust_data['engineer'],
-                "engineer_mobile": cust_data['engineer_mobile'],
-                "salesman": cust_data['salesman'],
-                "branch": cust_data['branch'],
-                "status": cust_data['status'],
-                "selections": cust_data['selections'],
-                "total_sqft": cust_data['total_sqft'],
-                "total_boxes": cust_data['total_boxes']
+                "mobile": str(cust_data['mobile']),
+                "name": str(cust_data['name']),
+                "address": str(cust_data.get('address', '')),
+                "engineer": str(cust_data.get('engineer', '')),
+                "engineer_mobile": str(cust_data.get('engineer_mobile', '')),
+                "salesman": str(cust_data.get('salesman', '')),
+                "branch": str(cust_data.get('branch', '')),
+                "status": str(cust_data.get('status', 'ACTIVE')),
+                "selections": cust_data.get('selections', []),
+                "total_sqft": float(cust_data.get('total_sqft', 0.0)),
+                "total_boxes": float(cust_data.get('total_boxes', 0.0))
             }, on_conflict="mobile").execute()
             return True
     except Exception as e:
-        print(e)
-    return False
-
+        st.error(f"Supabase Error: {e}")
+        return False
 def get_all_customers_from_db():
     try:
         if supabase:
