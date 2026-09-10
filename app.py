@@ -6,7 +6,22 @@ from calculations import calculate_totals, generate_whatsapp_link
 
 st.set_page_config(page_title="Jay Granite & Tiles Hub - Hiriyur", layout="wide")
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWP3S6r7Ujwm-kczX8OGevw4yXWTPbMLvL87PGTR_0w/pub?gid=1816738640&single=true&output=csv"
+
+# --- SESSION STATE SETUP ---
+for key, default in [('logged_in', False), ('user', None), ('role', None), ('customer', None)]:
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+# --- 1. LOGIN PAGE ---
+if not st.session_state['logged_in']:
+    st.title("🔐 Jay Granite & Tiles Hub - Secure Login")
+    u_name = st.text_input("Username")
+    u_pass = st.text_input("Password", type="password")
+    
+    if st.button("Login"):
+        if u_name == "admin" and u_pass == "admin123":
+            st.session_state['logged_in'] = True
             st.session_state['user'] = "DEEPCHAND JAIN"
             st.session_state['role'] = "ADMIN"
             st.rerun()
@@ -23,8 +38,8 @@ GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3
 @st.cache_data(ttl=3600)
 def get_master_df():
     try:
-        return pd.read_csv(GOOGLE_SHEET_CSV_URL)="https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
-    except:
+        return pd.read_csv(GOOGLE_SHEET_CSV_URL)
+    except Exception:
         return pd.DataFrame()
 
 master_df = get_master_df()
@@ -105,7 +120,6 @@ elif menu == "2. Tile Selection & BOQ":
         
         st.markdown("### 🏢 Building & Floor Selection")
         
-        # 1. Floor Level Selection
         floor_level = st.selectbox("Select Floor Level", [
             "-- Select Floor Level --",
             "Ground Floor", 
@@ -115,7 +129,6 @@ elif menu == "2. Tile Selection & BOQ":
             "Other / Independent Area"
         ])
         
-        # 2. Specific Building Area / Room Selection
         area_type = st.selectbox("Select Building Area / Room", [
             "-- Select Area Type --",
             "Hall Floor", 
@@ -141,13 +154,11 @@ elif menu == "2. Tile Selection & BOQ":
         if area_type == "Custom Area":
             custom_area_name = st.text_input("Enter Custom Area Name (e.g. Staircase, Passage)")
         
-        # Combine Floor and Area for final record
         if floor_level != "-- Select Floor Level --" and area_type != "-- Select Area Type --":
             final_area_name = f"{floor_level} - {custom_area_name if area_type == 'Custom Area' and custom_area_name else area_type}"
         else:
             final_area_name = ""
 
-        # Design Search from Google Sheet Catalog
         st.markdown("#### Search Tile Design from Catalog")
         search_query = st.text_input("Search Design by Name / Code / Size")
         
@@ -185,7 +196,9 @@ elif menu == "2. Tile Selection & BOQ":
 
         if cust['selections']:
             st.markdown("### Selected Items Queue")
-            st.dataframe(pd.DataFrame(cust['selections']))# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
+            st.dataframe(pd.DataFrame(cust['selections']))
+
+# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
 elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation & Order Finalization")
     
