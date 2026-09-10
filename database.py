@@ -68,7 +68,7 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
     def update_customer_db(cust_dict):
     if not SUPABASE_URL or not SUPABASE_KEY:
         return False, "URL or Key missing"
-        
+
     cust_id = cust_dict.get("id")
     payload = {
         "name": cust_dict.get("name"),
@@ -82,7 +82,7 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
         "total_sqft": float(cust_dict.get("total_sqft", 0.0)),
         "total_boxes": float(cust_dict.get("total_boxes", 0.0))
     }
-    
+
     if cust_id:
         url = f"{SUPABASE_URL}/rest/v1/customer_master?id=eq.{cust_id}"
         try:
@@ -91,7 +91,7 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
                 return True, "Success"
         except Exception as e:
             pass
-            
+
     url = f"{SUPABASE_URL}/rest/v1/customer_master"
     try:
         res = requests.post(url, headers=get_supabase_headers(), json=payload, timeout=10)
@@ -100,7 +100,7 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch, statu
         else:
             return False, f"Error {res.status_code}: {res.text}"
     except Exception as e:
-        return False, str(e)        
+        return False, str(e)      
     # Fallback: Agar update fail ho ya ID na ho toh POST (insert) karo
     url = f"{SUPABASE_URL}/rest/v1/customer_master"
     try:
