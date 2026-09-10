@@ -179,14 +179,9 @@ def delete_customer_db(cust_id):
 @st.cache_data(ttl=3600)
 def get_master_df():
     try:
-        raw_df = pd.read_csv(GOOGLE_SHEET_CSV_URL, header=None, dtype=str)
-        h_idx = 0
-        for i in range(min(15, len(raw_df))):
-            row_vals = [str(x).upper().strip() for x in raw_df.iloc[i].values if pd.notna(x)]
-            if "ITEM NAME" in row_vals:
-                h_idx = i
-                break
-                
+        return pd.read_csv(GOOGLE_SHEET_CSV_URL)
+    except Exception as e:
+        return pd.DataFrame()                
         headers = [str(x).strip().upper() for x in raw_df.iloc[h_idx].values]
         data_rows = raw_df.iloc[h_idx + 1:].copy()
         
