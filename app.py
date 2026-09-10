@@ -1,11 +1,11 @@
-import os
-import json
-import requests
+import sqlite3
+import pandas as pd
+from datetime import datetime
+
 DB_FILE = "database.db"
 
 def get_db():
     return sqlite3.connect(DB_FILE, check_same_thread=False)
-
 SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
 SUPABASE_KEY = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
