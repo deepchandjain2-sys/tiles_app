@@ -696,15 +696,19 @@ elif nav == "3️⃣ Sq.Ft Entry & Final Estimate":
     with b2:
         st.link_button("📲 1-Click WhatsApp Send", f"https://wa.me/{mob_num}?text={enc_txt}", use_container_width=True)
     with b3:
-        if st.button("✅ Finalize Deal & Archive Customer", type="primary", use_container_width=True):
+        if st.button("Finalize Deal & Archive Customer", type="primary", use_container_width=True):
             curr_c["status"] = "FINALIZED"
             curr_c["total_sqft"] = tot_sq
-            curr_c["total_boxes"] = tot_bx
-            update_customer_db(curr_c)
-            st.session_state.current_customer = None
-            st.success(f"🎉 **{curr_c['name']}** finalize ho gaya!")
-            st.rerun()
-
+            curr_c["total_boxes"] = tot_boxes
+            
+            # Database mein update/save call karo aur check karo
+            success = update_customer_db(curr_c)
+            if success:
+                st.success(f"**{curr_c.get('name')}** finalize ho gaya!")
+                st.session_state.current_customer = None
+                st.rerun()
+            else:
+                st.error("Database mein save nahi ho paya. Connection check karein.")
 # --- PAGE 4: SALESMAN PROGRESS REPORT ---
 elif nav == "📈 Salesman Progress Report":
     st.title("📈 Salesman Progress & Performance Tracking")
