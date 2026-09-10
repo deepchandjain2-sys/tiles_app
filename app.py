@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 from datetime import datetime
+from database import SUPABASE_URL, SUPABASE_KEY, update_customer_db
 
 
 
