@@ -41,7 +41,8 @@ def update_customer_db(cust_dict):
             
     url = f"{SUPABASE_URL}/rest/v1/customer_master"
     res = requests.post(url, headers=headers, json=payload, timeout=10)
-    return res.status_code in [200, 201]GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+    return res.status_code in [200, 201]
+    GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 DB_FILE = "jay_granite_master.db"
 
 # --- SQLITE DATABASE ENGINE ---
