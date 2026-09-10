@@ -211,6 +211,7 @@ elif menu == "2. Tile Selection & BOQ":
         if cust['selections']:
             st.markdown("### Selected Items Queue")
             st.dataframe(pd.DataFrame(cust['selections']))# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
+# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
 elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation & Order Finalization")
     
@@ -223,8 +224,15 @@ elif menu == "3. Calculation & Final Estimate":
         st.dataframe(pd.DataFrame(cust['selections']))
         
         sqft_tot, box_tot = calculate_totals(cust['selections'])
-        st.metric("Total Billable Area", f"{sqft_tot} Sq.Ft")
-        st.metric("Total Boxes Required", f"{box_tot} Boxes")
+        
+        # Totals ek line mein aur normal font size mein
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.markdown(f"**Total Billable Area:** {sqft_tot} Sq.Ft")
+        with col_m2:
+            st.markdown(f"**Total Boxes Required:** {box_tot} Boxes")
+        
+        st.markdown("---")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -236,9 +244,7 @@ elif menu == "3. Calculation & Final Estimate":
                     st.error("Cloud sync failed. Please check connection.")
         with col2:
             wa_link = generate_whatsapp_link(cust['mobile'], cust['name'], cust['selections'], sqft_tot, box_tot)
-            st.markdown(f"### [📲 Send Estimate via WhatsApp]({wa_link})", unsafe_allow_html=True)
-
-# --- DASHBOARD & SALESMAN SUMMARY ---
+            st.markdown(f"### [📲 Send Estimate via WhatsApp]({wa_link})", unsafe_allow_html=True)# --- DASHBOARD & SALESMAN SUMMARY ---
 elif menu == "Dashboard & Salesman Summary":
     st.title("📊 Executive Dashboard & Salesman Summary")
     st.markdown("Track team performance, total selections, and finalized deals.")
