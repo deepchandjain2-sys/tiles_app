@@ -78,39 +78,68 @@ if st.sidebar.button("Sign Out"):
 
 # --- PAGE 1: CUSTOMER REGISTRATION ---
 if menu == "1. Customer Registration":
-    st.title("Step 1: Customer Registration")
+    st.title("Step 1: Customer & Party Management")
     
-    with st.form("reg_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            c_name = st.text_input("Customer Name*")
-            c_mobile = st.text_input("Mobile Number*")
-            c_address = st.text_area("Site Address")
-        with col2:
-            c_engineer = st.text_input("Engineer / Architect Name")
-            c_eng_mobile = st.text_input("Engineer Mobile Number")
-            
-        reg_submitted = st.form_submit_button("Save Customer & Go to Tile Selection")
-        if reg_submitted:
-            if c_name and c_mobile:
-                st.session_state['customer'] = {
-                    "name": c_name,
-                    "mobile": c_mobile,
-                    "address": c_address,
-                    "engineer": c_engineer,
-                    "engineer_mobile": c_eng_mobile,
-                    "salesman": st.session_state['user'],
-                    "branch": branch,
-                    "status": "ACTIVE",
-                    "selections": [],
-                    "total_sqft": 0.0,
-                    "total_boxes": 0.0
-                }
-                st.success("Customer registered successfully! Now click on '2. Tile Selection & BOQ' from the left menu.")
-            else:
-                st.error("Please fill Customer Name and Mobile Number.")
+    # Session state mein saved customers ki list maintain karne ke liye
+    if 'saved_customers' not in st.session_state:
+        st.session_state['saved_customers'] = []
 
-# --- PAGE 2: TILE SELECTION & BOQ ---
+    reg_mode = st.radio("Select Mode", ["Register New Customer", "Select Existing Customer / Party"])
+
+    if reg_mode == "Register New Customer":
+        with st.form("reg_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                c_name = st.text_input("Customer Name*")
+                c_mobile = st.text_input("Mobile Number*")
+                c_address = st.text_area("Site Address")
+            with col2:
+                c_engineer = st.text_input("Engineer / Architect Name")
+                c_eng_mobile = st.text_input("Engineer Mobile Number")
+                
+            reg_submitted = st.form_submit_button("Save Customer & Go to Tile Selection")
+            if reg_submitted:
+                if c_name and c_mobile:
+                    new_cust = {
+                        "name": c_name,
+                        "mobile": c_mobile,
+                        "address": c_address,
+                        "engineer": c_engineer,
+                        "engineer_mobile": c_eng_mobile,
+                        "salesman": st.session_state['user'],
+                        "branch": branch,
+                        "status": "ACTIVE",
+                        "selections": [],
+                        "total_sqft": 0.0,
+                        "total_boxes": 0.0
+                    }
+                    st.session_state['customer'] = new_cust
+                    # List mein bhi add kar dete hain taaki yahin dikhe
+                    if new_cust not in st.session_state['saved_customers']:
+                        st.session_state['saved_customers'].append(new_cust)
+                        
+                    st.success("Customer registered successfully! Now click on '2. Tile Selection & BOQ' from the left menu.")
+                else:
+                    st.error("Please fill Customer Name and Mobile Number.")
+    else:
+        st.markdown("### 📋 Existing Customers / Parties List")
+        if not st.session_state['saved_customers']:
+            st.info("No customers registered yet in this session. Please register a new customer first.")
+        else:
+            # Customers ki list dropdown ya selectbox ke liye
+            cust_names = [f"{c['name']} ({c['mobile']})" for c in st.session_state['saved_customers']]
+            selected_party = st.selectbox("Select Party / Customer to Modify", cust_names)
+            
+            if selected_party:
+                idx = cust_names.index(selected_party)
+                active_c = st.session_state['saved_customers'][idx]
+                st.session_state['customer'] = active_c
+                
+                st.write(f"**Active Party Selected:** {active_c['name']} | **Mobile:** {active_c['mobile']}")
+                st.write(f"**Current Selections Count:** {len(active_c['selections'])} items")
+                
+                if st.button("Load this Customer for Tile Modification"):
+                    st.success(f"Customer '{active_c['name']}' loaded! Now go to '2. Tile Selection & BOQ' to change or add tiles.")# --- PAGE 2: TILE SELECTION & BOQ ---
 elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
     
