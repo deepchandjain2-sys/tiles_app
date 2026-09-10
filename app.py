@@ -175,13 +175,13 @@ elif menu == "2. Tile Selection & BOQ":
         else:
             st.warning("Master catalog loading or empty. Check Google Sheet URL.")
 
-     if cust['selections']:
+            if cust['selections']:
             st.markdown("### Selected Items Queue")
             st.dataframe(pd.DataFrame(cust['selections']))
   elif menu == "3. Calculation & Final Estimate":
        st.title("Step 3: Calculation & Order Finalization")
     
-    if not st.session_state['customer'] or not st.session_state['customer']['selections']:
+       if not st.session_state['customer'] or not st.session_state['customer']['selections']:
         st.warning("No active customer selections found. Please complete Step 1 & Step 2 first.")
     else:
         cust = st.session_state['customer']
