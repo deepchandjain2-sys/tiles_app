@@ -175,7 +175,7 @@ elif menu == "2. Tile Selection & BOQ":
         else:
             st.warning("Master catalog loading or empty. Check Google Sheet URL.")
 
-        if cust['selections']:
+      if cust['selections']:
             st.markdown("### Selected Items Queue")
             st.dataframe(pd.DataFrame(cust['selections']))
         elif menu == "3. Calculation & Final Estimate":
