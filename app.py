@@ -66,9 +66,14 @@ if menu == "2. Customer Registration & Tile Selection":
     st.title("Step 2: Customer Registration & Area-wise Tile Selection")
     
     with st.form("reg_form"):
-        c_name = st.text_input("Customer Name*")
-        c_mobile = st.text_input("Mobile Number*")
-        c_address = st.text_area("Site Address")
+        col1, col2 = st.columns(2)
+        with col1:
+            c_name = st.text_input("Customer Name*")
+            c_mobile = st.text_input("Mobile Number*")
+            c_address = st.text_area("Site Address")
+        with col2:
+            c_engineer = st.text_input("Engineer / Architect Name")
+            c_eng_mobile = st.text_input("Engineer Mobile Number")
             
         reg_submitted = st.form_submit_button("Save & Proceed to Tile Selection")
         if reg_submitted:
@@ -77,6 +82,8 @@ if menu == "2. Customer Registration & Tile Selection":
                     "name": c_name,
                     "mobile": c_mobile,
                     "address": c_address,
+                    "engineer": c_engineer,
+                    "engineer_mobile": c_eng_mobile,
                     "salesman": st.session_state['user'],
                     "branch": branch,
                     "status": "ACTIVE",
@@ -84,7 +91,7 @@ if menu == "2. Customer Registration & Tile Selection":
                     "total_sqft": 0.0,
                     "total_boxes": 0.0
                 }
-                st.success("Customer registered successfully! Now select areas and tiles below.")
+                st.success("Customer and Engineer details saved successfully! Now select areas and tiles below.")
             else:
                 st.error("Please fill Customer Name and Mobile Number.")
     if st.session_state['customer']:
