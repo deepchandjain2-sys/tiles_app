@@ -118,23 +118,51 @@ elif menu == "2. Tile Selection & BOQ":
         cust = st.session_state['customer']
         st.info(f"**Active Customer:** {cust['name']} | **Mobile:** {cust['mobile']} | **Branch:** {cust['branch']}")
         
-        st.markdown("### 🏢 Building Area Selection")
+        st.markdown("### 🏢 Building & Floor Selection")
         
-        area_category = st.selectbox("Select Building Area (Floor, Wall & Custom)", [
-            "-- Select Building Area --",
-            "Ground Floor", "1st Floor", "2nd Floor", "3rd Floor",
-            "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
-            "3rd Bedroom Floor", "4th Bedroom Floor", "Attached Bathroom Floor", 
-            "Common Bathroom Floor", "Parking Area", "Front Area", "Pooja Room Floor",
-            "Kitchen Wall", "Bathroom Wall", "Living Room Wall", "Elevation Wall", "Balcony Wall",
-            "Custom Building Area"
+        # 1. Floor Level Selection
+        floor_level = st.selectbox("Select Floor Level", [
+            "-- Select Floor Level --",
+            "Ground Floor", 
+            "1st Floor", 
+            "2nd Floor", 
+            "3rd Floor",
+            "Other / Independent Area"
         ])
         
-        if area_category == "Custom Building Area":
+        # 2. Specific Building Area / Room Selection
+        area_type = st.selectbox("Select Building Area / Room", [
+            "-- Select Area Type --",
+            "Hall Floor", 
+            "Kitchen Floor", 
+            "Master Bedroom Floor", 
+            "Common Bedroom Floor",
+            "3rd Bedroom Floor", 
+            "4th Bedroom Floor", 
+            "Attached Bathroom Floor", 
+            "Common Bathroom Floor", 
+            "Parking Area", 
+            "Front Area", 
+            "Pooja Room Floor",
+            "Kitchen Wall", 
+            "Bathroom Wall", 
+            "Living Room Wall", 
+            "Elevation Wall", 
+            "Balcony Wall",
+            "Custom Area"
+        ])
+        
+        custom_area_name = ""
+        if area_type == "Custom Area":
             custom_area_name = st.text_input("Enter Custom Area Name (e.g. Staircase, Passage)")
-            if custom_area_name:
-                area_category = f"Custom: {custom_area_name}"
+        
+        # Combine Floor and Area for final record
+        if floor_level != "-- Select Floor Level --" and area_type != "-- Select Area Type --":
+            final_area_name = f"{floor_level} - {custom_area_name if area_type == 'Custom Area' and custom_area_name else area_type}"
+        else:
+            final_area_name = ""
 
+        # Design Search from Google Sheet Catalog
         st.markdown("#### Search Tile Design from Catalog")
         search_query = st.text_input("Search Design by Name / Code / Size")
         
@@ -151,11 +179,11 @@ elif menu == "2. Tile Selection & BOQ":
                 boxes_input = st.number_input("Required Boxes", min_value=0.0, value=10.0)
                 
                 if st.button("Add Design to Queue"):
-                    if "--" in area_category:
-                        st.error("Please select a valid building area type.")
+                    if not final_area_name or "-- Select" in final_area_name:
+                        st.error("Please select both Floor Level and Building Area properly.")
                     else:
                         item_entry = {
-                            "area_type": area_category,
+                            "area_type": final_area_name,
                             "tile_name": selected_tile,
                             "sqft": sqft_input,
                             "boxes": boxes_input
@@ -164,7 +192,7 @@ elif menu == "2. Tile Selection & BOQ":
                         sqft_tot, box_tot = calculate_totals(cust['selections'])
                         cust['total_sqft'] = sqft_tot
                         cust['total_boxes'] = box_tot
-                        st.success(f"Added {selected_tile} for {area_category} successfully!")
+                        st.success(f"Added {selected_tile} for {final_area_name} successfully!")
             else:
                 st.info("No matching designs found in Google Sheet catalog.")
         else:
@@ -172,9 +200,7 @@ elif menu == "2. Tile Selection & BOQ":
 
         if cust['selections']:
             st.markdown("### Selected Items Queue")
-            st.dataframe(pd.DataFrame(cust['selections']))
-
-# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
+            st.dataframe(pd.DataFrame(cust['selections']))# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
 elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation & Order Finalization")
     
