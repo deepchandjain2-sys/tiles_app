@@ -50,7 +50,8 @@ st.sidebar.markdown(f"**Role:** {st.session_state['role']}")
 branch = st.sidebar.selectbox("Showroom Branch", ["Hiriyur"])
 
 menu = st.sidebar.radio("Navigation Flow", [
-    "2. Customer Registration & Tile Selection", 
+    "1. Customer Registration", 
+    "2. Tile Selection & BOQ", 
     "3. Calculation & Final Estimate", 
     "Dashboard & Salesman Summary",
     "Admin User Management"
@@ -61,9 +62,9 @@ if st.sidebar.button("Sign Out"):
         del st.session_state[k]
     st.rerun()
 
-# --- 2. CUSTOMER REGISTRATION & TILE SELECTION ---
-if menu == "2. Customer Registration & Tile Selection":
-    st.title("Step 2: Customer Registration & Area-wise Tile Selection")
+# --- PAGE 1: CUSTOMER REGISTRATION ---
+if menu == "1. Customer Registration":
+    st.title("Step 1: Customer Registration")
     
     with st.form("reg_form"):
         col1, col2 = st.columns(2)
@@ -75,7 +76,7 @@ if menu == "2. Customer Registration & Tile Selection":
             c_engineer = st.text_input("Engineer / Architect Name")
             c_eng_mobile = st.text_input("Engineer Mobile Number")
             
-        reg_submitted = st.form_submit_button("Save & Proceed to Tile Selection")
+        reg_submitted = st.form_submit_button("Save Customer & Go to Tile Selection")
         if reg_submitted:
             if c_name and c_mobile:
                 st.session_state['customer'] = {
@@ -91,15 +92,21 @@ if menu == "2. Customer Registration & Tile Selection":
                     "total_sqft": 0.0,
                     "total_boxes": 0.0
                 }
-                st.success("Customer and Engineer details saved successfully! Now select areas and tiles below.")
+                st.success("Customer registered successfully! Now click on '2. Tile Selection & BOQ' from the left menu.")
             else:
                 st.error("Please fill Customer Name and Mobile Number.")
-    if st.session_state['customer']:
+
+# --- PAGE 2: TILE SELECTION & BOQ ---
+elif menu == "2. Tile Selection & BOQ":
+    st.title("Step 2: Area-wise Tile Selection")
+    
+    if not st.session_state['customer']:
+        st.warning("Please register a customer first from '1. Customer Registration'.")
+    else:
         cust = st.session_state['customer']
-        st.markdown(f"---")
-        st.subheader(f"Active Customer: {cust['name']} ({cust['mobile']})")
+        st.info(f"**Active Customer:** {cust['name']} | **Mobile:** {cust['mobile']} | **Engineer:** {cust['engineer'] or 'N/A'}")
         
-        # Area Selection Dropdown (Floors, Walls & Custom Additions)
+        # Area Selection Dropdown
         area_category = st.selectbox("Select Application Area Type", [
             "Ground Floor", "1st Floor", "2nd Floor", "3rd Floor",
             "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
@@ -149,12 +156,12 @@ if menu == "2. Customer Registration & Tile Selection":
             st.markdown("### Selected Items Queue")
             st.dataframe(pd.DataFrame(cust['selections']))
 
-# --- 3. CALCULATION & FINAL ESTIMATE ---
+# --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
 elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation & Order Finalization")
     
     if not st.session_state['customer'] or not st.session_state['customer']['selections']:
-        st.warning("No active customer selections found. Please register and add tiles in Step 2.")
+        st.warning("No active customer selections found. Please complete Step 1 & Step 2 first.")
     else:
         cust = st.session_state['customer']
         st.write(f"**Customer:** {cust['name']} | **Mobile:** {cust['mobile']}")
