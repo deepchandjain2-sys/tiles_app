@@ -3,7 +3,7 @@ import json
 import requests
 
 SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHppemlyd3hheGFibnBjaGNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyMzg2ODMsImV4cCI6MjA1NjgxNDY4M30.YOUR_ANON_KEY_HERE"
+SUPABASE_KEY = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
 def get_supabase_headers():
     return {
