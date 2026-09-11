@@ -188,11 +188,13 @@ if menu == "2. Tile Selection & BOQ":
         area_type = st.selectbox("Select Building Area / Room", [
             "-- Select Area Type --",
             "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
-            "3rd Bedroom Floor", "4th Bedroom Floor", "Associated Bathroom Floor"
-        ])        ])        custom_area_name = ""
-        if area_type == "Custom Area":
-            custom_area_name = st.text_input("Enter Custom Area Name (e.g. Staircase, Passage)")
+            "3rd Bedroom Floor", "4th Bedroom Floor", "Associated Bathroom Floor", "Custom Area"
+        ])
         
+        if area_type == "Custom Area":
+            custom_area_name = st.text_input("Enter Custom Area Name")
+        else:
+            custom_area_name = area_type
         if floor_level != "-- Select Floor Level --" and area_type != "-- Select Area Type --":
             final_area_name = f"{floor_level} - {custom_area_name if area_type == 'Custom Area' and custom_area_name else area_type}"
         else:
