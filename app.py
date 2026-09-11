@@ -127,7 +127,7 @@ if menu == "1. Customer Registration":
                     else:
                         st.error("Failed to delete customer.")
     else:
-                        st.info("No existing customers found in the database.")
+        st.info("No existing customers found in the database.")
 
 #-- PAGE 2: TILE SELECTION & BOQ --
 elif menu == "2. Tile Selection & BOQ":
