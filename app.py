@@ -216,18 +216,29 @@ elif menu == "2. Area-wise Tile Selection":
             st.write(f"**Selected Item Specs:** Coverage: {default_box_cov} sq.ft/box")
 
             if st.button("Add Area & Tile to Queue", key="add_to_queue_btn"):
-                entry = {
-                    "floor": floor_level,
-                    "category": app_type,
-                    "area": specific_area_name,
-                    "tile_name": selected_tile_name,
-                    "box_cov": default_box_cov,
-                    "price": default_price,
-                    "sqft": 0.0,
-                    "boxes": 0,
-                    "total": 0.0
-                }
-                if 'selections' not in cust or cust['selections'] is None:
+    entry = {
+        "floor": floor_level,
+        "category": app_type,
+        "area": specific_area_name,
+        "tile_name": selected_tile_name,
+        "box_cov": default_box_cov,
+        "sqft": 0.0,
+        "boxes": 0,
+        "total": 0.0
+    }
+    
+    if "selections" not in st.session_state or st.session_state["selections"] is None:
+        st.session_state["selections"] = []
+    
+    # Purani list ko replace karne ki jagah nayi entry ko append karein
+    st.session_state["selections"].append(entry)
+    st.success("Item added to queue successfully!")
+
+# Niche queue ki sari items one-by-one dikhane ke liye:
+if "selections" in st.session_state and st.session_state["selections"]:
+    st.write("### Added Items in Queue:")
+    for idx, item in enumerate(st.session_state["selections"]):
+        st.write(f"{idx + 1}. **{item['floor']}** -> {item['area']} | **{item['tile_name']}** (Coverage: {item['box_cov']} sq.ft/box)")            if 'selections' not in cust or cust['selections'] is None:
                     cust['selections'] = []
                 cust['selections'].append(entry)
                 save_customer_to_db(cust)
