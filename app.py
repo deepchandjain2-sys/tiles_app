@@ -25,8 +25,7 @@ def calculate_tile_boxes(area_sqft, box_coverage_sqft, wastage_pct=5):
         return 0, 0
     total_area = area_sqft * (1 + wastage_pct / 100.0)
     boxes = math.ceil(total_area / box_coverage_sqft)
-    return boxes, total_area
-st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
+    return boxes, total_areast.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
 for key, default in [
     ('authenticated', False),
