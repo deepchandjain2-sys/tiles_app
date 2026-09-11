@@ -4,7 +4,7 @@ import math
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
 # --- GOOGLE SHEET CATALOG SETUP ---
-GOOGLE_SHEET_CSV_URL = st.secrets.get("GOOGLE_SHEET_CSV_URL", "YOUR_PUBLIC_CSV_URL_HERE")
+GOOGLE_SHEET_CSV_URL = "YOUR_PUBLIC_CSV_URL_HERE"
 
 @st.cache_data(ttl=600)
 def load_catalog_from_google_sheet():
@@ -67,10 +67,18 @@ if not st.session_state['authenticated']:
             st.error("Invalid Username or Password")
     st.stop()
 
+# --- SHOWROOM BRANCH SELECTION (Hiriyur, Davangere, or Custom) ---
 st.sidebar.markdown(f"**User:** {st.session_state.get('user')}")
 st.sidebar.markdown(f"**Role:** {st.session_state.get('role')}")
-branch = st.sidebar.selectbox("Showroom Branch", ["Hiriyur", "Other Branch"], index=0, key="sidebar_branch_select")
-st.session_state['branch'] = branch
+
+branch_options = ["Hiriyur", "Davangere", "Other / New Branch"]
+selected_branch_option = st.sidebar.selectbox("Showroom Branch", branch_options, index=0, key="sidebar_branch_select")
+
+if selected_branch_option == "Other / New Branch":
+    custom_branch_name = st.sidebar.text_input("Enter New Branch Name", "Branch 3", key="custom_branch_input")
+    st.session_state['branch'] = custom_branch_name
+else:
+    st.session_state['branch'] = selected_branch_option
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Navigation Flow")
@@ -95,13 +103,13 @@ if menu == "1. Customer Registration & List":
     col_reg, col_list = st.columns([1, 1])
     
     with col_reg:
-        st.markdown("### 📝 Register New Customer")
+        st.markdown("### 📝 Register New Customer / Party")
         with st.form("customer_reg_form"):
             c_name = st.text_input("Customer / Party Name")
             c_mobile = st.text_input("Mobile Number (Unique ID)")
             c_address = st.text_area("Site Address")
             
-            submitted = st.form_submit_button("Register Customer")
+            submitted = st.form_submit_button("Register & Save Party")
             if submitted:
                 if c_name and c_mobile:
                     cust_data = {
@@ -111,20 +119,18 @@ if menu == "1. Customer Registration & List":
                         "branch": st.session_state['branch'],
                         "selections": []
                     }
-                    if save_customer_to_db(cust_data):
-                        st.session_state['customer'] = cust_data
-                        st.success(f"Customer '{c_name}' registered and saved online successfully!")
-                    else:
-                        st.error("Error saving to Supabase database.")
+                    save_customer_to_db(cust_data)
+                    st.session_state['customer'] = cust_data
+                    st.success(f"Customer '{c_name}' registered successfully! You can now register another party below.")
                 else:
                     st.error("Please enter Name and Mobile Number.")
 
     with col_list:
-        st.markdown("### 📂 Saved Parties List (Online)")
+        st.markdown("### 📂 Saved Parties List (Select to Edit/Add Tiles)")
         customers = get_all_customers()
         if customers:
-            cust_options = {f"{c.get('name')} ({c.get('mobile')})": c for c in customers}
-            selected_key = st.selectbox("Select Party to Load / Edit", list(cust_options.keys()), key="party_select_box")
+            cust_options = {f"{c.get('name')} ({c.get('mobile')}) - [{c.get('branch', 'Hiriyur')}]": c for c in customers}
+            selected_key = st.selectbox("Select Party to Load / Modify", list(cust_options.keys()), key="party_select_box")
             if selected_key:
                 active_party = cust_options[selected_key]
                 st.session_state['customer'] = active_party
@@ -138,10 +144,10 @@ if menu == "1. Customer Registration & List":
                 with c_btn2:
                     if st.button("Delete Party", key="del_party_btn"):
                         delete_customer_from_db(active_party.get('mobile'))
-                        st.success("Party deleted from online database.")
+                        st.success("Party deleted successfully.")
                         st.rerun()
         else:
-            st.info("No customers found in Supabase database.")
+            st.info("No customers registered yet.")
 
 #-- PAGE 2: AREA-WISE TILE SELECTION --
 elif menu == "2. Area-wise Tile Selection":
@@ -179,7 +185,7 @@ elif menu == "2. Area-wise Tile Selection":
 
         if floor_level != "-- Select Floor Level --" and selected_area_choice not in ["-- Select Floor Area --", "-- Select Wall Area --"]:
             st.markdown("---")
-            st.markdown(f"### 🔍 Search Item from Catalog (Google Sheet)")
+            st.markdown(f"### 🔍 Search Item from Catalog")
             
             search_query = st.text_input("Search Tile by Name / Category", "", key="tile_search_input")
             filtered_catalog = [item for item in CATALOG_ITEMS if search_query.lower() in str(item.get('name', '')).lower() or search_query.lower() in str(item.get('category', '')).lower()]
@@ -232,7 +238,7 @@ elif menu == "2. Area-wise Tile Selection":
                     cust['selections'] = []
                 cust['selections'].append(entry)
                 save_customer_to_db(cust)
-                st.success(f"Added {specific_area_name} ({chosen_tile.get('name')}) to Queue and saved online successfully!")
+                st.success(f"Added {specific_area_name} ({chosen_tile.get('name')}) to Queue successfully!")
 
 #-- PAGE 3: CALCULATION & FINAL ESTIMATE --
 elif menu == "3. Calculation & Final Estimate":
@@ -282,7 +288,7 @@ elif menu == "3. Calculation & Final Estimate":
 
 elif menu == "Dashboard & Salesman Summary":
     st.title("📊 Dashboard & Salesman Summary")
-    st.write("Overview of all showroom customer estimations from Supabase online database.")
+    st.write("Overview of all showroom customer estimations.")
 
 elif menu == "Admin User Management":
     st.title("⚙️ Admin User Management")
