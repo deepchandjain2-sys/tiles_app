@@ -19,7 +19,6 @@ def get_all_customers():
     if supabase:
         try:
             response = supabase.table(TABLE_NAME).select("*").execute()
-            # Agar supabase empty data de lekin session mein ho, toh dono merge kar sakte hain
             db_data = response.data or []
             if db_data:
                 return db_data
@@ -31,7 +30,6 @@ def get_all_customers():
     return st.session_state['mock_customers']
 
 def save_customer_to_db(cust_data):
-    # Hamesha session state mein bhi save rakho taaki app turant dikhaye
     if 'mock_customers' not in st.session_state:
         st.session_state['mock_customers'] = []
     
@@ -43,8 +41,15 @@ def save_customer_to_db(cust_data):
 
     if supabase:
         try:
-            # Supabase upsert
-            res = supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
+            # Clean dictionary to match exact Supabase table columns
+            clean_data = {
+                "mobile": str(cust_data.get("mobile", "")),
+                "name": str(cust_data.get("name", "")),
+                "address": str(cust_data.get("address", "")),
+                "branch": str(cust_data.get("branch", "Hiriyur")),
+                "selections": cust_data.get("selections", [])
+            }
+            res = supabase.table(TABLE_NAME).upsert(clean_data, on_conflict="mobile").execute()
             return True
         except Exception as e:
             st.error(f"⚠️ Supabase Save Failed: {e}")
