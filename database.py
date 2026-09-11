@@ -2,15 +2,16 @@ import os
 import streamlit as st
 from supabase import create_client, Client
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+# Yahan apna real Supabase URL aur Key seedha daal dein taaki Render par error na aaye
+SUPABASE_URL = "APNA_SUPABASE_URL_YAHAN_DAALEIN"
+SUPABASE_KEY = "APNA_SUPABASE_ANON_KEY_YAHAN_DAALEIN"
 
 supabase: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
+try:
+    if SUPABASE_URL and SUPABASE_KEY and "SUPABASE_URL" not in SUPABASE_URL:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        st.error(f"Supabase Connection Init Error: {e}")
+except Exception as e:
+    st.error(f"Supabase Connection Init Error: {e}")
 
 TABLE_NAME = "customers"
 
