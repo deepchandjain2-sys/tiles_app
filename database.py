@@ -56,7 +56,7 @@ def delete_customer_from_db(mobile):
             return False
     else:
         if 'mock_customers' in st.session_state:
-            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile'] != mobile]
+            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile') != mobile]
         return True
 
 def get_all_admin_users():
