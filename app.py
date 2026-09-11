@@ -144,16 +144,15 @@ st.write(f"**Current Selections Count:** {sel_count} items")
 
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
-    if st.button("Load this Customer for Tile Modification"):
+    if st.button("Load this Customer for Tile Modification", key="load_cust_btn"):
         st.success("Customer loaded successfully!")
 with col_btn2:
-    if st.button("Delete Customer Permanently"):
+    if st.button("Delete Customer Permanently", key="del_cust_btn"):
         if active_c and delete_customer_from_db(active_c.get('mobile')):
             st.success("Customer deleted successfully!")
             st.rerun()
         else:
-            st.error("Failed to delete customer.")
-            
+            st.error("Failed to delete customer.")            
 
 
 col_btn1, col_btn2 = st.columns(2)
