@@ -20,12 +20,6 @@ def load_catalog_from_google_sheet():
 
 CATALOG_ITEMS = load_catalog_from_google_sheet()
 
-def calculate_tile_boxes(area_sqft, box_coverage_sqft, wastage_pct=5):
-    if box_coverage_sqft <= 0:
-        return 0, 0
-    total_area = area_sqft * (1 + wastage_pct / 100.0)
-    boxes = math.ceil(total_area / box_coverage_sqft)
-    return boxes, total_areast.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
 for key, default in [
     ('authenticated', False),
