@@ -4,14 +4,18 @@ import math
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
 # --- GOOGLE SHEET CATALOG SETUP ---
+# Apni published Google Sheet ka CSV link yahan daaliye
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        # Clean column names (remove leading/trailing spaces if any)
+        df.columns = df.columns.str.strip().str.lower()
         return df.to_dict(orient="records")
     except Exception:
+        # Fallback catalog agar Google Sheet load na ho ya link galat ho
         return [
             {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0},
             {"name": "Matte Anti-Skid Tile 300x300mm", "category": "Bathroom Floor", "box_cov": 10.0, "price": 450.0},
@@ -67,7 +71,7 @@ if not st.session_state['authenticated']:
             st.error("Invalid Username or Password")
     st.stop()
 
-# --- SHOWROOM BRANCH SELECTION (Hiriyur, Davangere, or Custom) ---
+# --- SHOWROOM BRANCH SELECTION ---
 st.sidebar.markdown(f"**User:** {st.session_state.get('user')}")
 st.sidebar.markdown(f"**Role:** {st.session_state.get('role')}")
 
@@ -122,9 +126,10 @@ if menu == "1. Customer Registration & List":
                     save_customer_to_db(cust_data)
                     st.session_state['customer'] = cust_data
                     st.success(f"Customer '{c_name}' registered successfully!")
-                    st.rerun()  # Form clear hokar page instantly refresh ho jayega
+                    st.rerun()
                 else:
                     st.error("Please enter Name and Mobile Number.")
+
     with col_list:
         st.markdown("### 📂 Saved Parties List (Select to Edit/Add Tiles)")
         customers = get_all_customers()
@@ -135,7 +140,7 @@ if menu == "1. Customer Registration & List":
                 active_party = cust_options[selected_key]
                 st.session_state['customer'] = active_party
                 st.info(f"Loaded: **{active_party.get('name')}** | Mobile: {active_party.get('mobile')}")
-                st.write(f"Added Items Count: {len(active_party.get('selections', []) or [])}")
+                st.write(f"Added Items in Queue: {len(active_party.get('selections', []) or [])}")
                 
                 c_btn1, c_btn2 = st.columns(2)
                 with c_btn1:
@@ -149,9 +154,9 @@ if menu == "1. Customer Registration & List":
         else:
             st.info("No customers registered yet.")
 
-#-- PAGE 2: AREA-WISE TILE SELECTION --
+#-- PAGE 2: AREA-WISE TILE SELECTION (CLEAN QUEUE WORKFLOW) --
 elif menu == "2. Area-wise Tile Selection":
-    st.title("🏗️ Step 2: Area-wise Tile & Wall Selection")
+    st.title("🏗️ Step 2: Area-wise Tile & Wall Selection (Queue)")
 
     if not st.session_state.get('customer'):
         st.warning("⚠️ Please select or register a customer first from '1. Customer Registration & List'.")
@@ -185,17 +190,29 @@ elif menu == "2. Area-wise Tile Selection":
 
         if floor_level != "-- Select Floor Level --" and selected_area_choice not in ["-- Select Floor Area --", "-- Select Wall Area --"]:
             st.markdown("---")
-            st.markdown(f"### 🔍 Search Item from Catalog")
+            st.markdown(f"### 🔍 Search Item from Catalog (Google Sheet)")
             
             search_query = st.text_input("Search Tile by Name / Category", "", key="tile_search_input")
-            filtered_catalog = [item for item in CATALOG_ITEMS if search_query.lower() in str(item.get('name', '')).lower() or search_query.lower() in str(item.get('category', '')).lower()]
+            
+            # Flexible key checking for google sheet columns (name/item, category, box_cov/coverage, price)
+            filtered_catalog = []
+            for item in CATALOG_ITEMS:
+                name_val = str(item.get('name', item.get('item', 'Tile')))
+                cat_val = str(item.get('category', ''))
+                if search_query.lower() in name_val.lower() or search_query.lower() in cat_val.lower():
+                    filtered_catalog.append(item)
             
             if not filtered_catalog:
                 filtered_catalog = CATALOG_ITEMS
                 
-            selected_tile_name = st.selectbox("Select Tile Item", [t.get('name', 'Tile') for t in filtered_catalog], key="tile_item_selectbox")
-            chosen_tile = next((t for t in CATALOG_ITEMS if t.get('name') == selected_tile_name), CATALOG_ITEMS[0])
+            tile_names = [str(t.get('name', t.get('item', 'Tile'))) for t in filtered_catalog]
+            selected_tile_name = st.selectbox("Select Tile Item", tile_names, key="tile_item_selectbox")
             
+            chosen_tile = next((t for t in CATALOG_ITEMS if str(t.get('name', t.get('item', 'Tile'))) == selected_tile_name), CATALOG_ITEMS[0])
+            
+            default_box_cov = float(chosen_tile.get('box_cov', chosen_tile.get('coverage', 15.0)))
+            default_price = float(chosen_tile.get('price', 600.0))
+
             col_dim1, col_dim2 = st.columns(2)
             with col_dim1:
                 calc_mode = st.radio("Measurement Mode", ["Length x Width (Feet)", "Direct Square Feet"], key="meas_mode_radio")
@@ -209,9 +226,9 @@ elif menu == "2. Area-wise Tile Selection":
                 st.info(f"Net Area: **{area_sqft} Sq. Ft.**")
 
             with col_dim2:
-                box_cov = st.number_input("Box Coverage (Sq. Ft. / Box)", min_value=0.1, value=float(chosen_tile.get('box_cov', 15.0)), step=0.5, key="box_cov_input_p2")
+                box_cov = st.number_input("Box Coverage (Sq. Ft. / Box)", min_value=0.1, value=default_box_cov, step=0.5, key="box_cov_input_p2")
                 wastage_pct = st.slider("Wastage (%)", min_value=0, max_value=20, value=5, key="wastage_slider_p2")
-                item_price = st.number_input("Price per Box (₹)", min_value=0.0, value=float(chosen_tile.get('price', 600.0)), step=50.0, key="price_input_p2")
+                item_price = st.number_input("Price per Box (₹)", min_value=0.0, value=default_price, step=50.0, key="price_input_p2")
 
             calc_res = calculate_tile_boxes(area_sqft, box_cov, wastage_pct)
             
@@ -223,12 +240,12 @@ elif menu == "2. Area-wise Tile Selection":
             total_cost = calc_res['rounded_boxes'] * item_price
             m4.metric("Total Amount", f"₹ {total_cost}")
 
-            if st.button("Add to Queue (Send for Estimation)", key="add_to_queue_btn"):
+            if st.button("Add to Queue & Continue More Areas", key="add_to_queue_btn"):
                 entry = {
                     "floor": floor_level,
                     "category": app_type,
                     "area": specific_area_name,
-                    "tile_name": chosen_tile.get('name', 'Tile'),
+                    "tile_name": selected_tile_name,
                     "sqft": area_sqft,
                     "boxes": calc_res['rounded_boxes'],
                     "price": item_price,
@@ -238,7 +255,7 @@ elif menu == "2. Area-wise Tile Selection":
                     cust['selections'] = []
                 cust['selections'].append(entry)
                 save_customer_to_db(cust)
-                st.success(f"Added {specific_area_name} ({chosen_tile.get('name')}) to Queue successfully!")
+                st.success(f"Added [{floor_level} -> {specific_area_name}] to Queue successfully! You can add another area or go to Step 3.")
 
 #-- PAGE 3: CALCULATION & FINAL ESTIMATE --
 elif menu == "3. Calculation & Final Estimate":
@@ -281,6 +298,7 @@ elif menu == "3. Calculation & Final Estimate":
             wa_text += f"Mobile: {cust.get('mobile')}%0A-------------------%0A"
             for s in selections:
                 wa_text += f"- {s.get('floor')} ({s.get('area')}): {s.get('boxes')} Boxes ({s.get('tile_name')}) - ₹{s.get('total')}%0A"
+                
             wa_text += f"-------------------%0A*Total Boxes:* {grand_boxes}%0A*Grand Total:* ₹{grand_amount}"
             
             whatsapp_link = f"https://wa.me/{cust.get('mobile')}?text={wa_text}"
