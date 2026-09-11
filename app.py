@@ -1,26 +1,64 @@
 import streamlit as st
 import math
-from database import (
-    get_all_customers, 
-    save_customer_to_db, 
-    delete_customer_from_db, 
-    get_all_admin_users, 
-    add_admin_user, 
-    delete_admin_user
-)
+
+# --- IN-LINE DATABASE & SESSION FUNCTIONS ---
+def get_all_customers():
+    if 'mock_customers' not in st.session_state:
+        st.session_state['mock_customers'] = []
+    return st.session_state['mock_customers']
+
+def save_customer_to_db(cust_data):
+    if 'mock_customers' not in st.session_state:
+        st.session_state['mock_customers'] = []
+    existing = [c for c in st.session_state['mock_customers'] if c.get('mobile') == cust_data.get('mobile')]
+    if existing:
+        st.session_state['mock_customers'].remove(existing[0])
+    st.session_state['mock_customers'].append(cust_data)
+    return True
+
+def delete_customer_from_db(mobile):
+    if 'mock_customers' in st.session_state:
+        st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile') != mobile]
+    return True
+
+def get_all_admin_users():
+    return [{"username": "admin", "password": "password", "role": "ADMIN", "branch": "Hiriyur"}]
+
+def calculate_tile_boxes(area_sqft, tile_length_mm, tile_width_mm, box_coverage_sqft, wastage_pct=5):
+    if area_sqft <= 0 or box_coverage_sqft <= 0:
+        return {
+            "total_area_with_wastage": 0.0,
+            "exact_boxes": 0,
+            "rounded_boxes": 0,
+            "total_tiles_count": 0
+        }
+    area_with_wastage = area_sqft * (1 + wastage_pct / 100.0)
+    exact_boxes = area_with_wastage / box_coverage_sqft
+    rounded_boxes = math.ceil(exact_boxes)
+    tile_sqft = (tile_length_mm * tile_width_mm) / 92903.0
+    tiles_per_box = math.ceil(box_coverage_sqft / tile_sqft) if tile_sqft > 0 else 0
+    total_tiles = rounded_boxes * tiles_per_box
+    return {
+        "total_area_with_wastage": round(area_with_wastage, 2),
+        "exact_boxes": round(exact_boxes, 2),
+        "rounded_boxes": rounded_boxes,
+        "total_tiles_count": total_tiles
+    }
 
 # Page Configuration
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
 # Session State Initialization
-if 'authenticated' not in st.session_state:
-    st.session_state['authenticated'] = False
-if 'user' not in st.session_state:
-    st.session_state['user'] = None
-if 'role' not in st.session_state:
-    st.session_state['role'] = None
-if 'branch' not in st.session_state:
-    st.session_state['branch'] = None
+for key, default in [
+    ('authenticated', False),
+    ('user', None),
+    ('role', None),
+    ('branch', 'Hiriyur'),
+    ('customer', None),
+    ('current_selections', [])
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 # Authentication Check
 if not st.session_state['authenticated']:
@@ -47,8 +85,7 @@ if not st.session_state['authenticated']:
 # Sidebar Navigation & User Info
 st.sidebar.markdown(f"**User:** {st.session_state.get('user')}")
 st.sidebar.markdown(f"**Role:** {st.session_state.get('role')}")
-st.sidebar.markdown(f"**Showroom Branch:**")
-branch = st.sidebar.selectbox("Branch", ["Hiriyur", "Other Branch"], index=0, key="sidebar_branch_select")
+branch = st.sidebar.selectbox("Showroom Branch", ["Hiriyur", "Other Branch"], index=0, key="sidebar_branch_select")
 st.session_state['branch'] = branch
 
 st.sidebar.markdown("---")
@@ -91,7 +128,7 @@ if menu == "1. Customer Registration":
                     st.session_state['customer'] = cust_data
                     st.success(f"Customer '{cust_name}' registered successfully!")
                 else:
-                    st.error("Failed to save customer to database.")
+                    st.error("Failed to save customer.")
             else:
                 st.error("Please fill in both Customer Name and Mobile Number.")
 
@@ -108,9 +145,6 @@ if menu == "1. Customer Registration":
             st.session_state['customer'] = active_c
             
             st.write(f"**Active Party Selected:** {active_c.get('name')} | **Mobile:** {active_c.get('mobile')}")
-            
-            safe_selections = active_c.get('selections', []) or []
-            st.write(f"**Current Selections Count:** {len(safe_selections)} items")
             
             col_btn1, col_btn2 = st.columns(2)
             with col_btn1:
@@ -156,32 +190,41 @@ elif menu == "2. Tile Selection & BOQ":
 
         if floor_level != "-- Select Floor Level --" and area_type != "-- Select Area Type --":
             st.markdown("---")
-            st.markdown(f"### 📐 Dimensions & Box Calculation for: {floor_level} -> {custom_area_name}")
+            st.markdown(f"### 📐 Dimensions & Tile Configuration for: {floor_level} -> {custom_area_name}")
             
             col1, col2 = st.columns(2)
             with col1:
-                area_sqft = st.number_input("Total Area (Sq. Ft.)", min_value=0.0, value=100.0, step=1.0, key="area_sqft_input")
+                calc_mode = st.radio("Calculation Input Mode", ["Length x Width (Feet)", "Direct Square Feet"], key="calc_mode_radio")
+                if calc_mode == "Length x Width (Feet)":
+                    length_ft = st.number_input("Length (ft)", min_value=0.0, value=10.0, step=0.1, key="length_ft_input")
+                    width_ft = st.number_input("Width (ft)", min_value=0.0, value=10.0, step=0.1, key="width_ft_input")
+                    area_sqft = length_ft * width_ft
+                else:
+                    area_sqft = st.number_input("Total Area (Sq. Ft.)", min_value=0.0, value=100.0, step=1.0, key="direct_sqft_input")
+                
+                st.info(f"Calculated Net Area: **{area_sqft} Sq. Ft.**")
+
             with col2:
                 box_coverage = st.number_input("Box Coverage (Sq. Ft. per Box)", min_value=0.1, value=15.0, step=0.5, key="box_cov_input")
+                wastage = st.slider("Wastage Percentage (%)", min_value=0, max_value=20, value=5, key="wastage_slider")
                 tile_price = st.number_input("Price per Box (₹)", min_value=0.0, value=600.0, step=50.0, key="tile_price_input")
 
-            # Calculation without wastage
-            exact_boxes = area_sqft / box_coverage if box_coverage > 0 else 0
-            rounded_boxes = math.ceil(exact_boxes)
-            total_est_cost = rounded_boxes * tile_price
-
+            calc_result = calculate_tile_boxes(area_sqft, 600, 600, box_coverage, wastage)
+            
             st.markdown("#### 📦 Calculation Summary")
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Net Area", f"{area_sqft} sq.ft")
-            m2.metric("Required Boxes (Rounded)", f"{rounded_boxes} Boxes")
-            m3.metric("Estimated Cost", f"₹ {total_est_cost}")
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Area + Wastage", f"{calc_result['total_area_with_wastage']} sq.ft")
+            m2.metric("Exact Boxes", calc_result['exact_boxes'])
+            m3.metric("Rounded Boxes (Order)", f"{calc_result['rounded_boxes']} Boxes")
+            total_est_cost = calc_result['rounded_boxes'] * tile_price
+            m4.metric("Estimated Cost", f"₹ {total_est_cost}")
 
             if st.button("Add This Area to Customer Order", key="add_area_btn"):
                 selection_entry = {
                     "floor": floor_level,
                     "area": custom_area_name,
                     "sqft": area_sqft,
-                    "boxes": rounded_boxes,
+                    "boxes": calc_result['rounded_boxes'],
                     "price_per_box": tile_price,
                     "total_cost": total_est_cost
                 }
@@ -218,7 +261,6 @@ elif menu == "3. Calculation & Final Estimate":
             st.markdown(f"### Grand Total Boxes: **{total_grand_boxes} Boxes**")
             st.markdown(f"### Grand Total Estimate: **₹ {total_grand_cost}**")
             
-            # WhatsApp Share Link Generator
             whatsapp_msg = f"*Tile Estimation BOQ - {cust.get('name')}*\n"
             whatsapp_msg += f"Mobile: {cust.get('mobile')}\n"
             whatsapp_msg += f"Total Boxes: {total_grand_boxes}\n"
@@ -232,7 +274,7 @@ elif menu == "3. Calculation & Final Estimate":
 #-- DASHBOARD & SALESMAN SUMMARY --
 elif menu == "Dashboard & Salesman Summary":
     st.title("📊 Dashboard & Salesman Summary")
-    st.write("Summary metrics and analytics.")
+    st.write("Summary metrics and analytics for showroom sales.")
 
 #-- ADMIN USER MANAGEMENT --
 elif menu == "Admin User Management":
