@@ -236,11 +236,14 @@ elif menu == "2. Area-wise Tile Selection":
 if "selections" in st.session_state and st.session_state["selections"]:
     st.write("### Added Items in Queue:")
     for idx, item in enumerate(st.session_state["selections"]):
-        st.write(f"{idx + 1}. **{item['floor']}** -> {item['area']} | **{item['tile_name']}** (Coverage: {item['box_cov']} sq.ft/box)")x)")
-    # Purani list ko replace karne ki jagah nayi entry ko append karein
-    st.session_state["selections"].append(entry)
-    st.success("Item added to queue successfully!")
-
+        q_num = idx + 1
+        q_floor = item.get('floor', '')
+        q_area = item.get('area', '')
+        q_tile = item.get('tile_name', '')
+        q_cov = item.get('box_cov', 0.0)
+        
+        display_text = str(q_num) + ". " + str(q_floor) + " -> " + str(q_area) + " | " + str(q_tile) + " (Coverage: " + str(q_cov) + " sq.ft)"
+        st.text(display_text)
 if "selections" in st.session_state and st.session_state["selections"]:
     st.write("### Added Items in Queue:")
     for idx, item in enumerate(st.session_state["selections"]):
