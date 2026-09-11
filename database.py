@@ -1,38 +1,27 @@
 import streamlit as st
-from supabase import create_client, Client
 
-SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
-
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHphemlyd3hheGFibnBwY2hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2ODAyOTgsImV4cCI6MjEwNDI1NjI5OH0.CSCbuwInWJtGpL7w_nMFU6ElGWnXxr67bKeMWuTpMMM"
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+def get_all_customers():
+    return st.session_state.get('mock_customers', [])
 
 def save_customer_to_db(cust_data):
-    
-    try:
-        data = {
-            "mobile": str(cust_data.get('mobile')),
-            "name": str(cust_data.get('name')),
-            "address": str(cust_data.get('address')),
-            "engineer": str(cust_data.get('engineer')),
-            "engineer_mobile": str(cust_data.get('engineer_mobile'))
-        }
-        response = supabase.table("customers").upsert(data).execute()
-        return True
-    except Exception as e:
-        st.error(f"Connection Error: {e}")
-        return False
-
-def get_all_customers_from_db():
-    try:
-        response = supabase.table("customers").select("*").execute()
-        return response.data
-    except Exception as e:
-        return []
+    if 'mock_customers' not in st.session_state:
+        st.session_state['mock_customers'] = []
+    existing = [c for c in st.session_state['mock_customers'] if c.get('mobile') == cust_data.get('mobile')]
+    if existing:
+        st.session_state['mock_customers'].remove(existing[0])
+    st.session_state['mock_customers'].append(cust_data)
+    return True
 
 def delete_customer_from_db(mobile):
-    try:
-        supabase.table("customers").delete().eq("mobile", mobile).execute()
-        return True
-    except Exception as e:
-        return False
+    if 'mock_customers' in st.session_state:
+        st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile') != mobile]
+    return True
+
+def get_all_admin_users():
+    return [{"username": "admin", "password": "password", "role": "ADMIN", "branch": "Hiriyur"}]
+
+def add_admin_user(u, p, r, b):
+    return True
+
+def delete_admin_user(u):
+    return True
