@@ -2,13 +2,13 @@ import os
 import streamlit as st
 from supabase import create_client, Client
 
-# Yahan apna real Supabase URL aur Key seedha daal dein taaki Render par error na aaye
-SUPABASE_URL = "APNA_SUPABASE_URL_YAHAN_DAALEIN"
-SUPABASE_KEY = "APNA_SUPABASE_ANON_KEY_YAHAN_DAALEIN"
+# Hardcoded credentials to bypass environment variable lookup issues on Render
+SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHphemlyd3hheGFibnBwY2hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyMzg2Mzh9.EXAMPLE_KEY" # Apni asli anon key yahan paste kar dein
 
 supabase: Client = None
 try:
-    if SUPABASE_URL and SUPABASE_KEY and "SUPABASE_URL" not in SUPABASE_URL:
+    if SUPABASE_URL and SUPABASE_KEY:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
     st.error(f"Supabase Connection Init Error: {e}")
@@ -65,7 +65,7 @@ def delete_customer_from_db(mobile):
             return False
     else:
         if 'mock_customers' in st.session_state:
-            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile') != mobile]
+            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile'] != mobile]
         return True
 
 def get_all_admin_users():
