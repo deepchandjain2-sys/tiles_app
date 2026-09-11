@@ -2,25 +2,9 @@ import os
 import streamlit as st
 from supabase import create_client, Client
 
-# Safe way to fetch credentials without throwing StreamlitSecretNotFoundError
-SUPABASE_URL = ""
-SUPABASE_KEY = ""
-
-try:
-    SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
-except Exception:
-    pass
-
-if not SUPABASE_URL:
-    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-
-try:
-    SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
-except Exception:
-    pass
-
-if not SUPABASE_KEY:
-    SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+# Directly read from Environment Variables to completely avoid st.secrets error
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
 if SUPABASE_URL and SUPABASE_KEY:
     try:
