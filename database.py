@@ -2,7 +2,6 @@ import os
 import streamlit as st
 from supabase import create_client, Client
 
-# Directly read from Environment Variables to completely avoid st.secrets error
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
@@ -15,8 +14,10 @@ else:
     supabase = None
 
 def get_all_customers():
+    """Fetches all registered customers/parties from Supabase without any limit."""
     if supabase:
         try:
+            # Fetching all records without restrictions
             response = supabase.table("customers").select("*").execute()
             return response.data or []
         except Exception as e:
@@ -28,8 +29,10 @@ def get_all_customers():
         return st.session_state['mock_customers']
 
 def save_customer_to_db(cust_data):
+    """Saves or updates a customer in Supabase properly."""
     if supabase:
         try:
+            # Using upsert matching mobile unique constraint
             supabase.table("customers").upsert(cust_data, on_conflict="mobile").execute()
             return True
         except Exception as e:
@@ -38,10 +41,13 @@ def save_customer_to_db(cust_data):
     else:
         if 'mock_customers' not in st.session_state:
             st.session_state['mock_customers'] = []
-        existing = [c for c in st.session_state['mock_customers'] if c.get('mobile') == cust_data.get('mobile')]
-        if existing:
-            st.session_state['mock_customers'].remove(existing[0])
-        st.session_state['mock_customers'].append(cust_data)
+        
+        # Check if mobile already exists in session, update it; otherwise append new
+        existing_idx = next((i for i, c in enumerate(st.session_state['mock_customers']) if c.get('mobile') == cust_data.get('mobile')), None)
+        if existing_idx is not None:
+            st.session_state['mock_customers'][existing_idx] = cust_data
+        else:
+            st.session_state['mock_customers'].append(cust_data)
         return True
 
 def delete_customer_from_db(mobile):
