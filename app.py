@@ -11,13 +11,33 @@ def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
         df.columns = df.columns.str.strip().str.lower()
+        
+        # Mapping alternative column names to standard keys
+        rename_map = {}
+        for col in df.columns:
+            if 'name' in col or 'tile' in col:
+                rename_map[col] = 'name'
+            elif 'cat' in col:
+                rename_map[col] = 'category'
+            elif 'cov' in col or 'box' in col:
+                rename_map[col] = 'box_cov'
+            elif 'price' in col or 'rate' in col:
+                rename_map[col] = 'price'
+                
+        df = df.rename(columns=rename_map)
+        
+        # Ensure required columns exist
+        required_cols = ['name', 'category', 'box_cov', 'price']
+        for rc in required_cols:
+            if rc not in df.columns:
+                df[rc] = 'Default' if rc in ['name', 'category'] else 0.0
+                
         return df.to_dict(orient="records")
     except Exception as e:
         st.error(f"Google Sheet Error: {e}")
         return [
             {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0}
         ]
-
 CATALOG_ITEMS = load_catalog_from_google_sheet()
 
 
