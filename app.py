@@ -155,11 +155,11 @@ with col_btn2:
             st.error("Failed to delete customer.")
             
 
-#-- PAGE 2: TILE SELECTION & BOQ -- 
- if menu == "2. Tile Selection & BOQ":
-    
+
+#-- PAGE 2: TILE SELECTION & BOQ --
+if menu == "2. Tile Selection & BOQ":
     active_c = st.session_state.get('active_customer') or st.session_state.get('customer', {})
-    st.title("Step 2: Area-wise Tile Selection")
+    
     st.title("Step 2: Area-wise Tile Selection")
 
     if not st.session_state.get('customer'):
@@ -179,8 +179,7 @@ with col_btn2:
             "-- Select Area Type --",
             "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
             "3rd Bedroom Floor", "4th Bedroom Floor", "Associated Bathroom Floor"
-        ])        
-        custom_area_name = ""
+        ])        custom_area_name = ""
         if area_type == "Custom Area":
             custom_area_name = st.text_input("Enter Custom Area Name (e.g. Staircase, Passage)")
         
