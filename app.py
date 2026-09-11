@@ -134,6 +134,8 @@ if menu == "1. Customer Registration":
                 
                 st.write(f"**Active Party Selected:** {active_c['name']} | **Mobile:** {active_c['mobile']}")
                 st.write(f"**Current Selections Count:** {len(active_c.get('selections', []))} items")
+                # Agar selections None hai toh use khali list ([]) maan lein
+                selections = selections or []
                 
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
