@@ -1,15 +1,29 @@
 import streamlit as st
 import pandas as pd
 import math
+import os
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
 # --- GOOGLE SHEET CATALOG SETUP ---
-# Agar aapne Google sheet publish kar di hai toh uska CSV link yahan daaliye, 
-# ya environment variable/secrets se fetch karega.
-GOOGLE_SHEET_CSV_URL = st.secrets.get"https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = os.environ.get("https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv")
 
 @st.cache_data(ttl=60)
 def load_catalog_from_google_sheet():
+    try:
+        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        df.columns = df.columns.str.strip().str.lower()
+        return df.to_dict(orient="records")
+    except Exception:
+        # Fallback catalog agar Google sheet load na ho
+        return [
+            {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0},
+            {"name": "Matte Anti-Skid Tile 300x300mm", "category": "Bathroom Floor", "box_cov": 10.0, "price": 450.0},
+            {"name": "Kitchen Glossy Wall Tile 300x450mm", "category": "Wall", "box_cov": 12.0, "price": 500.0},
+            {"name": "Wooden Plank Tile 200x1200mm", "category": "Hall / Bedroom", "box_cov": 13.5, "price": 850.0},
+            {"name": "Elevation Highlighter Tile", "category": "Wall", "box_cov": 10.0, "price": 750.0}
+        ]
+
+CATALOG_ITEMS = load_catalog_from_google_sheet()def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
         df.columns = df.columns.str.strip().str.lower()
