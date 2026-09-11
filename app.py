@@ -22,35 +22,6 @@ def load_catalog_from_google_sheet():
             {"name": "Elevation Highlighter Tile", "category": "Wall", "box_cov": 10.0, "price": 750.0}
         ]
 
-CATALOG_ITEMS = load_catalog_from_google_sheet()    try:
-        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        df.columns = df.columns.str.strip().str.lower()
-        return df.to_dict(orient="records")
-    except Exception:
-        # Fallback catalog agar Google sheet load na ho
-        return [
-            {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0},
-            {"name": "Matte Anti-Skid Tile 300x300mm", "category": "Bathroom Floor", "box_cov": 10.0, "price": 450.0},
-            {"name": "Kitchen Glossy Wall Tile 300x450mm", "category": "Wall", "box_cov": 12.0, "price": 500.0},
-            {"name": "Wooden Plank Tile 200x1200mm", "category": "Hall / Bedroom", "box_cov": 13.5, "price": 850.0},
-            {"name": "Elevation Highlighter Tile", "category": "Wall", "box_cov": 10.0, "price": 750.0}
-        ]
-
-CATALOG_ITEMS = load_catalog_from_google_sheet()def load_catalog_from_google_sheet():
-    try:
-        df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        df.columns = df.columns.str.strip().str.lower()
-        return df.to_dict(orient="records")
-    except Exception:
-        # Fallback catalog agar Google sheet load na ho
-        return [
-            {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0},
-            {"name": "Matte Anti-Skid Tile 300x300mm", "category": "Bathroom Floor", "box_cov": 10.0, "price": 450.0},
-            {"name": "Kitchen Glossy Wall Tile 300x450mm", "category": "Wall", "box_cov": 12.0, "price": 500.0},
-            {"name": "Wooden Plank Tile 200x1200mm", "category": "Hall / Bedroom", "box_cov": 13.5, "price": 850.0},
-            {"name": "Elevation Highlighter Tile", "category": "Wall", "box_cov": 10.0, "price": 750.0}
-        ]
-
 CATALOG_ITEMS = load_catalog_from_google_sheet()
 
 def calculate_tile_boxes(area_sqft, box_coverage_sqft, wastage_pct=5):
@@ -259,7 +230,7 @@ elif menu == "2. Area-wise Tile Selection":
                 save_customer_to_db(cust)
                 st.success(f"Added [{floor_level} -> {specific_area_name}] with {selected_tile_name} to Queue! Go to Step 3 to enter Sqft and calculate.")
 
-#-- PAGE 3: CALCULATION & FINAL ESTIMATE (MANUAL SQFT ENTRY & BOX CALCULATION) --
+#-- PAGE 3: CALCULATION & FINAL ESTIMATE --
 elif menu == "3. Calculation & Final Estimate":
     st.title("📋 Step 3: Enter Sqft, Box Calculation & BOQ Estimate")
     if not st.session_state.get('customer'):
@@ -287,7 +258,6 @@ elif menu == "3. Calculation & Final Estimate":
                 with col_c2:
                     wastage_pct = st.slider("Wastage (%)", min_value=0, max_value=20, value=5, key=f"wastage_slider_{i}")
                 
-                # Calculate boxes dynamically based on manual sqft input
                 calc_res = calculate_tile_boxes(manual_sqft, float(sel.get('box_cov', 15.0)), wastage_pct)
                 item_total_cost = calc_res['rounded_boxes'] * float(sel.get('price', 600.0))
                 
@@ -296,7 +266,6 @@ elif menu == "3. Calculation & Final Estimate":
                 
                 st.write(f"Area with Wastage: {calc_res['total_area_with_wastage']} sq.ft | **Item Cost:** ₹{item_total_cost}")
                 
-                # Save updated values in local copy
                 updated_entry = sel.copy()
                 updated_entry['sqft'] = manual_sqft
                 updated_entry['boxes'] = calc_res['rounded_boxes']
@@ -313,7 +282,6 @@ elif menu == "3. Calculation & Final Estimate":
                 grand_boxes += calc_res['rounded_boxes']
                 grand_amount += item_total_cost
             
-            # Save all updated selections back to database on state change
             cust['selections'] = updated_selections
             save_customer_to_db(cust)
 
