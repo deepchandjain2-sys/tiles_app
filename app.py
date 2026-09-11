@@ -177,24 +177,23 @@ if menu == "2. Tile Selection & BOQ":
         cust = st.session_state['customer']
         st.info(f"**Active Customer:** {cust.get('name')} | **Mobile:** {cust.get('mobile')} | **Branch:** {cust.get('branch')}")
         
-       st.markdown("### 🏗️ Building & Floor Selection")
+        st.markdown("### 🏗️ Building & Floor Selection")
         
         floor_level = st.selectbox("Select Floor Level", [
             "-- Select Floor Level --",
             "Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Other / Independent Area"
-        ])
+        ], key="floor_level_selectbox")
         
         area_type = st.selectbox("Select Building Area / Room", [
             "-- Select Area Type --",
             "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
             "3rd Bedroom Floor", "4th Bedroom Floor", "Associated Bathroom Floor", "Custom Area"
-        ])
+        ], key="area_type_selectbox")
         
         if area_type == "Custom Area":
-            custom_area_name = st.text_input("Enter Custom Area Name")
+            custom_area_name = st.text_input("Enter Custom Area Name", key="custom_area_input")
         else:
-            custom_area_name = area_type
-        if floor_level != "-- Select Floor Level --" and area_type != "-- Select Area Type --":
+            custom_area_name = area_type    if floor_level != "-- Select Floor Level --" and area_type != "-- Select Area Type --":
             final_area_name = f"{floor_level} - {custom_area_name if area_type == 'Custom Area' and custom_area_name else area_type}"
         else:
             final_area_name = ""
