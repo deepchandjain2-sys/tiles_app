@@ -153,6 +153,7 @@ with col_btn2:
             st.rerun()
         else:
             st.error("Failed to delete customer.")
+            
 
 #-- PAGE 2: TILE SELECTION & BOQ --
 if menu == "2. Tile Selection & BOQ":
