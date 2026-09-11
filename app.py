@@ -4,8 +4,7 @@ import math
 import os
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
-# --- GOOGLE SHEET CATALOG SETUP ---
-GOOGLE_SHEET_CSV_URL = os.environ.get("GOOGLE_SHEET_CSV_URL", "https://docs.google.com/spreadsheets/d/1VrRwsP3s6r7UIw-kcX80gev4yXWTPMLvL87PG/export?format=csv")
+GOOGLE_SHEET_CSV_URL = os.environ.get("GOOGLE_SHEET_CSV_URL", "https://docs.google.com/spreadsheets/d/1VrRwP3s6e7UlW-kcX8Qgev4y7_nxFU6E1GWnXxz67bKmWuTPmmw/export?format=csv")
 
 @st.cache_data(ttl=0)
 def load_catalog_from_google_sheet():
@@ -17,18 +16,16 @@ def load_catalog_from_google_sheet():
         st.error(f"Google Sheet Error: {e}")
         return [
             {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0}
-        ]def calculate_tile_boxes(area_sqft, box_coverage_sqft, wastage_pct=5):
-    if area_sqft <= 0 or box_coverage_sqft <= 0:
-        return {"total_area_with_wastage": 0.0, "exact_boxes": 0, "rounded_boxes": 0}
-    area_with_wastage = area_sqft * (1 + wastage_pct / 100.0)
-    exact_boxes = area_with_wastage / box_coverage_sqft
-    rounded_boxes = math.ceil(exact_boxes)
-    return {
-        "total_area_with_wastage": round(area_with_wastage, 2),
-        "exact_boxes": round(exact_boxes, 2),
-        "rounded_boxes": rounded_boxes
-    }
+        ]
 
+CATALOG_ITEMS = load_catalog_from_google_sheet()
+
+def calculate_tile_boxes(area_sqft, box_coverage_sqft, wastage_pct=5):
+    if box_coverage_sqft <= 0:
+        return 0, 0
+    total_area = area_sqft * (1 + wastage_pct / 100.0)
+    boxes = math.ceil(total_area / box_coverage_sqft)
+    return boxes, total_area
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
 for key, default in [
