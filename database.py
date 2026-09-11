@@ -21,7 +21,7 @@ def get_all_customers():
             response = supabase.table(TABLE_NAME).select("*").execute()
             return response.data or []
         except Exception as e:
-            st.error(f"Database Fetch Error: {e}")
+            st.error(f"Supabase Fetch Error: {e}")
             return []
     else:
         if 'mock_customers' not in st.session_state:
@@ -31,10 +31,10 @@ def get_all_customers():
 def save_customer_to_db(cust_data):
     if supabase:
         try:
-            supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
+            res = supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
             return True
         except Exception as e:
-            st.error(f"Database Save Error: {e}")
+            st.error(f"Supabase Save Error: {e}")
             return False
     else:
         if 'mock_customers' not in st.session_state:
@@ -52,11 +52,11 @@ def delete_customer_from_db(mobile):
             supabase.table(TABLE_NAME).delete().eq("mobile", mobile).execute()
             return True
         except Exception as e:
-            st.error(f"Database Delete Error: {e}")
+            st.error(f"Supabase Delete Error: {e}")
             return False
     else:
         if 'mock_customers' in st.session_state:
-            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile') != mobile]
+            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile'] != mobile]
         return True
 
 def get_all_admin_users():
