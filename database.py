@@ -19,34 +19,42 @@ def get_all_customers():
     if supabase:
         try:
             response = supabase.table(TABLE_NAME).select("*").execute()
-            return response.data or []
+            # Agar supabase empty data de lekin session mein ho, toh dono merge kar sakte hain
+            db_data = response.data or []
+            if db_data:
+                return db_data
         except Exception as e:
             st.error(f"Supabase Fetch Error: {e}")
-            return []
-    else:
-        if 'mock_customers' not in st.session_state:
-            st.session_state['mock_customers'] = []
-        return st.session_state['mock_customers']
+            
+    if 'mock_customers' not in st.session_state:
+        st.session_state['mock_customers'] = []
+    return st.session_state['mock_customers']
 
 def save_customer_to_db(cust_data):
+    # Hamesha session state mein bhi save rakho taaki app turant dikhaye
+    if 'mock_customers' not in st.session_state:
+        st.session_state['mock_customers'] = []
+    
+    existing_idx = next((i for i, c in enumerate(st.session_state['mock_customers']) if c.get('mobile') == cust_data.get('mobile')), None)
+    if existing_idx is not None:
+        st.session_state['mock_customers'][existing_idx] = cust_data
+    else:
+        st.session_state['mock_customers'].append(cust_data)
+
     if supabase:
         try:
+            # Supabase upsert
             res = supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
             return True
         except Exception as e:
-            st.error(f"Supabase Save Error: {e}")
+            st.error(f"⚠️ Supabase Save Failed: {e}")
             return False
-    else:
-        if 'mock_customers' not in st.session_state:
-            st.session_state['mock_customers'] = []
-        existing_idx = next((i for i, c in enumerate(st.session_state['mock_customers']) if c.get('mobile') == cust_data.get('mobile')), None)
-        if existing_idx is not None:
-            st.session_state['mock_customers'][existing_idx] = cust_data
-        else:
-            st.session_state['mock_customers'].append(cust_data)
-        return True
+    return True
 
 def delete_customer_from_db(mobile):
+    if 'mock_customers' in st.session_state:
+        st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile') != mobile]
+        
     if supabase:
         try:
             supabase.table(TABLE_NAME).delete().eq("mobile", mobile).execute()
@@ -54,10 +62,7 @@ def delete_customer_from_db(mobile):
         except Exception as e:
             st.error(f"Supabase Delete Error: {e}")
             return False
-    else:
-        if 'mock_customers' in st.session_state:
-            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile') != mobile]
-        return True
+    return True
 
 def get_all_admin_users():
     return [
