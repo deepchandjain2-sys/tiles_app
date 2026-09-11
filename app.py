@@ -156,9 +156,9 @@ with col_btn2:
             
 
 #-- PAGE 2: TILE SELECTION & BOQ --
-if menu == "2. Tile Selection & BOQ":
+    if menu == "2. Tile Selection & BOQ":
 
-if menu == "2. Tile Selection & BOQ":
+    if menu == "2. Tile Selection & BOQ":
     # Safe initialization for active customer in Page 2
     active_c = st.session_state.get('active_customer') or st.session_state.get('customer', {})
     st.title("Step 2: Area-wise Tile Selection")
