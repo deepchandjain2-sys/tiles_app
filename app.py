@@ -213,7 +213,7 @@ elif menu == "2. Area-wise Tile Selection":
             default_box_cov = float(chosen_tile.get('box_cov', chosen_tile.get('coverage', 15.0)))
             default_price = float(chosen_tile.get('price', 600.0))
 
-            st.write(f"**Selected Item Specs:** Coverage: {default_box_cov} sq.ft/box | Rate: ₹{default_price}/box")
+            st.write(f"**Selected Item Specs:** Coverage: {default_box_cov} sq.ft/box")
 
             if st.button("Add Area & Tile to Queue", key="add_to_queue_btn"):
                 entry = {
