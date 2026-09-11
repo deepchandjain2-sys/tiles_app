@@ -157,6 +157,9 @@ with col_btn2:
 
 #-- PAGE 2: TILE SELECTION & BOQ --
 if menu == "2. Tile Selection & BOQ":
+
+if menu == "2. Tile Selection & BOQ":
+    st.title("Step 2: Area-wise Tile Selection")
     st.title("Step 2: Area-wise Tile Selection")
 
     if not st.session_state.get('customer'):
