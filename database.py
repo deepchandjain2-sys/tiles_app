@@ -2,9 +2,25 @@ import os
 import streamlit as st
 from supabase import create_client, Client
 
-# Render ya Streamlit secrets se Supabase credentials lena
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL", ""))
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.environ.get("SUPABASE_KEY", ""))
+# Safe way to fetch credentials without throwing StreamlitSecretNotFoundError
+SUPABASE_URL = ""
+SUPABASE_KEY = ""
+
+try:
+    SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+except Exception:
+    pass
+
+if not SUPABASE_URL:
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+
+try:
+    SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+except Exception:
+    pass
+
+if not SUPABASE_KEY:
+    SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -15,7 +31,6 @@ else:
     supabase = None
 
 def get_all_customers():
-    """Supabase online database se saari saved parties fetch karta hai"""
     if supabase:
         try:
             response = supabase.table("customers").select("*").execute()
@@ -24,13 +39,11 @@ def get_all_customers():
             st.error(f"Database Fetch Error: {e}")
             return []
     else:
-        # Fallback agar Supabase configure nahi hai
         if 'mock_customers' not in st.session_state:
             st.session_state['mock_customers'] = []
         return st.session_state['mock_customers']
 
 def save_customer_to_db(cust_data):
-    """Party ko Supabase cloud par permanently save/upsert karta hai"""
     if supabase:
         try:
             supabase.table("customers").upsert(cust_data, on_conflict="mobile").execute()
@@ -48,7 +61,6 @@ def save_customer_to_db(cust_data):
         return True
 
 def delete_customer_from_db(mobile):
-    """Supabase database se party delete karta hai"""
     if supabase:
         try:
             supabase.table("customers").delete().eq("mobile", mobile).execute()
