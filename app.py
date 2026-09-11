@@ -4,7 +4,7 @@ import math
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
 # --- GOOGLE SHEET CATALOG SETUP ---
-GOOGLE_SHEET_CSV_URL = "YOUR_PUBLIC_CSV_URL_HERE"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
 @st.cache_data(ttl=600)
 def load_catalog_from_google_sheet():
