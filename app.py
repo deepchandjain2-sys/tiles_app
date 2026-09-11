@@ -244,12 +244,12 @@ if "selections" in st.session_state and st.session_state["selections"]:
 if "selections" in st.session_state and st.session_state["selections"]:
     st.write("### Added Items in Queue:")
     for idx, item in enumerate(st.session_state["selections"]):
-        floor_val = item.get('floor', '')
-        area_val = item.get('area', '')
-        tile_val = item.get('tile_name', '')
-        cov_val = item.get('box_cov', 0.0)
-        st.write(f"{idx + 1}. **{floor_val}** -> {area_val} | **{tile_val}** (Coverage: {cov_val} sq.ft/box)")
-#-- PAGE 3: CALCULATION & FINAL ESTIMATE --
+        num = idx + 1
+        flr = item.get('floor', '')
+        ar = item.get('area', '')
+        tname = item.get('tile_name', '')
+        bcov = item.get('box_cov', 0.0)
+        st.write(str(num) + ". **" + str(flr) + "** -> " + str(ar) + " | **" + str(tname) + "** (Coverage: " + str(bcov) + " sq.ft/box)")#-- PAGE 3: CALCULATION & FINAL ESTIMATE --
 elif menu == "3. Calculation & Final Estimate":
     st.title("📋 Step 3: Enter Sqft, Box Calculation & BOQ Estimate")
     if not st.session_state.get('customer'):
