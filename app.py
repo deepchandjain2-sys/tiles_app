@@ -155,11 +155,9 @@ with col_btn2:
             st.error("Failed to delete customer.")
             
 
-#-- PAGE 2: TILE SELECTION & BOQ --
-    if menu == "2. Tile Selection & BOQ":
-
-    if menu == "2. Tile Selection & BOQ":
-    # Safe initialization for active customer in Page 2
+#-- PAGE 2: TILE SELECTION & BOQ -- 
+ if menu == "2. Tile Selection & BOQ":
+    
     active_c = st.session_state.get('active_customer') or st.session_state.get('customer', {})
     st.title("Step 2: Area-wise Tile Selection")
     st.title("Step 2: Area-wise Tile Selection")
