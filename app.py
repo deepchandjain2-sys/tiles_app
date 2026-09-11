@@ -4,18 +4,18 @@ import math
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
 # --- GOOGLE SHEET CATALOG SETUP ---
-# Apni published Google Sheet ka CSV link yahan daaliye
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+# Agar aapne Google sheet publish kar di hai toh uska CSV link yahan daaliye, 
+# ya environment variable/secrets se fetch karega.
+GOOGLE_SHEET_CSV_URL = st.secrets.get("GOOGLE_SHEET_CSV_URL", "https://docs.google.com/spreadsheets/d/1VrRwsP3s6r7UIw-kcX80gev4yXWTPMLvL87PG/export?format=csv")
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60)
 def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        # Clean column names (remove leading/trailing spaces if any)
         df.columns = df.columns.str.strip().str.lower()
         return df.to_dict(orient="records")
     except Exception:
-        # Fallback catalog agar Google Sheet load na ho ya link galat ho
+        # Fallback catalog agar Google sheet load na ho
         return [
             {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0},
             {"name": "Matte Anti-Skid Tile 300x300mm", "category": "Bathroom Floor", "box_cov": 10.0, "price": 450.0},
@@ -154,7 +154,7 @@ if menu == "1. Customer Registration & List":
         else:
             st.info("No customers registered yet.")
 
-#-- PAGE 2: AREA-WISE TILE SELECTION (CLEAN QUEUE WORKFLOW) --
+#-- PAGE 2: AREA-WISE TILE SELECTION (CLEAN SELECTION & QUEUE) --
 elif menu == "2. Area-wise Tile Selection":
     st.title("🏗️ Step 2: Area-wise Tile & Wall Selection (Queue)")
 
@@ -194,7 +194,6 @@ elif menu == "2. Area-wise Tile Selection":
             
             search_query = st.text_input("Search Tile by Name / Category", "", key="tile_search_input")
             
-            # Flexible key checking for google sheet columns (name/item, category, box_cov/coverage, price)
             filtered_catalog = []
             for item in CATALOG_ITEMS:
                 name_val = str(item.get('name', item.get('item', 'Tile')))
@@ -213,53 +212,29 @@ elif menu == "2. Area-wise Tile Selection":
             default_box_cov = float(chosen_tile.get('box_cov', chosen_tile.get('coverage', 15.0)))
             default_price = float(chosen_tile.get('price', 600.0))
 
-            col_dim1, col_dim2 = st.columns(2)
-            with col_dim1:
-                calc_mode = st.radio("Measurement Mode", ["Length x Width (Feet)", "Direct Square Feet"], key="meas_mode_radio")
-                if calc_mode == "Length x Width (Feet)":
-                    l_ft = st.number_input("Length (ft)", min_value=0.0, value=12.0, step=0.1, key="len_ft")
-                    w_ft = st.number_input("Width (ft)", min_value=0.0, value=10.0, step=0.1, key="wid_ft")
-                    area_sqft = l_ft * w_ft
-                else:
-                    area_sqft = st.number_input("Total Area (Sq. Ft.)", min_value=0.0, value=120.0, step=1.0, key="dir_sqft")
-                
-                st.info(f"Net Area: **{area_sqft} Sq. Ft.**")
+            st.write(f"**Selected Item Specs:** Coverage: {default_box_cov} sq.ft/box | Rate: ₹{default_price}/box")
 
-            with col_dim2:
-                box_cov = st.number_input("Box Coverage (Sq. Ft. / Box)", min_value=0.1, value=default_box_cov, step=0.5, key="box_cov_input_p2")
-                wastage_pct = st.slider("Wastage (%)", min_value=0, max_value=20, value=5, key="wastage_slider_p2")
-                item_price = st.number_input("Price per Box (₹)", min_value=0.0, value=default_price, step=50.0, key="price_input_p2")
-
-            calc_res = calculate_tile_boxes(area_sqft, box_cov, wastage_pct)
-            
-            st.markdown("#### 📦 Calculation Summary for Queue")
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Area with Wastage", f"{calc_res['total_area_with_wastage']} sq.ft")
-            m2.metric("Exact Boxes", calc_res['exact_boxes'])
-            m3.metric("Required Boxes", f"{calc_res['rounded_boxes']} Boxes")
-            total_cost = calc_res['rounded_boxes'] * item_price
-            m4.metric("Total Amount", f"₹ {total_cost}")
-
-            if st.button("Add to Queue & Continue More Areas", key="add_to_queue_btn"):
+            if st.button("Add Area & Tile to Queue", key="add_to_queue_btn"):
                 entry = {
                     "floor": floor_level,
                     "category": app_type,
                     "area": specific_area_name,
                     "tile_name": selected_tile_name,
-                    "sqft": area_sqft,
-                    "boxes": calc_res['rounded_boxes'],
-                    "price": item_price,
-                    "total": total_cost
+                    "box_cov": default_box_cov,
+                    "price": default_price,
+                    "sqft": 0.0,
+                    "boxes": 0,
+                    "total": 0.0
                 }
                 if 'selections' not in cust or cust['selections'] is None:
                     cust['selections'] = []
                 cust['selections'].append(entry)
                 save_customer_to_db(cust)
-                st.success(f"Added [{floor_level} -> {specific_area_name}] to Queue successfully! You can add another area or go to Step 3.")
+                st.success(f"Added [{floor_level} -> {specific_area_name}] with {selected_tile_name} to Queue! Go to Step 3 to enter Sqft and calculate.")
 
-#-- PAGE 3: CALCULATION & FINAL ESTIMATE --
+#-- PAGE 3: CALCULATION & FINAL ESTIMATE (MANUAL SQFT ENTRY & BOX CALCULATION) --
 elif menu == "3. Calculation & Final Estimate":
-    st.title("📋 Step 3: Queue Review, BOQ Estimate & WhatsApp Share")
+    st.title("📋 Step 3: Enter Sqft, Box Calculation & BOQ Estimate")
     if not st.session_state.get('customer'):
         st.warning("⚠️ Please select a customer from '1. Customer Registration & List'.")
     else:
@@ -270,33 +245,58 @@ elif menu == "3. Calculation & Final Estimate":
         if not selections:
             st.info("Queue is empty. Please add items from '2. Area-wise Tile Selection'.")
         else:
-            st.markdown("### 🛒 Queued Selections Summary")
+            st.markdown("### 🛒 Enter Square Footage for Queued Areas")
             grand_boxes = 0
             grand_amount = 0.0
             
+            updated_selections = []
             for i, sel in enumerate(selections):
-                col_i1, col_i2 = st.columns([3, 1])
-                with col_i1:
-                    st.markdown(f"**{i+1}. [{sel.get('floor')}] {sel.get('category')} - {sel.get('area')}**")
-                    st.write(f"Tile: {sel.get('tile_name')} | Area: {sel.get('sqft')} sq.ft | Boxes: **{sel.get('boxes')}** | Rate: ₹{sel.get('price')}/box")
-                    st.write(f"**Item Total:** ₹{sel.get('total')}")
-                with col_i2:
-                    if st.button(f"Remove #{i+1}", key=f"remove_item_{i}"):
-                        selections.pop(i)
-                        cust['selections'] = selections
-                        save_customer_to_db(cust)
-                        st.rerun()
+                st.markdown(f"#### **{i+1}. [{sel.get('floor')}] {sel.get('category')} - {sel.get('area')}**")
+                st.write(f"**Tile:** {sel.get('tile_name')} | **Rate:** ₹{sel.get('price')}/box | **Coverage:** {sel.get('box_cov', 15.0)} sq.ft/box")
+                
+                col_c1, col_c2, col_c3 = st.columns([2, 2, 1])
+                with col_c1:
+                    manual_sqft = st.number_input("Enter Net Area (Sq. Ft.)", min_value=0.0, value=float(sel.get('sqft', 100.0)), step=1.0, key=f"sqft_input_{i}")
+                with col_c2:
+                    wastage_pct = st.slider("Wastage (%)", min_value=0, max_value=20, value=5, key=f"wastage_slider_{i}")
+                
+                # Calculate boxes dynamically based on manual sqft input
+                calc_res = calculate_tile_boxes(manual_sqft, float(sel.get('box_cov', 15.0)), wastage_pct)
+                item_total_cost = calc_res['rounded_boxes'] * float(sel.get('price', 600.0))
+                
+                with col_c3:
+                    st.metric("Req. Boxes", f"{calc_res['rounded_boxes']}")
+                
+                st.write(f"Area with Wastage: {calc_res['total_area_with_wastage']} sq.ft | **Item Cost:** ₹{item_total_cost}")
+                
+                # Save updated values in local copy
+                updated_entry = sel.copy()
+                updated_entry['sqft'] = manual_sqft
+                updated_entry['boxes'] = calc_res['rounded_boxes']
+                updated_entry['total'] = item_total_cost
+                updated_selections.append(updated_entry)
+                
+                if st.button(f"Remove Item #{i+1}", key=f"remove_item_{i}"):
+                    selections.pop(i)
+                    cust['selections'] = selections
+                    save_customer_to_db(cust)
+                    st.rerun()
+                    
                 st.markdown("---")
-                grand_boxes += sel.get('boxes', 0)
-                grand_amount += sel.get('total', 0.0)
+                grand_boxes += calc_res['rounded_boxes']
+                grand_amount += item_total_cost
             
+            # Save all updated selections back to database on state change
+            cust['selections'] = updated_selections
+            save_customer_to_db(cust)
+
             st.markdown(f"### 📦 Grand Total Boxes: **{grand_boxes} Boxes**")
             st.markdown(f"### 💰 Grand Total Estimate: **₹ {grand_amount}**")
             
             wa_text = f"*Showroom Tile BOQ Estimation*%0A"
             wa_text += f"Customer: {cust.get('name')}%0A"
             wa_text += f"Mobile: {cust.get('mobile')}%0A-------------------%0A"
-            for s in selections:
+            for s in updated_selections:
                 wa_text += f"- {s.get('floor')} ({s.get('area')}): {s.get('boxes')} Boxes ({s.get('tile_name')}) - ₹{s.get('total')}%0A"
                 
             wa_text += f"-------------------%0A*Total Boxes:* {grand_boxes}%0A*Grand Total:* ₹{grand_amount}"
