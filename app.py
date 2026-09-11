@@ -6,7 +6,7 @@ from database import get_all_customers, save_customer_to_db, delete_customer_fro
 # --- GOOGLE SHEET CATALOG SETUP ---
 # Agar aapne Google sheet publish kar di hai toh uska CSV link yahan daaliye, 
 # ya environment variable/secrets se fetch karega.
-GOOGLE_SHEET_CSV_URL = st.secrets.get("GOOGLE_SHEET_CSV_URL", "https://docs.google.com/spreadsheets/d/1VrRwsP3s6r7UIw-kcX80gev4yXWTPMLvL87PG/export?format=csv")
+GOOGLE_SHEET_CSV_URL = st.secrets.get"https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
 @st.cache_data(ttl=60)
 def load_catalog_from_google_sheet():
