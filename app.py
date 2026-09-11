@@ -104,7 +104,7 @@ if menu == "1. Customer Registration & List":
     
     with col_reg:
         st.markdown("### 📝 Register New Customer / Party")
-        with st.form("customer_reg_form"):
+        with st.form("customer_reg_form", clear_on_submit=True):
             c_name = st.text_input("Customer / Party Name")
             c_mobile = st.text_input("Mobile Number (Unique ID)")
             c_address = st.text_area("Site Address")
@@ -121,10 +121,10 @@ if menu == "1. Customer Registration & List":
                     }
                     save_customer_to_db(cust_data)
                     st.session_state['customer'] = cust_data
-                    st.success(f"Customer '{c_name}' registered successfully! You can now register another party below.")
+                    st.success(f"Customer '{c_name}' registered successfully!")
+                    st.rerun()  # Form clear hokar page instantly refresh ho jayega
                 else:
                     st.error("Please enter Name and Mobile Number.")
-
     with col_list:
         st.markdown("### 📂 Saved Parties List (Select to Edit/Add Tiles)")
         customers = get_all_customers()
