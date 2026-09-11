@@ -152,7 +152,8 @@ with col_btn2:
             st.success("Customer deleted successfully!")
             st.rerun()
         else:
-            st.error("Failed to delete customer.")# --- PAGE 2: TILE SELECTION & BOQ ---
+            st.error("Failed to delete customer.")
+            # --- PAGE 2: TILE SELECTION & BOQ ---
 elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
     
