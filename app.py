@@ -7,7 +7,7 @@ from database import get_all_customers, save_customer_to_db, delete_customer_fro
 # --- GOOGLE SHEET CATALOG SETUP ---
 GOOGLE_SHEET_CSV_URL = os.environ.get("GOOGLE_SHEET_CSV_URL", "https://docs.google.com/spreadsheets/d/1VrRwsP3s6r7UIw-kcX80gev4yXWTPMLvL87PG/export?format=csv")
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=0)
 def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
@@ -16,14 +16,10 @@ def load_catalog_from_google_sheet():
     except Exception:
         return [
             {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0},
-            {"name": "Matte Anti-Skid Tile 300x300mm", "category": "Bathroom Floor", "box_cov": 10.0, "price": 450.0},
-            {"name": "Kitchen Glossy Wall Tile 300x450mm", "category": "Wall", "box_cov": 12.0, "price": 500.0},
-            {"name": "Wooden Plank Tile 200x1200mm", "category": "Hall / Bedroom", "box_cov": 13.5, "price": 850.0},
-            {"name": "Elevation Highlighter Tile", "category": "Wall", "box_cov": 10.0, "price": 750.0}
+            # baki default items...
         ]
 
 CATALOG_ITEMS = load_catalog_from_google_sheet()
-
 def calculate_tile_boxes(area_sqft, box_coverage_sqft, wastage_pct=5):
     if area_sqft <= 0 or box_coverage_sqft <= 0:
         return {"total_area_with_wastage": 0.0, "exact_boxes": 0, "rounded_boxes": 0}
