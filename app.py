@@ -132,23 +132,23 @@ if menu == "1. Customer Registration":
                 active_c = saved_db_customers[idx]
                 st.session_state['customer'] = active_c
                 
-                st.write(f"**Active Party Selected:** {active_c['name']} | **Mobile:** {active_c['mobile']}")
-                st.write(f"**Current Selections Count:** {len(active_c.get('selections', []))} items")
-                # Agar selections None hai toh use khali list ([]) maan lein
-                selections = selections or []
-                
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    if st.button("Load this Customer for Tile Modification"):
-                        st.success(f"Customer '{active_c['name']}' loaded! Now go to '2. Tile Selection & BOQ'.")
-                with col_btn2:
-                    if st.button("🗑️ Delete Customer Permanently"):
-                        if delete_customer_from_db(active_c['mobile']):
-                            st.success("Customer deleted successfully!")
-                            st.rerun()
-                        else:
-                            st.error("Failed to delete customer.")
+                st.write(f"**Active Party Selected:** {active_c.get('name')} | **Mobile:** {active_c.get('mobile')}")
+active_c = active_c or {}
+selections = active_c.get('selections', [])
+selections = selections or []
+st.write(f"**Current Selections Count:** {len(selections)} items")
 
+col_btn1, col_btn2 = st.columns(2)
+with col_btn1:
+    if st.button("Load this Customer for Tile Modification"):
+        st.success(f"Customer '{active_c.get('name')}' loaded! Now go to '2. Tile Selection & BOQ'.")
+with col_btn2:
+    if st.button("Delete Customer Permanently"):
+        if delete_customer_from_db(active_c.get('mobile')):
+            st.success("Customer deleted successfully!")
+            st.rerun()
+        else:
+            st.error("Failed to delete customer.")
 # --- PAGE 2: TILE SELECTION & BOQ ---
 elif menu == "2. Tile Selection & BOQ":
     st.title("Step 2: Area-wise Tile Selection")
