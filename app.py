@@ -178,7 +178,7 @@ if menu == "2. Tile Selection & BOQ":
         cust = st.session_state['customer']
         st.info(f"**Active Customer:** {cust.get('name')} | **Mobile:** {cust.get('mobile')} | **Branch:** {cust.get('branch')}")
         
-        st.markdown("### 🏗️ Building & Floor Selection")
+       st.markdown("### 🏗️ Building & Floor Selection")
         
         floor_level = st.selectbox("Select Floor Level", [
             "-- Select Floor Level --",
