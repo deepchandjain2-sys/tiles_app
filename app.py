@@ -1,4 +1,5 @@
 import streamlit as st
+import math
 from database import (
     get_all_customers, 
     save_customer_to_db, 
@@ -127,8 +128,6 @@ if menu == "1. Customer Registration":
 
 #-- PAGE 2: TILE SELECTION & BOQ --
 elif menu == "2. Tile Selection & BOQ":
-    active_c = st.session_state.get('active_customer') or st.session_state.get('customer', {})
-    
     st.title("Step 2: Area-wise Tile Selection")
 
     if not st.session_state.get('customer'):
@@ -155,13 +154,80 @@ elif menu == "2. Tile Selection & BOQ":
         else:
             custom_area_name = area_type
 
+        if floor_level != "-- Select Floor Level --" and area_type != "-- Select Area Type --":
+            st.markdown("---")
+            st.markdown(f"### 📐 Dimensions & Box Calculation for: {floor_level} -> {custom_area_name}")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                area_sqft = st.number_input("Total Area (Sq. Ft.)", min_value=0.0, value=100.0, step=1.0, key="area_sqft_input")
+            with col2:
+                box_coverage = st.number_input("Box Coverage (Sq. Ft. per Box)", min_value=0.1, value=15.0, step=0.5, key="box_cov_input")
+                tile_price = st.number_input("Price per Box (₹)", min_value=0.0, value=600.0, step=50.0, key="tile_price_input")
+
+            # Calculation without wastage
+            exact_boxes = area_sqft / box_coverage if box_coverage > 0 else 0
+            rounded_boxes = math.ceil(exact_boxes)
+            total_est_cost = rounded_boxes * tile_price
+
+            st.markdown("#### 📦 Calculation Summary")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Net Area", f"{area_sqft} sq.ft")
+            m2.metric("Required Boxes (Rounded)", f"{rounded_boxes} Boxes")
+            m3.metric("Estimated Cost", f"₹ {total_est_cost}")
+
+            if st.button("Add This Area to Customer Order", key="add_area_btn"):
+                selection_entry = {
+                    "floor": floor_level,
+                    "area": custom_area_name,
+                    "sqft": area_sqft,
+                    "boxes": rounded_boxes,
+                    "price_per_box": tile_price,
+                    "total_cost": total_est_cost
+                }
+                if 'selections' not in cust:
+                    cust['selections'] = []
+                cust['selections'].append(selection_entry)
+                save_customer_to_db(cust)
+                st.success(f"Added {custom_area_name} successfully! Go to Step 3 to view final BOQ.")
+
 #-- PAGE 3: CALCULATION & FINAL ESTIMATE --
 elif menu == "3. Calculation & Final Estimate":
     st.title("Step 3: Calculation, Box Management & BOQ Estimate")
     if not st.session_state.get('customer'):
         st.warning("Please register or select a customer first from '1. Customer Registration'.")
     else:
-        st.info("Calculation and Box rounding logic goes here.")
+        cust = st.session_state['customer']
+        st.info(f"**Customer:** {cust.get('name')} | **Mobile:** {cust.get('mobile')}")
+        
+        selections = cust.get('selections', [])
+        if not selections:
+            st.info("No tile selections added yet. Please go to '2. Tile Selection & BOQ' to add areas.")
+        else:
+            st.markdown("### 📋 Final Bill of Quantities (BOQ)")
+            total_grand_boxes = 0
+            total_grand_cost = 0.0
+            
+            for idx, item in enumerate(selections):
+                st.write(f"**{idx+1}. {item.get('floor')} - {item.get('area')}**")
+                st.write(f"Area: {item.get('sqft')} sq.ft | Boxes: **{item.get('boxes')}** | Cost: ₹{item.get('total_cost')}")
+                total_grand_boxes += item.get('boxes', 0)
+                total_grand_cost += item.get('total_cost', 0.0)
+                st.markdown("---")
+            
+            st.markdown(f"### Grand Total Boxes: **{total_grand_boxes} Boxes**")
+            st.markdown(f"### Grand Total Estimate: **₹ {total_grand_cost}**")
+            
+            # WhatsApp Share Link Generator
+            whatsapp_msg = f"*Tile Estimation BOQ - {cust.get('name')}*\n"
+            whatsapp_msg += f"Mobile: {cust.get('mobile')}\n"
+            whatsapp_msg += f"Total Boxes: {total_grand_boxes}\n"
+            whatsapp_msg += f"Total Amount: ₹{total_grand_cost}\n"
+            
+            encoded_msg = whatsapp_msg.replace(' ', '%20').replace('\n', '%0A')
+            whatsapp_url = f"https://wa.me/{cust.get('mobile')}?text={encoded_msg}"
+            
+            st.markdown(f"[📲 Send Estimate via WhatsApp]({whatsapp_url})", unsafe_allow_html=True)
 
 #-- DASHBOARD & SALESMAN SUMMARY --
 elif menu == "Dashboard & Salesman Summary":
