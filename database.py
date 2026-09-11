@@ -7,6 +7,7 @@ SUPABASE_KEY = "sb_publishable_oI8gTy66M8ICtq-DasQHA_M1Wq_s"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def save_customer_to_db(cust_data):
+    
     try:
         data = {
             "mobile": str(cust_data.get('mobile')),
