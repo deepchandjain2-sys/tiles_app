@@ -2,13 +2,12 @@ import os
 import streamlit as st
 from supabase import create_client, Client
 
-# Hardcoded credentials to bypass environment variable lookup issues on Render
 SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHphemlyd3hheGFibnBwY2hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyMzg2Mzh9.EXAMPLE_KEY" # Apni asli anon key yahan paste kar dein
+SUPABASE_KEY = "YAHAN_APNI_ASLI_ANON_KEY_PASTE_KAREIN"
 
 supabase: Client = None
 try:
-    if SUPABASE_URL and SUPABASE_KEY:
+    if SUPABASE_URL and SUPABASE_KEY and "YAHAN" not in SUPABASE_KEY:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
     st.error(f"Supabase Connection Init Error: {e}")
@@ -65,7 +64,7 @@ def delete_customer_from_db(mobile):
             return False
     else:
         if 'mock_customers' in st.session_state:
-            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile'] != mobile]
+            st.session_state['mock_customers'] = [c for c in st.session_state['mock_customers'] if c.get('mobile') != mobile]
         return True
 
 def get_all_admin_users():
