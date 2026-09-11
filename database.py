@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import json
 
-SUPABASE_URL = "https://gedzazriwvaxabnppchc.supabase.co"
+SUPABASE_URL = "https://gedzazirwxaxabnppchc"
 SUPABASE_KEY = "sb_publishable_o18gTy66MVBCtq-DasQHAA_MlWvg_g"
 
 def get_headers():
