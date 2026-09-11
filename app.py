@@ -13,14 +13,11 @@ def load_catalog_from_google_sheet():
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
         df.columns = df.columns.str.strip().str.lower()
         return df.to_dict(orient="records")
-    except Exception:
+    except Exception as e:
+        st.error(f"Google Sheet Error: {e}")
         return [
-            {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0},
-            # baki default items...
-        ]
-
-CATALOG_ITEMS = load_catalog_from_google_sheet()
-def calculate_tile_boxes(area_sqft, box_coverage_sqft, wastage_pct=5):
+            {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 600.0}
+        ]def calculate_tile_boxes(area_sqft, box_coverage_sqft, wastage_pct=5):
     if area_sqft <= 0 or box_coverage_sqft <= 0:
         return {"total_area_with_wastage": 0.0, "exact_boxes": 0, "rounded_boxes": 0}
     area_with_wastage = area_sqft * (1 + wastage_pct / 100.0)
