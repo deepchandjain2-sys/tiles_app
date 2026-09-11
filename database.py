@@ -3,7 +3,7 @@ import streamlit as st
 from supabase import create_client, Client
 
 SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
-SUPABASE_KEY = "YAHAN_APNI_ASLI_ANON_KEY_PASTE_KAREIN"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHphemlyd3hheGFibnBwY2hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2ODAyOTgsImV4cCI6MjEwNDI1NjI5OH0.CSCbuwInWJtGpL7w_nMFU6ElGWnXxr67bKeMWuTpMMM"
 
 supabase: Client = None
 try:
