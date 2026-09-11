@@ -145,7 +145,7 @@ st.write(f"**Current Selections Count:** {sel_count} items")
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
     if st.button("Load this Customer for Tile Modification"):
-        st.success(f"Customer loaded successfully!")
+        st.success("Customer loaded successfully!")
 with col_btn2:
     if st.button("Delete Customer Permanently"):
         if active_c and delete_customer_from_db(active_c.get('mobile')):
@@ -153,17 +153,18 @@ with col_btn2:
             st.rerun()
         else:
             st.error("Failed to delete customer.")
-            
-     if menu == "2. Tile Selection & BOQ":
-        st.title("Step 2: Area-wise Tile Selection")
-    
-    if not st.session_state['customer']:
+
+#-- PAGE 2: TILE SELECTION & BOQ --
+if menu == "2. Tile Selection & BOQ":
+    st.title("Step 2: Area-wise Tile Selection")
+
+    if not st.session_state.get('customer'):
         st.warning("Please register a customer first from '1. Customer Registration'.")
     else:
         cust = st.session_state['customer']
-        st.info(f"**Active Customer:** {cust['name']} | **Mobile:** {cust['mobile']} | **Branch:** {cust['branch']}")
+        st.info(f"**Active Customer:** {cust.get('name')} | **Mobile:** {cust.get('mobile')} | **Branch:** {cust.get('branch')}")
         
-        st.markdown("### 🏢 Building & Floor Selection")
+        st.markdown("### 🏗️ Building & Floor Selection")
         
         floor_level = st.selectbox("Select Floor Level", [
             "-- Select Floor Level --",
@@ -173,12 +174,8 @@ with col_btn2:
         area_type = st.selectbox("Select Building Area / Room", [
             "-- Select Area Type --",
             "Hall Floor", "Kitchen Floor", "Master Bedroom Floor", "Common Bedroom Floor",
-            "3rd Bedroom Floor", "4th Bedroom Floor", "Attached Bathroom Floor", 
-            "Common Bathroom Floor", "Parking Area", "Front Area", "Pooja Room Floor",
-            "Kitchen Wall", "Bathroom Wall", "Living Room Wall", "Elevation Wall", "Balcony Wall",
-            "Custom Area"
-        ])
-        
+            "3rd Bedroom Floor", "4th Bedroom Floor", "Associated Bathroom Floor"
+        ])        
         custom_area_name = ""
         if area_type == "Custom Area":
             custom_area_name = st.text_input("Enter Custom Area Name (e.g. Staircase, Passage)")
