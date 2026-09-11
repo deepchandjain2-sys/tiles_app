@@ -241,16 +241,14 @@ if "selections" in st.session_state and st.session_state["selections"]:
     st.session_state["selections"].append(entry)
     st.success("Item added to queue successfully!")
 
-# Niche queue ki sari items one-by-one dikhane ke liye:
 if "selections" in st.session_state and st.session_state["selections"]:
     st.write("### Added Items in Queue:")
     for idx, item in enumerate(st.session_state["selections"]):
-        st.write(f"{idx + 1}. **{item['floor']}** -> {item['area']} | **{item['tile_name']}** (Coverage: {item['box_cov']} sq.ft/box)")            if 'selections' not in cust or cust['selections'] is None:
-                    cust['selections'] = []
-                cust['selections'].append(entry)
-                save_customer_to_db(cust)
-                st.success(f"Added [{floor_level} -> {specific_area_name}] with {selected_tile_name} to Queue! Go to Step 3 to enter Sqft and calculate.")
-
+        floor_val = item.get('floor', '')
+        area_val = item.get('area', '')
+        tile_val = item.get('tile_name', '')
+        cov_val = item.get('box_cov', 0.0)
+        st.write(f"{idx + 1}. **{floor_val}** -> {area_val} | **{tile_val}** (Coverage: {cov_val} sq.ft/box)")
 #-- PAGE 3: CALCULATION & FINAL ESTIMATE --
 elif menu == "3. Calculation & Final Estimate":
     st.title("📋 Step 3: Enter Sqft, Box Calculation & BOQ Estimate")
