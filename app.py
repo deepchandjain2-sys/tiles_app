@@ -1,6 +1,5 @@
 import streamlit as st
 from database import (
-    init_db, 
     get_all_customers, 
     save_customer_to_db, 
     delete_customer_from_db, 
@@ -11,9 +10,6 @@ from database import (
 
 # Page Configuration
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
-
-# Initialize Database
-init_db()
 
 # Session State Initialization
 if 'authenticated' not in st.session_state:
