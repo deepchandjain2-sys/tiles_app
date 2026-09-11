@@ -20,3 +20,17 @@ def save_customer_to_db(cust_data):
     except Exception as e:
         st.error(f"Connection Error: {e}")
         return False
+
+def get_all_customers_from_db():
+    try:
+        response = supabase.table("customers").select("*").execute()
+        return response.data
+    except Exception as e:
+        return []
+
+def delete_customer_from_db(mobile):
+    try:
+        supabase.table("customers").delete().eq("mobile", mobile).execute()
+        return True
+    except Exception as e:
+        return False
