@@ -4,7 +4,7 @@ import math
 import os
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAMSp-l-7Ulm-KX80pqxVke8L87GTR_JckbGMwy-_WkYpTInHS02N4r-vV/pub?gid=0&single=true&output=csv"
 
 @st.cache_data(ttl=0)
 def load_catalog_from_google_sheet():
@@ -126,9 +126,24 @@ else:
             submitted = st.form_submit_button("Save Customer to Supabase")
             if submitted:
                 if cust_name and cust_phone:
-                    # Saving customer with name and mobile details
-                    save_customer_to_db(cust_name, cust_phone, cust_address, st.session_state['username'])
-                    st.success(f"Customer {cust_name} ({cust_phone}) saved to Supabase successfully!")
+                    cust_data = {
+                        "name": cust_name,
+                        "phone": cust_phone,
+                        "engineer_name": engineer_name,
+                        "engineer_mobile": engineer_mobile,
+                        "address": cust_address,
+                        "branch": branch_name
+                    }
+                    try:
+                        save_customer_to_db(cust_data)
+                        st.success(f"Customer {cust_name} ({cust_phone}) saved to Supabase successfully!")
+                    except Exception as err:
+                        # Fallback if database.py expects positional parameters
+                        try:
+                            save_customer_to_db(cust_name, cust_phone, cust_address, st.session_state['username'])
+                            st.success(f"Customer {cust_name} saved successfully!")
+                        except Exception as e2:
+                            st.error(f"Database Error: {e2}")
                 else:
                     st.error("Please enter Customer Name and Phone number.")
                 
