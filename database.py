@@ -35,6 +35,7 @@ def save_customer_to_db(customer_data):
 
 def delete_customer_from_db(customer_id):
     try:
+        # Delete supporting both integer and string/UUID primary keys
         if str(customer_id).isdigit():
             supabase.table("customers").delete().eq("id", int(customer_id)).execute()
         supabase.table("customers").delete().eq("id", str(customer_id)).execute()
