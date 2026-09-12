@@ -63,3 +63,5 @@ def delete_customer_from_db(customer_id):
             st.error(f"Supabase Delete Error: {e}")
             return False
     return False
+    def get_all_admin_users():
+    return []
