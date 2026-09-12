@@ -47,7 +47,7 @@ def calculate_tile_boxes(area_sqft, box_coverage_sqft):
 
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
-# Session state initialization for login & user credentials
+# Initialize session state variables
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 if "username" not in st.session_state:
@@ -55,7 +55,7 @@ if "username" not in st.session_state:
 if "role" not in st.session_state:
     st.session_state["role"] = ""
 
-# Login / Authentication Screen if not logged in
+# Authentication Check
 if not st.session_state["authenticated"]:
     st.title("🔐 Login - Tiles & BOQ App")
     login_user = st.text_input("Username")
@@ -63,7 +63,6 @@ if not st.session_state["authenticated"]:
     
     if st.button("Login"):
         admins = get_all_admin_users()
-        # Fallback or check DB
         matched = False
         user_role = "ADMIN"
         
