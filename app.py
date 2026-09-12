@@ -57,9 +57,17 @@ if "role" not in st.session_state:
 if "selected_customer" not in st.session_state:
     st.session_state["selected_customer"] = None
 
-# Form input states for clearing
-if "form_clear" not in st.session_state:
-    st.session_state["form_clear"] = False
+# Input fields session keys initialization
+if "cust_name_input" not in st.session_state:
+    st.session_state["cust_name_input"] = ""
+if "cust_phone_input" not in st.session_state:
+    st.session_state["cust_phone_input"] = ""
+if "eng_name_input" not in st.session_state:
+    st.session_state["eng_name_input"] = ""
+if "eng_mob_input" not in st.session_state:
+    st.session_state["eng_mob_input"] = ""
+if "cust_addr_input" not in st.session_state:
+    st.session_state["cust_addr_input"] = ""
 
 # Authentication Check
 if not st.session_state["authenticated"]:
@@ -96,7 +104,6 @@ else:
     st.sidebar.write(f"**User:** {st.session_state['username']}")
     st.sidebar.write(f"**Role:** {st.session_state['role']}")
     
-    # Showroom branch options with manual entry support for New Show Room
     branch_selection = st.sidebar.selectbox("Showroom Branch", ["Hiriyur", "Davangere", "New Show Room"])
     if branch_selection == "New Show Room":
         custom_branch = st.sidebar.text_input("Enter New Showroom Name", "Showroom Branch 3")
@@ -120,20 +127,11 @@ else:
     if page == "1. Customer Registration":
         st.title("📋 Customer Registration & Management")
         
-        # Reset input states if flag is True
-        if st.session_state.get("form_clear", False):
-            st.session_state["c_name"] = ""
-            st.session_state["c_phone"] = ""
-            st.session_state["e_name"] = ""
-            st.session_state["e_mobile"] = ""
-            st.session_state["c_address"] = ""
-            st.session_state["form_clear"] = False
-
-        cust_name = st.text_input("Customer Name", key="c_name")
-        cust_phone = st.text_input("Phone Number", key="c_phone")
-        engineer_name = st.text_input("Engineer Name", key="e_name")
-        engineer_mobile = st.text_input("Engineer Mobile", key="e_mobile")
-        cust_address = st.text_area("Address", key="c_address")
+        cust_name = st.text_input("Customer Name", key="cust_name_input")
+        cust_phone = st.text_input("Phone Number", key="cust_phone_input")
+        engineer_name = st.text_input("Engineer Name", key="eng_name_input")
+        engineer_mobile = st.text_input("Engineer Mobile", key="eng_mob_input")
+        cust_address = st.text_area("Address", key="cust_addr_input")
         
         if st.button("Save Customer to Supabase"):
             if cust_name and cust_phone:
@@ -148,13 +146,22 @@ else:
                 try:
                     save_customer_to_db(cust_data)
                     st.success(f"Customer {cust_name} ({cust_phone}) saved successfully!")
-                    st.session_state["form_clear"] = True
+                    # Clear inputs by resetting session states and rerunning
+                    st.session_state["cust_name_input"] = ""
+                    st.session_state["cust_phone_input"] = ""
+                    st.session_state["eng_name_input"] = ""
+                    st.session_state["eng_mob_input"] = ""
+                    st.session_state["cust_addr_input"] = ""
                     st.rerun()
                 except Exception as err:
                     try:
                         save_customer_to_db(cust_name, cust_phone, cust_address, st.session_state['username'])
                         st.success(f"Customer {cust_name} saved successfully!")
-                        st.session_state["form_clear"] = True
+                        st.session_state["cust_name_input"] = ""
+                        st.session_state["cust_phone_input"] = ""
+                        st.session_state["eng_name_input"] = ""
+                        st.session_state["eng_mob_input"] = ""
+                        st.session_state["cust_addr_input"] = ""
                         st.rerun()
                     except Exception as e2:
                         st.error(f"Database Error: {e2}")
