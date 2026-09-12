@@ -192,25 +192,20 @@ else:
             
     elif page == "2. Area & Tile Selection":
         st.title("🏠 Step 2: Floor, Area & Tile Selection")
-        if st.session_state.get("selected_customer"):
-            curr_cust = st.session_state["selected_customer"]
-            st.info(f"**Active Customer:** {curr_cust.get('name')} | **Mobile:** {curr_cust.get('mobile') or curr_cust.get('phone')}")
-            
-            col_s1, col_s2 = st.columns([2, 2])
-            with col_s1:
-                if st.button("💾 Save Selections Draft"):
-                    try:
-                        curr_cust["selections"] = json.dumps(st.session_state["selections"])
-                        save_customer_to_db(curr_cust)
-                        st.success("Selections saved as draft for this customer!")
-                    except Exception as e:
-                        st.error(f"Error saving draft: {e}")
-            with col_s2:
-                if st.button("Change / Clear Customer"):
-                    st.session_state["selected_customer"] = None
-                    st.session_state["selections"] = []
-                    st.rerun()
-        else:
+        if st.session_state["selections"]:
+            st.markdown("### 🛒 Current Queue Preview")
+            for idx, item in enumerate(st.session_state["selections"]):
+                col_q1, col_q2 = st.columns([5, 1])
+                with col_q1:
+                    st.write(f"{idx+1}. **{item.get('floor')}** | {item.get('category')} | **{item.get('area')}** -> {item.get('tile_name')}")
+                with col_q2:
+                    if st.button("❌", key=f"remove_queue_{idx}"):
+                        st.session_state["selections"].pop(idx)
+                        st.rerun()
+                        
+            if st.button("Proceed to Page 3: BOQ Calculation & Finalize ➡️"):
+                st.session_state["current_page"] = "3. BOQ Calculation & Finalize"
+                st.rerun()        else:
             st.warning("⚠️ No customer selected.")
         
         st.markdown("---")
