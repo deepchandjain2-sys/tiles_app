@@ -4,37 +4,53 @@ import math
 import urllib.parse
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAMSp-l-7Ulm-KX80pqxVke8L87GTR_JckbGMwy-_WkYpTInHS02N4r-vV/pub?gid=0&single=true&output=csv"
 
 @st.cache_data(ttl=0)
 def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        df.columns = df.columns.str.strip().str.lower()
         
-        rename_map = {}
-        for col in df.columns:
-            if 'name' in col or 'tile' in col:
-                rename_map[col] = 'name'
-            elif 'cat' in col:
-                rename_map[col] = 'category'
-            elif 'cov' in col or 'box' in col:
-                rename_map[col] = 'box_cov'
-            elif 'price' in col or 'rate' in col:
-                rename_map[col] = 'price'
-                
-        df = df.rename(columns=rename_map)
+        # Print columns or map by index to be 100% sure of Column H and I
+        # Python index: Column H is index 7, Column I is index 8 (if 0-indexed)
+        cols = list(df.columns)
         
-        required_cols = ['name', 'category', 'box_cov', 'price']
-        for rc in required_cols:
-            if rc not in df.columns:
-                df[rc] = 'Default' if rc in ['name', 'category'] else 0.0
+        parsed_items = []
+        for idx, row in df.iterrows():
+            # Extract safe values
+            name = str(row.iloc[1]) if len(row) > 1 else "Unknown Tile"
+            category = str(row.iloc[2]) if len(row) > 2 else "Floor"
+            
+            # Column H (Con Factor) and Column I (Packing Unit)
+            try:
+                con_factor = float(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else 1.0
+            except:
+                con_factor = 1.0
                 
-        return df.to_dict(orient="records")
+            try:
+                packing_unit = float(row.iloc[8]) if len(row) > 8 and pd.notna(row.iloc[8]) else 15.0
+            except:
+                packing_unit = 15.0
+                
+            try:
+                price = float(row.iloc[5]) if len(row) > 5 and pd.notna(row.iloc[5]) else 0.0
+            except:
+                price = 0.0
+
+            parsed_items.append({
+                "name": name,
+                "category": category,
+                "con_factor": con_factor,
+                "packing_unit": packing_unit,
+                "price": price,
+                "box_cov": con_factor * packing_unit  # H * I calculation
+            })
+            
+        return parsed_items
     except Exception as e:
         st.error(f"Google Sheet Error: {e}")
         return [
-            {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "box_cov": 15.0, "price": 60.0}
+            {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "con_factor": 1.0, "packing_unit": 15.0, "price": 60.0, "box_cov": 15.0}
         ]
 
 CATALOG_ITEMS = load_catalog_from_google_sheet()
@@ -229,10 +245,12 @@ else:
         if not chosen_tile and CATALOG_ITEMS:
             chosen_tile = CATALOG_ITEMS[0]
 
-        default_box_cov = float(chosen_tile.get('box_cov', 15.0) if chosen_tile else 15.0)
-        tile_price = float(chosen_tile.get('price', 0.0) if chosen_tile else 0.0)
+        con_factor = float(chosen_tile.get('con_factor', 1.0))
+        packing_unit = float(chosen_tile.get('packing_unit', 15.0))
+        box_cov = float(chosen_tile.get('box_cov', con_factor * packing_unit))
+        tile_price = float(chosen_tile.get('price', 0.0))
 
-        st.info(f"**Selected Design Specs:** Coverage: {default_box_cov} sq.ft/box | Price: ₹{tile_price} per sq.ft")
+        st.info(f"**Specs (H x I):** Con Factor: {con_factor} | Packing Unit: {packing_unit} | Effective Box Coverage: {box_cov} sq.ft")
 
         if st.button("➕ Add to Queue (Multiple Allowed)"):
             entry = {
@@ -240,7 +258,9 @@ else:
                 "category": category_type,
                 "area": specific_area_name,
                 "tile_name": selected_tile_name,
-                "box_cov": default_box_cov,
+                "con_factor": con_factor,
+                "packing_unit": packing_unit,
+                "box_cov": box_cov,
                 "sqft": 100.0,
                 "price": tile_price
             }
@@ -272,24 +292,27 @@ else:
             
             updated_selections = []
             for idx, item in enumerate(st.session_state["selections"]):
-                # Professional single line layout using columns
                 col1, col2, col3, col4 = st.columns([4, 2, 2, 1])
                 
                 with col1:
-                    st.markdown(f"**{idx+1}. [{item.get('floor')}] {item.get('category')} - {item.get('area')}**")
-                    st.caption(f"Design: {item.get('tile_name')} ({item.get('box_cov')} sq.ft/box)")
+                    st.markdown(f"**{idx+1}. [{item.get('floorकिसान') or item.get('floor')}] {item.get('category')} - {item.get('area')}**")
+                    st.caption(f"Design: {item.get('tile_name')} (Con: {item.get('con_factor')} × Pack: {item.get('packing_unit')})")
                 
                 with col2:
                     user_sqft = st.number_input(f"Sq.Ft ({idx})", min_value=0.0, value=float(item.get('sqft', 100.0)), step=10.0, key=f"sqft_input_{idx}", label_visibility="collapsed")
                 
-                box_cov = float(item.get('box_cov', 15.0))
-                calc_boxes = math.ceil(user_sqft / box_cov) if box_cov > 0 else 0
-                item_total = calc_boxes * box_cov * float(item.get('price', 0.0))
+                # Backend calculation using Con Factor (H) * Packing Unit (I)
+                c_factor = float(item.get('con_factor', 1.0))
+                p_unit = float(item.get('packing_unit', 15.0))
+                effective_coverage = c_factor * p_unit
+                
+                calc_boxes = math.ceil(user_sqft / effective_coverage) if effective_coverage > 0 else 0
+                item_total = calc_boxes * effective_coverage * float(item.get('price', 0.0))
                 grand_total += item_total
                 
                 with col3:
                     st.markdown(f"📦 **{calc_boxes} Boxes**")
-                    st.caption(f"({calc_boxes * box_cov} sq.ft)")
+                    st.caption(f"({calc_boxes * effective_coverage} sq.ft)")
                 
                 with col4:
                     if st.button("❌", key=f"remove_boq_{idx}", help="Remove Item"):
