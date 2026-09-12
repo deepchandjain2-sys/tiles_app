@@ -27,13 +27,12 @@ def load_catalog_from_google_sheet():
             except:
                 con_factor = 1.0
                 
-            # Column F (Index 5) -> Packing Unit
+            # Column I (Index 8) -> Packing Unit
             try:
-                packing_unit = float(row.iloc[5]) if len(row) > 5 and pd.notna(row.iloc[5]) else 15.0
+                packing_unit = float(row.iloc[8]) if len(row) > 8 and pd.notna(row.iloc[8]) else 15.0
             except:
                 packing_unit = 15.0
                 
-            # Price (Column G or default)
             try:
                 price = float(row.iloc[6]) if len(row) > 6 and pd.notna(row.iloc[6]) else 0.0
             except:
@@ -49,8 +48,7 @@ def load_catalog_from_google_sheet():
             })
         return parsed_items
     except Exception as e:
-        return []
-CATALOG_ITEMS = load_catalog_from_google_sheet()
+        return []CATALOG_ITEMS = load_catalog_from_google_sheet()
 
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
