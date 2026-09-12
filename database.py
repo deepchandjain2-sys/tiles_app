@@ -23,6 +23,8 @@ def get_all_customers():
             st.error(f"Supabase Fetch Error: {e}")
             return []
     return []
+    def get_all_admin_users():
+    return []
 
 def save_customer_to_db(cust_data):
     # Support multiple key formats so mobile/phone never gets lost
