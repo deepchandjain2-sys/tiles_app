@@ -4,7 +4,7 @@ import math
 import urllib.parse
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAMSp-l-7Ulm-KX80pqxVke8L87GTR_JckbGMwy-_WkYpTInHS02N4r-vV/pub?gid=0&single=true&output=csv"
 
 @st.cache_data(ttl=0)
 def load_catalog_from_google_sheet():
@@ -185,17 +185,14 @@ else:
         
         st.markdown("---")
         
-        # 1. Floor Level Selection
         floor_option = st.selectbox("1. Select Floor Level", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Other (Manual Entry)"])
         if floor_option == "Other (Manual Entry)":
             floor_level = st.text_input("Enter Custom Floor Name", "Basement / Mezzanine")
         else:
             floor_level = floor_option
 
-        # 2. Category Selection
         category_type = st.selectbox("2. Select Category", ["Floor", "Wall"])
 
-        # 3. Area / Room Selection Dropdown
         area_options = [
             "Hall", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", 
             "Bathroom 1", "Bathroom 2", "Bathroom 3", "Pooja room", "Parking", "Front wall", "Gallery", "Other (Manual Entry)"
@@ -209,7 +206,6 @@ else:
 
         st.markdown("---")
         
-        # 4. Item Search Bar & Design Selection
         st.markdown("### 4. Search & Select Tile / Design")
         search_query = st.text_input("🔍 Search Tile by Name / Category", "")
 
@@ -245,7 +241,7 @@ else:
                 "area": specific_area_name,
                 "tile_name": selected_tile_name,
                 "box_cov": default_box_cov,
-                "sqft": 100.0, # Default initial sqft
+                "sqft": 100.0,
                 "price": tile_price
             }
             st.session_state["selections"].append(entry)
@@ -261,7 +257,7 @@ else:
                 st.rerun()
 
     elif page == "3. BOQ Calculation & Finalize":
-        st.title("📊 Step 3: BOQ Calculation, Finalize & Share")
+        st.title("📊 Step 3: BOQ Calculation & Professional Summary")
         
         if not st.session_state["selections"]:
             st.warning("⚠️ No items in queue. Please add items in '2. Area & Tile Selection' first.")
@@ -272,41 +268,43 @@ else:
                 cust = st.session_state["selected_customer"]
                 whatsapp_text_lines.append(f"Customer: {cust.get('name')} ({cust.get('mobile') or cust.get('phone')})")
             
-            st.markdown("### Enter Square Feet for Each Item to Calculate Boxes:")
+            st.markdown("### Enter Square Feet in One Line per Item:")
             
             updated_selections = []
             for idx, item in enumerate(st.session_state["selections"]):
-                st.markdown(f"#### Item {idx+1}: [{item.get('floor')}] {item.get('category')} - {item.get('area')}")
-                st.write(f"**Design:** {item.get('tile_name')} (Coverage: {item.get('box_cov')} sq.ft/box, Rate: ₹{item.get('price')}/sq.ft)")
+                # Professional single line layout using columns
+                col1, col2, col3, col4 = st.columns([4, 2, 2, 1])
                 
-                col_c1, col_c2 = st.columns([2, 2])
-                with col_c1:
-                    user_sqft = st.number_input(f"Enter Sq.Ft for {item.get('area')} ({idx})", min_value=0.0, value=float(item.get('sqft', 100.0)), step=10.0, key=f"sqft_input_{idx}")
+                with col1:
+                    st.markdown(f"**{idx+1}. [{item.get('floor')}] {item.get('category')} - {item.get('area')}**")
+                    st.caption(f"Design: {item.get('tile_name')} ({item.get('box_cov')} sq.ft/box)")
                 
-                # Backend Calculation
+                with col2:
+                    user_sqft = st.number_input(f"Sq.Ft ({idx})", min_value=0.0, value=float(item.get('sqft', 100.0)), step=10.0, key=f"sqft_input_{idx}", label_visibility="collapsed")
+                
                 box_cov = float(item.get('box_cov', 15.0))
                 calc_boxes = math.ceil(user_sqft / box_cov) if box_cov > 0 else 0
                 item_total = calc_boxes * box_cov * float(item.get('price', 0.0))
                 grand_total += item_total
                 
-                with col_c2:
-                    st.metric(label="Required Boxes", value=f"{calc_boxes} Boxes", delta=f"Total: {calc_boxes * box_cov} sq.ft")
-                    st.write(f"**Estimated Cost:** ₹{item_total:.2f}")
+                with col3:
+                    st.markdown(f"📦 **{calc_boxes} Boxes**")
+                    st.caption(f"({calc_boxes * box_cov} sq.ft)")
+                
+                with col4:
+                    if st.button("❌", key=f"remove_boq_{idx}", help="Remove Item"):
+                        st.session_state["selections"].pop(idx)
+                        st.rerun()
                 
                 item["sqft"] = user_sqft
                 item["boxes"] = calc_boxes
                 item["total"] = item_total
                 updated_selections.append(item)
                 
-                if st.button("Remove Item", key=f"remove_boq_{idx}"):
-                    st.session_state["selections"].pop(idx)
-                    st.rerun()
-                
                 st.markdown("---")
-                whatsapp_text_lines.append(f"{idx+1}. {item.get('floor')} ({item.get('category')}) - {item.get('area')}: {item.get('tile_name')} | {user_sqft} sq.ft ({calc_boxes} Boxes) - Rs.{item_total:.2f}")
+                whatsapp_text_lines.append(f"{idx+1}. {item.get('floor')} ({item.get('category')}) - {item.get('area')}: {item.get('tile_name')} | {user_sqft} sq.ft ({calc_boxes} Boxes)")
 
-            st.markdown(f"### **Grand Total Estimated Cost: ₹{grand_total:.2f}**")
-            whatsapp_text_lines.append(f"*Grand Total: Rs.{grand_total:.2f}*")
+            st.markdown(f"### **Total Boxes & Summary Ready for Sharing**")
             
             col_f1, col_f2 = st.columns(2)
             with col_f1:
