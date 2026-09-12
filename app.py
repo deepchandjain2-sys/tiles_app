@@ -5,7 +5,7 @@ import json
 import urllib.parse
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4m6SP3s6r7UIwn-KCX80geiv4jXWTmPVEvLB7PGTr_tWxKcbU5NWx_mtkyYp1H0htvs02Nxf-V/pub?gid=181&single=true&output=csv"
 
 @st.cache_data(ttl=1)
 def load_catalog_from_google_sheet():
@@ -90,7 +90,7 @@ if not st.session_state["authenticated"]:
             for adm in admins:
                 if adm.get("username") == login_user and adm.get("password") == login_pass:
                     matched = True
-                    user_role = adm.get("role", "ADMIN")
+                    user_role = adm.get("role", "SALESMAN")
                     break
         if matched:
             st.session_state["authenticated"] = True
@@ -235,7 +235,7 @@ else:
         box_cov = float(chosen_tile.get('box_cov', con_factor * packing_unit))
         tile_price = float(chosen_tile.get('price', 0.0))
 
-        st.info(f"**Specs (D x E):** Con Factor: {con_factor} | Packing Unit: {packing_unit} | Effective Box Coverage: {box_cov} sq.ft")
+        st.info(f"**Specs (Col D x E):** Con Factor: {con_factor} | Packing Unit: {packing_unit} | Effective Box Coverage: {box_cov} sq.ft")
 
         if st.button("➕ Add to Queue (Multiple Allowed)"):
             st.session_state["selections"].append({
@@ -276,7 +276,6 @@ else:
             for idx, item in enumerate(st.session_state["selections"]):
                 col1, col2, col3, col4 = st.columns([4, 2, 2, 1])
                 
-                # Match tile from catalog if con_factor or packing_unit is None/Missing
                 matched_tile = next((t for t in CATALOG_ITEMS if str(t.get('name')) == str(item.get('tile_name'))), {})
                 
                 c_factor = item.get('con_factor')
@@ -318,7 +317,10 @@ else:
                 
                 st.markdown("---")
                 whatsapp_text_lines.append(
-                    f"{idx+1}. {item.get('floor')} ({item.get('category')}) - {item.get('area')}: {item.get('tile_name')} | {user_sqft} sq.ft ({calc_boxes} Boxes)")     col_f1, col_f2 = st.columns(2)
+                    f"{idx+1}. {item.get('floor')} ({item.get('category')}) - {item.get('area')}: {item.get('tile_name')} | {user_sqft} sq.ft ({calc_boxes} Boxes)"
+                )
+
+            col_f1, col_f2 = st.columns(2)
             with col_f1:
                 if st.button("✅ Finalize Order & Clear"):
                     st.session_state["selections"] = []
