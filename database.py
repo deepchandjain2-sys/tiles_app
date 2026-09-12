@@ -3,7 +3,7 @@ import streamlit as st
 from supabase import create_client, Client
 
 SUPABASE_URL = "https://gedrazirswxsakanppchc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHJhemlyc3d4c2FrYW5wcGNoYyIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzM1MTQzMjUzLCJleHAiOjIwNTA3MTkyNTN9.yIp3MUiOjicDHwfzS25Isin1ZlI1lInRSCl6IKpxVC39.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHJhemlyc3d4c2FrYW5wcGNoYyIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzM1MTQzMjUzLCJleHAiOjIwNTA3MTkyNTN9.WlZHSn1Z1lInRSCl6IKpxVC39"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHJhemlyc3d4c2FrYW5wcGNoYyIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzM1MTQzMjUzLCJleHAiOjIwNTA3MTkyNTN9.yIp3MUiOjicDHwfzS25Isin1ZlI1lInRSCl6IKpxVC39"
 
 supabase: Client = None
 try:
@@ -22,42 +22,40 @@ def get_all_customers():
         except Exception as e:
             st.error(f"Supabase Fetch Error: {e}")
             return []
-    else:
-        if 'mock_customers' not in st.session_state:
-            st.session_state['mock_customers'] = []
-        return st.session_state['mock_customers']
+    return []
 
 def save_customer_to_db(cust_data):
-    # Support both phone and mobile keys safely
-    phone_val = str(cust_data.get("mobile", "") or cust_data.get("phone", ""))
+    # Support multiple key formats so mobile/phone never gets lost
+    m_val = str(cust_data.get("mobile", "") or cust_data.get("phone", ""))
+    n_val = str(cust_data.get("name", ""))
+    e_name = str(cust_data.get("engineer_name", ""))
+    e_mob = str(cust_data.get("engineer_mobile", ""))
+    addr = str(cust_data.get("address", ""))
+    branch = str(cust_data.get("branch", "Hiriyur"))
     
     clean_data = {
-        "mobile": phone_val,
-        "name": str(cust_data.get("name", "")),
-        "address": str(cust_data.get("address", "")),
-        "branch": str(cust_data.get("branch", "Hiriyur")),
-        "selections": cust_data.get("selections", [])
+        "mobile": m_val,
+        "name": n_val,
+        "engineer_name": e_name,
+        "engineer_mobile": e_mob,
+        "address": addr,
+        "branch": branch
     }
     
     if supabase:
         try:
-            # Use insert instead of upsert so it creates a new row every time without overwriting
-            res = supabase.table(TABLE_NAME).insert(clean_data).execute()
+            # Using insert to always create a new row safely
+            supabase.table(TABLE_NAME).insert(clean_data).execute()
             return True
         except Exception as e:
             st.error(f"Supabase Save Error: {e}")
             return False
-    else:
-        if 'mock_customers' not in st.session_state:
-            st.session_state['mock_customers'] = []
-        st.session_state['mock_customers'].append(clean_data)
-        return True
+    return False
 
-def delete_customer_from_db(identifier):
+def delete_customer_from_db(customer_id):
     if supabase:
         try:
-            # Delete by mobile or id if available
-            supabase.table(TABLE_NAME).delete().eq("mobile", identifier).execute()
+            supabase.table(TABLE_NAME).delete().eq("id", customer_id).execute()
             return True
         except Exception as e:
             st.error(f"Supabase Delete Error: {e}")
