@@ -3,9 +3,9 @@ import pandas as pd
 import math
 import json
 import urllib.parse
-from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users, update_customer_in_db
+from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4m6SP3s6r7UIwn-KCX80geiv4jXWTmPVEvLB7PGTr_tWxKcbU5NWx_mtkyYp1H0htvs02Nxf-V/pub?gid=181&single=true&output=csv"
 
 @st.cache_data(ttl=1)
 def load_catalog_from_google_sheet():
@@ -169,7 +169,6 @@ else:
                 with col2:
                     if st.button("Select for Tiles", key=f"select_cust_{c_id}_{idx}"):
                         st.session_state["selected_customer"] = c
-                        # Load saved selections if available
                         raw_sel = c.get("selections", "[]")
                         try:
                             if isinstance(raw_sel, str):
@@ -202,7 +201,7 @@ else:
                 if st.button("💾 Save Selections Draft"):
                     try:
                         curr_cust["selections"] = json.dumps(st.session_state["selections"])
-                        update_customer_in_db(curr_cust.get("id"), {"selections": json.dumps(st.session_state["selections"])})
+                        save_customer_to_db(curr_cust)
                         st.success("Selections saved as draft for this customer!")
                     except Exception as e:
                         st.error(f"Error saving draft: {e}")
@@ -263,7 +262,8 @@ else:
                 if st.button("💾 Save Selections Draft"):
                     try:
                         curr_cust = st.session_state["selected_customer"]
-                        update_customer_in_db(curr_cust.get("id"), {"selections": json.dumps(st.session_state["selections"])})
+                        curr_cust["selections"] = json.dumps(st.session_state["selections"])
+                        save_customer_to_db(curr_cust)
                         st.success("Selections saved as draft successfully!")
                     except Exception as e:
                         st.error(f"Error saving draft: {e}")
