@@ -23,11 +23,8 @@ def get_all_customers():
             st.error(f"Supabase Fetch Error: {e}")
             return []
     return []
-    def get_all_admin_users():
-    return []
 
 def save_customer_to_db(cust_data):
-    # Support multiple key formats so mobile/phone never gets lost
     m_val = str(cust_data.get("mobile", "") or cust_data.get("phone", ""))
     n_val = str(cust_data.get("name", ""))
     e_name = str(cust_data.get("engineer_name", ""))
@@ -46,7 +43,6 @@ def save_customer_to_db(cust_data):
     
     if supabase:
         try:
-            # Using insert to always create a new row safely
             supabase.table(TABLE_NAME).insert(clean_data).execute()
             return True
         except Exception as e:
@@ -63,5 +59,6 @@ def delete_customer_from_db(customer_id):
             st.error(f"Supabase Delete Error: {e}")
             return False
     return False
-    def get_all_admin_users():
-        return []
+
+def get_all_admin_users():
+    return []
