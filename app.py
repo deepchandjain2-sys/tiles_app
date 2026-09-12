@@ -92,8 +92,15 @@ else:
     st.sidebar.write(f"**User:** {st.session_state['username']}")
     st.sidebar.write(f"**Role:** {st.session_state['role']}")
     
-    # 1. Showroom branch with Hiriyur, Davangere, and New Show Room
-    branch_name = st.sidebar.selectbox("Showroom Branch", ["Hiriyur", "Davangere", "New Show Room", "Branch 2"])
+    # Showroom branch options with manual entry support for New Show Room
+    branch_selection = st.sidebar.selectbox("Showroom Branch", ["Hiriyur", "Davangere", "New Show Room"])
+    if branch_selection == "New Show Room":
+        custom_branch = st.sidebar.text_input("Enter New Showroom Name", "Showroom Branch 3")
+        branch_name = custom_branch
+    else:
+        branch_name = branch_selection
+    
+    st.sidebar.markdown(f"**Active Branch:** {branch_name}")
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Navigation Flow")
@@ -112,7 +119,6 @@ else:
         with st.form("customer_form"):
             cust_name = st.text_input("Customer Name")
             cust_phone = st.text_input("Phone Number")
-            # 2. Engineer name and mobile added
             engineer_name = st.text_input("Engineer Name")
             engineer_mobile = st.text_input("Engineer Mobile")
             cust_address = st.text_area("Address")
@@ -120,42 +126,44 @@ else:
             submitted = st.form_submit_button("Save Customer to Supabase")
             if submitted:
                 if cust_name and cust_phone:
-                    # Saving extended details if supported by database or via standard handler
+                    # Saving customer with name and mobile details
                     save_customer_to_db(cust_name, cust_phone, cust_address, st.session_state['username'])
-                    st.success("Customer saved to database successfully!")
+                    st.success(f"Customer {cust_name} ({cust_phone}) saved to Supabase successfully!")
                 else:
                     st.error("Please enter Customer Name and Phone number.")
                 
         st.markdown("### Existing Customers (Supabase Database)")
         customers = get_all_customers()
         if customers:
-            for c in customers:
+            for idx, c in enumerate(customers):
+                c_id = c.get('id', str(idx))
+                c_phone = c.get('phone', 'no_phone')
                 col1, col2, col3 = st.columns([3, 2, 2])
                 with col1:
-                    st.write(f"**{c.get('name')}** ({c.get('phone')}) - {c.get('address', '')}")
+                    st.write(f"**{c.get('name')}** | Mobile: {c_phone} | Addr: {c.get('address', '')}")
                 with col2:
-                    if st.button(f"Select for Tiles", key=f"select_cust_{c.get('id', c.get('phone'))}"):
+                    if st.button("Select for Tiles", key=f"select_cust_{c_id}_{idx}"):
                         st.session_state["selected_customer"] = c
-                        st.success(f"Selected customer: {c.get('name')}. Switch to 'Area-wise Tile Selection' page.")
+                        st.success(f"Selected customer: {c.get('name')}. Switch to 'Area-wise Tile Selection'.")
                 with col3:
-                    if st.button(f"Edit / View", key=f"edit_cust_{c.get('id', c.get('phone'))}"):
+                    if st.button("Edit / View", key=f"edit_cust_{c_id}_{idx}"):
                         st.session_state["selected_customer"] = c
-                        st.info(f"Loaded {c.get('name')} for editing/selection.")
+                        st.info(f"Loaded {c.get('name')} for selection/editing.")
         else:
             st.info("No customers found in database.")
             
     elif page == "2. Area-wise Tile Selection":
         st.title("🏠 Area-wise Tile Selection")
         
-        # 3. Active Selected Customer Banner
+        # Active Selected Customer Banner
         if st.session_state.get("selected_customer"):
             curr_cust = st.session_state["selected_customer"]
-            st.info(f"**Active Customer:** {curr_cust.get('name')} | **Phone:** {curr_cust.get('phone')} | **Address:** {curr_cust.get('address', 'N/A')}")
+            st.info(f"**Active Customer:** {curr_cust.get('name')} | **Mobile/Phone:** {curr_cust.get('phone')} | **Address:** {curr_cust.get('address', 'N/A')}")
             if st.button("Change / Clear Customer"):
                 st.session_state["selected_customer"] = None
                 st.rerun()
         else:
-            st.warning("⚠️ No customer selected. Please select a customer from '1. Customer Registration' page first.")
+            st.warning("⚠️ No customer selected. Please select or register a customer from '1. Customer Registration' page first.")
         
         floor_level = st.selectbox("Select Room / Area", ["Hall", "Bedroom", "Kitchen", "Bathroom", "Balcony"])
         app_type = st.selectbox("Category", ["Floor", "Wall"])
