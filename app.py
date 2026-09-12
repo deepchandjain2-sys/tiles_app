@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import math
+import json
 import urllib.parse
-from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
+from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users, update_customer_in_db
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4m6SP3s6r7UIwn-KCX80geiv4jXWTmPVEvLB7PGTr_tWxKcbU5NWx_mtkyYp1H0htvs02Nxf-V/pub?gid=181&single=true&output=csv"
 
 @st.cache_data(ttl=1)
 def load_catalog_from_google_sheet():
@@ -31,7 +32,8 @@ def load_catalog_from_google_sheet():
             try:
                 packing_unit = float(row.iloc[4]) if len(row) > 4 and pd.notna(row.iloc[4]) else 1.0
             except:
-                packing_unit = 1.0                
+                packing_unit = 1.0
+                
             try:
                 price = float(row.iloc[6]) if len(row) > 6 and pd.notna(row.iloc[6]) else 0.0
             except:
@@ -143,7 +145,8 @@ else:
                 cust_data = {
                     "name": cust_name, "mobile": cust_phone, "phone": cust_phone,
                     "engineer": engineer_name, "engineer_mobile": engineer_mobile,
-                    "address": cust_address, "branch": branch_name
+                    "address": cust_address, "branch": branch_name,
+                    "selections": json.dumps([])
                 }
                 if save_customer_to_db(cust_data):
                     st.success(f"Customer {cust_name} saved successfully!")
@@ -166,6 +169,18 @@ else:
                 with col2:
                     if st.button("Select for Tiles", key=f"select_cust_{c_id}_{idx}"):
                         st.session_state["selected_customer"] = c
+                        # Load saved selections if available
+                        raw_sel = c.get("selections", "[]")
+                        try:
+                            if isinstance(raw_sel, str):
+                                st.session_state["selections"] = json.loads(raw_sel)
+                            elif isinstance(raw_sel, list):
+                                st.session_state["selections"] = raw_sel
+                            else:
+                                st.session_state["selections"] = []
+                        except:
+                            st.session_state["selections"] = []
+                            
                         st.session_state["current_page"] = "2. Area & Tile Selection"
                         st.success(f"Selected customer: {c.get('name')}.")
                         st.rerun()
@@ -181,9 +196,21 @@ else:
         if st.session_state.get("selected_customer"):
             curr_cust = st.session_state["selected_customer"]
             st.info(f"**Active Customer:** {curr_cust.get('name')} | **Mobile:** {curr_cust.get('mobile') or curr_cust.get('phone')}")
-            if st.button("Change / Clear Customer"):
-                st.session_state["selected_customer"] = None
-                st.rerun()
+            
+            col_s1, col_s2 = st.columns([2, 2])
+            with col_s1:
+                if st.button("💾 Save Selections Draft"):
+                    try:
+                        curr_cust["selections"] = json.dumps(st.session_state["selections"])
+                        update_customer_in_db(curr_cust.get("id"), {"selections": json.dumps(st.session_state["selections"])})
+                        st.success("Selections saved as draft for this customer!")
+                    except Exception as e:
+                        st.error(f"Error saving draft: {e}")
+            with col_s2:
+                if st.button("Change / Clear Customer"):
+                    st.session_state["selected_customer"] = None
+                    st.session_state["selections"] = []
+                    st.rerun()
         else:
             st.warning("⚠️ No customer selected.")
         
@@ -205,11 +232,11 @@ else:
         chosen_tile = next((t for t in filtered_catalog if str(t.get('name')) == str(selected_tile_name)), CATALOG_ITEMS[0] if CATALOG_ITEMS else {})
 
         con_factor = float(chosen_tile.get('con_factor', 1.0))
-        packing_unit = float(chosen_tile.get('packing_unit', 15.0))
+        packing_unit = float(chosen_tile.get('packing_unit', 1.0))
         box_cov = float(chosen_tile.get('box_cov', con_factor * packing_unit))
         tile_price = float(chosen_tile.get('price', 0.0))
 
-        st.info(f"**Specs (D x I):** Con Factor: {con_factor} | Packing Unit: {packing_unit} | Effective Box Coverage: {box_cov} sq.ft")
+        st.info(f"**Specs (D x E):** Con Factor: {con_factor} | Packing Unit: {packing_unit} | Effective Box Coverage: {box_cov} sq.ft")
 
         if st.button("➕ Add to Queue (Multiple Allowed)"):
             st.session_state["selections"].append({
@@ -232,6 +259,15 @@ else:
         if not st.session_state["selections"]:
             st.warning("⚠️ No items in queue.")
         else:
+            if st.session_state.get("selected_customer"):
+                if st.button("💾 Save Selections Draft"):
+                    try:
+                        curr_cust = st.session_state["selected_customer"]
+                        update_customer_in_db(curr_cust.get("id"), {"selections": json.dumps(st.session_state["selections"])})
+                        st.success("Selections saved as draft successfully!")
+                    except Exception as e:
+                        st.error(f"Error saving draft: {e}")
+
             whatsapp_text_lines = ["*BOQ Order Summary - Showroom*"]
             if st.session_state.get("selected_customer"):
                 cust = st.session_state["selected_customer"]
@@ -246,7 +282,7 @@ else:
                     user_sqft = st.number_input(f"Sq.Ft ({idx})", min_value=0.0, value=float(item.get('sqft', 100.0)), step=10.0, key=f"sqft_input_{idx}", label_visibility="collapsed")
                 
                 c_factor = float(item.get('con_factor', 1.0))
-                p_unit = float(item.get('packing_unit', 15.0))
+                p_unit = float(item.get('packing_unit', 1.0))
                 effective_coverage = c_factor * p_unit
                 calc_boxes = math.ceil(user_sqft / effective_coverage) if effective_coverage > 0 else 0
                 item_total = calc_boxes * effective_coverage * float(item.get('price', 0.0))
