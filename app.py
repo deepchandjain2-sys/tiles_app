@@ -12,18 +12,27 @@ def load_catalog_from_google_sheet():
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
         parsed_items = []
         for idx, row in df.iterrows():
-            name_val = str(row.iloc[1]) if len(row) > 1 and pd.notna(row.iloc[1]) else f"Item {idx}"
-            if name_val.lower() == 'nan' or not name_val.strip():
+            # Column A (Index 0) for Item Name
+            name_val = str(row.iloc[0]) if len(row) > 0 and pd.notna(row.iloc[0]) else f"Item {idx}"
+            if name_val.lower() == 'nan' or not name_val.strip() or name_val.lower() == 'item name':
                 continue
+                
+            # Category (Default to Floor if not mapped, or use another column if available)
             cat_val = str(row.iloc[2]) if len(row) > 2 and pd.notna(row.iloc[2]) else "Floor"
+            
+            # Column H (Index 7) -> Con Factor
             try:
                 con_factor = float(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else 1.0
             except:
                 con_factor = 1.0
+                
+            # Column I (Index 8) -> Packing Unit
             try:
                 packing_unit = float(row.iloc[8]) if len(row) > 8 and pd.notna(row.iloc[8]) else 15.0
             except:
                 packing_unit = 15.0
+                
+            # Price (If available in sheet, e.g., column F or similar, else default 0)
             try:
                 price = float(row.iloc[5]) if len(row) > 5 and pd.notna(row.iloc[5]) else 0.0
             except:
@@ -40,7 +49,6 @@ def load_catalog_from_google_sheet():
         return parsed_items
     except Exception as e:
         return []
-
 CATALOG_ITEMS = load_catalog_from_google_sheet()
 
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
