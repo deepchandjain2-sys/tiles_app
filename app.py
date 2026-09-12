@@ -27,12 +27,11 @@ def load_catalog_from_google_sheet():
             except:
                 con_factor = 1.0
                 
-            # Column I (Index 8) -> Packing Unit
+            # Column E (Index 4) -> Packing Unit
             try:
-                packing_unit = float(row.iloc[8]) if len(row) > 8 and pd.notna(row.iloc[8]) else 15.0
+                packing_unit = float(row.iloc[4]) if len(row) > 4 and pd.notna(row.iloc[4]) else 1.0
             except:
-                packing_unit = 15.0
-                
+                packing_unit = 1.0                
             try:
                 price = float(row.iloc[6]) if len(row) > 6 and pd.notna(row.iloc[6]) else 0.0
             except:
