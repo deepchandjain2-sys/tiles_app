@@ -6,49 +6,84 @@ from database import get_all_customers, save_customer_to_db, delete_customer_fro
 
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
 
-@st.cache_data(ttl=5)  # Refresh every 5 seconds to catch new sheet updates
+@st.cache_data(ttl=1)
 def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        # Clean column names
+        df.columns = df.columns.str.strip().str.lower()
         
         parsed_items = []
         for idx, row in df.iterrows():
-            name = str(row.iloc[1]) if len(row) > 1 and pd.notna(row.iloc[1]) else "Unknown Tile"
-            category = str(row.iloc[2]) if len(row) > 2 and pd.notna(row.iloc[2]) else "Floor"
-            
+            # Find item name dynamically
+            name_val = ""
+            for col in df.columns:
+                if 'name' in col or 'tile' in col or 'item' in col:
+                    name_val = str(row[col])
+                    break
+            if not name_val or name_val.lower() == 'nan':
+                # Fallback to second column
+                name_val = str(row.iloc[1]) if len(row) > 1 else f"Item {idx}"
+
+            if name_val.lower() == 'nan' or not name_val.strip():
+                continue
+
+            # Category
+            cat_val = "Floor"
+            for col in df.columns:
+                if 'cat' in col:
+                    cat_val = str(row[col])
+                    break
+
+            # Con Factor (Column H equivalent or named column)
+            con_factor = 1.0
             try:
-                con_factor = float(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else 1.0
+                for col in df.columns:
+                    if 'con' in col or 'factor' in col:
+                        con_factor = float(row[col])
+                        break
+                else:
+                    con_factor = float(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else 1.0
             except:
                 con_factor = 1.0
-                
+
+            # Packing Unit (Column I equivalent or named column)
+            packing_unit = 15.0
             try:
-                packing_unit = float(row.iloc[8]) if len(row) > 8 and pd.notna(row.iloc[8]) else 15.0
+                for col in df.columns:
+                    if 'pack' in col or 'unit' in col or 'box' in col:
+                        packing_unit = float(row[col])
+                        break
+                else:
+                    packing_unit = float(row.iloc[8]) if len(row) > 8 and pd.notna(row.iloc[8]) else 15.0
             except:
                 packing_unit = 15.0
-                
+
+            # Price
+            price = 0.0
             try:
-                price = float(row.iloc[5]) if len(row) > 5 and pd.notna(row.iloc[5]) else 0.0
+                for col in df.columns:
+                    if 'price' in col or 'rate' in col:
+                        price = float(row[col])
+                        break
+                else:
+                    price = float(row.iloc[5]) if len(row) > 5 and pd.notna(row.iloc[5]) else 0.0
             except:
                 price = 0.0
 
-            # Ignore empty rows where name is NaN or 'nan'
-            if name.lower() != "nan" and name.strip() != "":
-                parsed_items.append({
-                    "name": name.strip(),
-                    "category": category.strip(),
-                    "con_factor": con_factor,
-                    "packing_unit": packing_unit,
-                    "price": price,
-                    "box_cov": con_factor * packing_unit
-                })
+            parsed_items.append({
+                "name": name_val.strip(),
+                "category": cat_val.strip(),
+                "con_factor": con_factor,
+                "packing_unit": packing_unit,
+                "price": price,
+                "box_cov": con_factor * packing_unit
+            })
             
         return parsed_items
     except Exception as e:
         st.error(f"Google Sheet Error: {e}")
-        return [
-            {"name": "Glossy Vitrified Tile 600x600mm", "category": "Floor", "con_factor": 1.0, "packing_unit": 15.0, "price": 60.0, "box_cov": 15.0}
-        ]
-CATALOG_ITEMS = load_catalog_from_google_sheet()
+        return []CATALOG_ITEMS = load_catalog_from_google_sheet()
 
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
