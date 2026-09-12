@@ -4,7 +4,7 @@ import math
 import urllib.parse
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4m6SP3s6r7UIwn-KCX80geiv4jXWTmPVEvLB7PGTr_tWxKcbU5NWx_mtkyYp1H0htvs02Nxf-V/pub?gid=181&single=true&output=csv"
 
 @st.cache_data(ttl=1)
 def load_catalog_from_google_sheet():
@@ -48,7 +48,9 @@ def load_catalog_from_google_sheet():
             })
         return parsed_items
     except Exception as e:
-        return []CATALOG_ITEMS = load_catalog_from_google_sheet()
+        return []
+
+CATALOG_ITEMS = load_catalog_from_google_sheet()
 
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
@@ -64,6 +66,8 @@ if "selections" not in st.session_state:
     st.session_state["selections"] = []
 if "clear_form_flag" not in st.session_state:
     st.session_state["clear_form_flag"] = False
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "1. Customer Registration"
 
 for key in ["cust_name_input", "cust_phone_input", "eng_name_input", "eng_mob_input", "cust_addr_input"]:
     if key not in st.session_state:
@@ -105,7 +109,10 @@ else:
     st.sidebar.markdown(f"**Active Branch:** {branch_name}")
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Navigation Flow")
-    page = st.sidebar.selectbox("Select Page", ["1. Customer Registration", "2. Area & Tile Selection", "3. BOQ Calculation & Finalize"])
+    
+    page_options = ["1. Customer Registration", "2. Area & Tile Selection", "3. BOQ Calculation & Finalize"]
+    page = st.sidebar.selectbox("Select Page", page_options, index=page_options.index(st.session_state["current_page"]))
+    st.session_state["current_page"] = page
     
     if st.sidebar.button("Sign Out"):
         st.session_state["authenticated"] = False
@@ -113,6 +120,7 @@ else:
         st.session_state["role"] = ""
         st.session_state["selected_customer"] = None
         st.session_state["selections"] = []
+        st.session_state["current_page"] = "1. Customer Registration"
         st.rerun()
         
     if page == "1. Customer Registration":
@@ -202,7 +210,7 @@ else:
         box_cov = float(chosen_tile.get('box_cov', con_factor * packing_unit))
         tile_price = float(chosen_tile.get('price', 0.0))
 
-        st.info(f"**Specs (H x I):** Con Factor: {con_factor} | Packing Unit: {packing_unit} | Effective Box Coverage: {box_cov} sq.ft")
+        st.info(f"**Specs (D x I):** Con Factor: {con_factor} | Packing Unit: {packing_unit} | Effective Box Coverage: {box_cov} sq.ft")
 
         if st.button("➕ Add to Queue (Multiple Allowed)"):
             st.session_state["selections"].append({
@@ -217,6 +225,7 @@ else:
             for idx, item in enumerate(st.session_state["selections"]):
                 st.write(f"{idx+1}. **{item.get('floor')}** | {item.get('category')} | **{item.get('area')}** -> {item.get('tile_name')}")
             if st.button("Proceed to Page 3: BOQ Calculation & Finalize ➡️"):
+                st.session_state["current_page"] = "3. BOQ Calculation & Finalize"
                 st.rerun()
 
     elif page == "3. BOQ Calculation & Finalize":
@@ -261,6 +270,7 @@ else:
             with col_f1:
                 if st.button("✅ Finalize Order & Clear"):
                     st.session_state["selections"] = []
+                    st.session_state["current_page"] = "1. Customer Registration"
                     st.success("Order finalized!")
                     st.rerun()
             with col_f2:
