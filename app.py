@@ -283,11 +283,9 @@ else:
                     p_unit = matched_tile.get('packing_unit', 1.0)
                 p_unit = float(p_unit)
 
-                effective_coverage = c_factor * p_unit
+                effective_coverage = c_factor * pu
                 if effective_coverage <= 0:
                     effective_coverage = 1.0
-
-                with col1:
                     st.markdown(f"**{idx+1}. [{item.get('floor')}] {item.get('category')} - {item.get('area')}**")
                     st.caption(f"Design: {item.get('tile_name')} (Con: {c_factor} × Pack: {p_unit})")
                 with col2:
