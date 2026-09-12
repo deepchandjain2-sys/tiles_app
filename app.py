@@ -316,10 +316,8 @@ else:
                 item["packing_unit"] = p_unit
                 
                 st.markdown("---")
-                whatsapp_text_lines.append(
-                    f"{idx+1}. {item.get('floor')} ({item.get('category')}) - {item.get('area')}: {item.get('tile_name')} | {user_sqft} sq.ft ({calc_boxes} Boxes)"
-                )
-
+                summary_line = str(idx+1) + ". " + str(item.get('floor')) + " (" + str(item.get('category')) + ") - " + str(item.get('area')) + ": " + str(item.get('tile_name')) + " | " + str(user_sqft) + " sq.ft (" + str(calc_boxes) + " Boxes)"
+                whatsapp_text_lines.append(summary_line)
             col_f1, col_f2 = st.columns(2)
             with col_f1:
                 if st.button("✅ Finalize Order & Clear"):
