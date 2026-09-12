@@ -16,7 +16,6 @@ def get_all_customers():
 
 def save_customer_to_db(customer_data):
     try:
-        # Check if customer with same mobile/phone already exists to upsert
         phone_val = customer_data.get("mobile") or customer_data.get("phone")
         if phone_val:
             existing = supabase.table("customers").select("*").eq("mobile", phone_val).execute()
