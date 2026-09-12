@@ -287,6 +287,7 @@ else:
                 if effective_coverage <= 0:
                     effective_coverage = 1.0
                     st.markdown(f"**{idx+1}. [{item.get('floor')}] {item.get('category')} - {item.get('area')}**")
+                    pass
                     st.caption(f"Design: {item.get('tile_name')} (Con: {c_factor} × Pack: {p_unit})")
                 with col2:
                     user_sqft = st.number_input(f"Sq.Ft ({idx})", min_value=0.0, value=float(item.get('sqft', 100.0)), step=10.0, key=f"sqft_input_{idx}", label_visibility="collapsed")
