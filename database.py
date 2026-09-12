@@ -51,16 +51,14 @@ def save_customer_to_db(cust_data):
     return False
 def delete_customer_from_db(customer_id):
     try:
-        # Try deleting by 'id'
-        supabase.table("customers").delete().eq("id", customer_id).execute()
+        # Try deleting by integer ID
+        if str(customer_id).isdigit():
+            supabase.table("customers").delete().eq("id", int(customer_id)).execute()
+        
+        # Try deleting by string/UUID ID
+        supabase.table("customers").delete().eq("id", str(customer_id)).execute()
         return True
     except Exception as e:
-        try:
-            # Fallback: try deleting by string/int conversion if id type mismatch occurs
-            supabase.table("customers").delete().eq("id", str(customer_id)).execute()
-            return True
-        except Exception as err:
-            print(f"Error deleting customer: {err}")
-            return False
-def get_all_admin_users():
+        print(f"Error deleting customer: {e}")
+        return Falsedef get_all_admin_users():
     return []
