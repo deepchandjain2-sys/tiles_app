@@ -19,7 +19,6 @@ def get_all_customers_db():
         try:
             response = supabase.table(TABLE_NAME).select("*").execute()
             rows = response.data or []
-            # Map database keys to match app expectations
             formatted_clients = []
             for r in rows:
                 formatted_clients.append({
@@ -88,7 +87,6 @@ def update_customer_db(cust_dict):
 def delete_customer_db(cust_id_or_mobile):
     if supabase:
         try:
-            # Delete by mobile if string, or id if int
             val = str(cust_id_or_mobile)
             if val.isdigit() and len(val) < 8:
                 supabase.table(TABLE_NAME).delete().eq("id", int(val)).execute()
