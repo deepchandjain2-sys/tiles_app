@@ -10,7 +10,7 @@ try:
     if SUPABASE_URL and SUPABASE_KEY:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
-    st.error(f"Supabase Connection Init Error: {e}")
+    st.error(f"Supabase Connection Error: {e}")
 
 TABLE_NAME = "customers"
 
@@ -35,6 +35,7 @@ def get_all_customers_db():
                     "total_boxes": float(r.get("total_boxes") or 0.0),
                     "created_at": r.get("created_at", "")
                 })
+            formatted_clients.sort(key=lambda x: x["id"], reverse=True)
             return formatted_clients
         except Exception as e:
             st.error(f"Supabase Fetch Error: {e}")
@@ -42,6 +43,8 @@ def get_all_customers_db():
     return []
 
 def insert_new_customer(name, mobile, address, engineer, salesman, branch):
+    from datetime import datetime
+    now_str = datetime.now().strftime("%d-%m-%Y %H:%M")
     cust_data = {
         "mobile": str(mobile),
         "name": str(name),
@@ -52,11 +55,14 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch):
         "status": "SELECTION ONLY",
         "selections": [],
         "total_sqft": 0.0,
-        "total_boxes": 0.0
+        "total_boxes": 0.0,
+        "created_at": now_str
     }
     if supabase:
         try:
-            supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
+            res = supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
+            if res.data and len(res.data) > 0:
+                cust_data["id"] = res.data[0].get("id", 1)
         except Exception as e:
             st.error(f"Insert Error: {e}")
     return cust_data
@@ -74,13 +80,12 @@ def update_customer_db(cust_dict):
         "total_sqft": float(cust_dict.get("total_sqft", 0.0)),
         "total_boxes": float(cust_dict.get("total_boxes", 0.0))
     }
-    
     if supabase:
         try:
             supabase.table(TABLE_NAME).upsert(clean_data, on_conflict="mobile").execute()
             return True
         except Exception as e:
-            st.error(f"⚠️ Supabase Save Error: {e}")
+            st.error(f"⚠️ Supabase Update Error: {e}")
             return False
     return False
 
