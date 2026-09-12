@@ -159,7 +159,9 @@ else:
                 with col2:
                     if st.button("Select for Tiles", key=f"select_cust_{c_id}_{idx}"):
                         st.session_state["selected_customer"] = c
+                        st.session_state["current_page"] = "2. Area & Tile Selection"
                         st.success(f"Selected customer: {c.get('name')}.")
+                        st.rerun()
                 with col3:
                     if st.button("Delete", key=f"del_cust_{c_id}_{idx}"):
                         delete_customer_from_db(c_id)
