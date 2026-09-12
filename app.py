@@ -4,13 +4,12 @@ import math
 import urllib.parse
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4m6SP3s6r7UIwn-KCX80geiv4jXWTmPVEvLB7PGTr_tWxKcbU5NWx_mtkyYp1H0htvs02Nxf-V/pub?gid=181&single=true&output=csv"
 
 @st.cache_data(ttl=1)
 def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        # Drop first header row if it contains text like 'ITEM NAME'
         if len(df) > 0 and str(df.iloc[0, 0]).strip().upper() == "ITEM NAME":
             df = df.iloc[1:].reset_index(drop=True)
             
@@ -47,7 +46,9 @@ def load_catalog_from_google_sheet():
             })
         return parsed_items
     except Exception as e:
-        return []CATALOG_ITEMS = load_catalog_from_google_sheet()
+        return []
+
+CATALOG_ITEMS = load_catalog_from_google_sheet()
 
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
