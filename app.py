@@ -137,37 +137,26 @@ else:
             if cust_name and cust_phone:
                 cust_data = {
                     "name": cust_name,
+                    "mobile": cust_phone,
                     "phone": cust_phone,
                     "engineer_name": engineer_name,
                     "engineer_mobile": engineer_mobile,
                     "address": cust_address,
                     "branch": branch_name
                 }
-                try:
-                    save_customer_to_db(cust_data)
-                    st.success(f"Customer {cust_name} ({cust_phone}) saved successfully!")
-                    # Clear inputs by resetting session states and rerunning
+                success = save_customer_to_db(cust_data)
+                if success:
+                    st.success(f"Customer {cust_name} saved successfully!")
                     st.session_state["cust_name_input"] = ""
                     st.session_state["cust_phone_input"] = ""
                     st.session_state["eng_name_input"] = ""
                     st.session_state["eng_mob_input"] = ""
                     st.session_state["cust_addr_input"] = ""
                     st.rerun()
-                except Exception as err:
-                    try:
-                        save_customer_to_db(cust_name, cust_phone, cust_address, st.session_state['username'])
-                        st.success(f"Customer {cust_name} saved successfully!")
-                        st.session_state["cust_name_input"] = ""
-                        st.session_state["cust_phone_input"] = ""
-                        st.session_state["eng_name_input"] = ""
-                        st.session_state["eng_mob_input"] = ""
-                        st.session_state["cust_addr_input"] = ""
-                        st.rerun()
-                    except Exception as e2:
-                        st.error(f"Database Error: {e2}")
+                else:
+                    st.error("Failed to save customer to database.")
             else:
-                st.error("Please enter Customer Name and Phone number.")
-                
+                st.error("Please enter Customer Name and Phone number.")        
         st.markdown("### Existing Customers (Supabase Database)")
         customers = get_all_customers()
         if customers:
