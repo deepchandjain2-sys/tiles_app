@@ -10,26 +10,20 @@ GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAMSp-l
 def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        st.sidebar.success(f"Sheet Loaded! Rows: {len(df)}")
-        
         parsed_items = []
         for idx, row in df.iterrows():
             name_val = str(row.iloc[1]) if len(row) > 1 and pd.notna(row.iloc[1]) else f"Item {idx}"
             if name_val.lower() == 'nan' or not name_val.strip():
                 continue
-                
             cat_val = str(row.iloc[2]) if len(row) > 2 and pd.notna(row.iloc[2]) else "Floor"
-            
             try:
                 con_factor = float(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else 1.0
             except:
                 con_factor = 1.0
-                
             try:
                 packing_unit = float(row.iloc[8]) if len(row) > 8 and pd.notna(row.iloc[8]) else 15.0
             except:
                 packing_unit = 15.0
-                
             try:
                 price = float(row.iloc[5]) if len(row) > 5 and pd.notna(row.iloc[5]) else 0.0
             except:
@@ -43,10 +37,8 @@ def load_catalog_from_google_sheet():
                 "price": price,
                 "box_cov": con_factor * packing_unit
             })
-            
         return parsed_items
     except Exception as e:
-        st.sidebar.error(f"Sheet Error: {e}")
         return []
 
 CATALOG_ITEMS = load_catalog_from_google_sheet()
@@ -78,7 +70,6 @@ if not st.session_state["authenticated"]:
     if st.button("Login"):
         matched = False
         user_role = "ADMIN"
-        
         if login_user == "admin" and login_pass == "admin123":
             matched = True
             user_role = "ADMIN"
@@ -89,7 +80,6 @@ if not st.session_state["authenticated"]:
                     matched = True
                     user_role = adm.get("role", "ADMIN")
                     break
-                    
         if matched:
             st.session_state["authenticated"] = True
             st.session_state["username"] = login_user
@@ -98,17 +88,12 @@ if not st.session_state["authenticated"]:
             st.rerun()
         else:
             st.error("Invalid Username or Password")
-            
 else:
     st.sidebar.write(f"**User:** {st.session_state['username']}")
     st.sidebar.write(f"**Role:** {st.session_state['role']}")
     
     branch_selection = st.sidebar.selectbox("Showroom Branch", ["Hiriyur", "Davangere", "New Show Room"])
-    if branch_selection == "New Show Room":
-        custom_branch = st.sidebar.text_input("Enter New Showroom Name", "Showroom Branch 3")
-        branch_name = custom_branch
-    else:
-        branch_name = branch_selection
+    branch_name = st.sidebar.text_input("Enter New Showroom Name", "Showroom Branch 3") if branch_selection == "New Show Room" else branch_selection
     
     st.sidebar.markdown(f"**Active Branch:** {branch_name}")
     st.sidebar.markdown("---")
@@ -125,7 +110,6 @@ else:
         
     if page == "1. Customer Registration":
         st.title("📋 Customer Registration & Management")
-        
         if st.session_state["clear_form_flag"]:
             st.session_state["cust_name_input"] = ""
             st.session_state["cust_phone_input"] = ""
@@ -143,16 +127,11 @@ else:
         if st.button("Save Customer to Supabase"):
             if cust_name and cust_phone:
                 cust_data = {
-                    "name": cust_name,
-                    "mobile": cust_phone,
-                    "phone": cust_phone,
-                    "engineer": engineer_name,
-                    "engineer_mobile": engineer_mobile,
-                    "address": cust_address,
-                    "branch": branch_name
+                    "name": cust_name, "mobile": cust_phone, "phone": cust_phone,
+                    "engineer": engineer_name, "engineer_mobile": engineer_mobile,
+                    "address": cust_address, "branch": branch_name
                 }
-                success = save_customer_to_db(cust_data)
-                if success:
+                if save_customer_to_db(cust_data):
                     st.success(f"Customer {cust_name} saved successfully!")
                     st.session_state["clear_form_flag"] = True
                     st.rerun()
@@ -173,73 +152,41 @@ else:
                 with col2:
                     if st.button("Select for Tiles", key=f"select_cust_{c_id}_{idx}"):
                         st.session_state["selected_customer"] = c
-                        st.success(f"Selected customer: {c.get('name')}. Switch to '2. Area & Tile Selection'.")
+                        st.success(f"Selected customer: {c.get('name')}.")
                 with col3:
                     if st.button("Delete", key=f"del_cust_{c_id}_{idx}"):
                         delete_customer_from_db(c_id)
-                        st.success(f"Customer {c.get('name')} deleted successfully!")
                         st.rerun()
         else:
             st.info("No customers found in database.")
             
     elif page == "2. Area & Tile Selection":
         st.title("🏠 Step 2: Floor, Area & Tile Selection")
-        
         if st.session_state.get("selected_customer"):
             curr_cust = st.session_state["selected_customer"]
-            cust_mob = curr_cust.get('mobile') or curr_cust.get('phone') or 'N/A'
-            st.info(f"**Active Customer:** {curr_cust.get('name')} | **Mobile:** {cust_mob} | **Address:** {curr_cust.get('address', 'N/A')}")
+            st.info(f"**Active Customer:** {curr_cust.get('name')} | **Mobile:** {curr_cust.get('mobile') or curr_cust.get('phone')}")
             if st.button("Change / Clear Customer"):
                 st.session_state["selected_customer"] = None
                 st.rerun()
         else:
-            st.warning("⚠️ No customer selected. Please select or register a customer from '1. Customer Registration' page first.")
+            st.warning("⚠️ No customer selected.")
         
         st.markdown("---")
-        
         floor_option = st.selectbox("1. Select Floor Level", ["Ground Floor", "1st Floor", "2nd Floor", "3rd Floor", "Other (Manual Entry)"])
-        if floor_option == "Other (Manual Entry)":
-            floor_level = st.text_input("Enter Custom Floor Name", "Basement / Mezzanine")
-        else:
-            floor_level = floor_option
+        floor_level = st.text_input("Enter Custom Floor Name", "Basement") if floor_option == "Other (Manual Entry)" else floor_option
 
         category_type = st.selectbox("2. Select Category", ["Floor", "Wall"])
-
-        area_options = [
-            "Hall", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", 
-            "Bathroom 1", "Bathroom 2", "Bathroom 3", "Pooja room", "Parking", "Front wall", "Gallery", "Other (Manual Entry)"
-        ]
+        area_options = ["Hall", "Kitchen", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bathroom 1", "Bathroom 2", "Bathroom 3", "Pooja room", "Parking", "Front wall", "Gallery", "Other (Manual Entry)"]
         selected_area_option = st.selectbox("3. Select Area / Room", area_options)
-        
-        if selected_area_option == "Other (Manual Entry)":
-            specific_area_name = st.text_input("Enter Custom Area Name", "Store Room")
-        else:
-            specific_area_name = selected_area_option
+        specific_area_name = st.text_input("Enter Custom Area Name", "Store Room") if selected_area_option == "Other (Manual Entry)" else selected_area_option
 
         st.markdown("---")
-        
-        st.markdown("### 4. Search & Select Tile / Design")
         search_query = st.text_input("🔍 Search Tile by Name / Category", "")
-
-        filtered_catalog = []
-        for item in CATALOG_ITEMS:
-            if search_query.lower() in str(item.get('name', '')).lower() or search_query.lower() in str(item.get('category', '')).lower():
-                filtered_catalog.append(item)
-
-        if not filtered_catalog:
-            filtered_catalog = CATALOG_ITEMS
+        filtered_catalog = [item for item in CATALOG_ITEMS if search_query.lower() in str(item.get('name', '')).lower() or search_query.lower() in str(item.get('category', '')).lower()] or CATALOG_ITEMS
 
         tile_names = [item.get('name', 'Unknown') for item in filtered_catalog]
         selected_tile_name = st.selectbox("Select Tile Design", tile_names)
-
-        chosen_tile = None
-        for t in filtered_catalog:
-            if str(t.get('name', '')) == str(selected_tile_name):
-                chosen_tile = t
-                break
-
-        if not chosen_tile and CATALOG_ITEMS:
-            chosen_tile = CATALOG_ITEMS[0]
+        chosen_tile = next((t for t in filtered_catalog if str(t.get('name')) == str(selected_tile_name)), CATALOG_ITEMS[0] if CATALOG_ITEMS else {})
 
         con_factor = float(chosen_tile.get('con_factor', 1.0))
         packing_unit = float(chosen_tile.get('packing_unit', 15.0))
@@ -249,89 +196,64 @@ else:
         st.info(f"**Specs (H x I):** Con Factor: {con_factor} | Packing Unit: {packing_unit} | Effective Box Coverage: {box_cov} sq.ft")
 
         if st.button("➕ Add to Queue (Multiple Allowed)"):
-            entry = {
-                "floor": floor_level,
-                "category": category_type,
-                "area": specific_area_name,
-                "tile_name": selected_tile_name,
-                "con_factor": con_factor,
-                "packing_unit": packing_unit,
-                "box_cov": box_cov,
-                "sqft": 100.0,
-                "price": tile_price
-            }
-            st.session_state["selections"].append(entry)
-            st.success(f"Added [{floor_level} - {specific_area_name}] with {selected_tile_name} to queue!")
+            st.session_state["selections"].append({
+                "floor": floor_level, "category": category_type, "area": specific_area_name,
+                "tile_name": selected_tile_name, "con_factor": con_factor, "packing_unit": packing_unit,
+                "box_cov": box_cov, "sqft": 100.0, "price": tile_price
+            })
+            st.success("Added to queue!")
 
         if st.session_state["selections"]:
             st.markdown("### 🛒 Current Queue Preview")
             for idx, item in enumerate(st.session_state["selections"]):
                 st.write(f"{idx+1}. **{item.get('floor')}** | {item.get('category')} | **{item.get('area')}** -> {item.get('tile_name')}")
-            
             if st.button("Proceed to Page 3: BOQ Calculation & Finalize ➡️"):
-                st.success("Switching to calculation page...")
                 st.rerun()
 
     elif page == "3. BOQ Calculation & Finalize":
         st.title("📊 Step 3: BOQ Calculation & Professional Summary")
-        
         if not st.session_state["selections"]:
-            st.warning("⚠️ No items in queue. Please add items in '2. Area & Tile Selection' first.")
+            st.warning("⚠️ No items in queue.")
         else:
-            grand_total = 0.0
             whatsapp_text_lines = ["*BOQ Order Summary - Showroom*"]
             if st.session_state.get("selected_customer"):
                 cust = st.session_state["selected_customer"]
                 whatsapp_text_lines.append(f"Customer: {cust.get('name')} ({cust.get('mobile') or cust.get('phone')})")
             
-            st.markdown("### Enter Square Feet in One Line per Item:")
-            
-            updated_selections = []
             for idx, item in enumerate(st.session_state["selections"]):
                 col1, col2, col3, col4 = st.columns([4, 2, 2, 1])
-                
                 with col1:
                     st.markdown(f"**{idx+1}. [{item.get('floor')}] {item.get('category')} - {item.get('area')}**")
                     st.caption(f"Design: {item.get('tile_name')} (Con: {item.get('con_factor')} × Pack: {item.get('packing_unit')})")
-                
                 with col2:
                     user_sqft = st.number_input(f"Sq.Ft ({idx})", min_value=0.0, value=float(item.get('sqft', 100.0)), step=10.0, key=f"sqft_input_{idx}", label_visibility="collapsed")
                 
                 c_factor = float(item.get('con_factor', 1.0))
                 p_unit = float(item.get('packing_unit', 15.0))
                 effective_coverage = c_factor * p_unit
-                
                 calc_boxes = math.ceil(user_sqft / effective_coverage) if effective_coverage > 0 else 0
                 item_total = calc_boxes * effective_coverage * float(item.get('price', 0.0))
-                grand_total += item_total
                 
                 with col3:
                     st.markdown(f"📦 **{calc_boxes} Boxes**")
                     st.caption(f"({calc_boxes * effective_coverage} sq.ft)")
-                
                 with col4:
-                    if st.button("❌", key=f"remove_boq_{idx}", help="Remove Item"):
+                    if st.button("❌", key=f"remove_boq_{idx}"):
                         st.session_state["selections"].pop(idx)
                         st.rerun()
                 
                 item["sqft"] = user_sqft
                 item["boxes"] = calc_boxes
                 item["total"] = item_total
-                updated_selections.append(item)
-                
                 st.markdown("---")
                 whatsapp_text_lines.append(f"{idx+1}. {item.get('floor')} ({item.get('category')}) - {item.get('area')}: {item.get('tile_name')} | {user_sqft} sq.ft ({calc_boxes} Boxes)")
 
-            st.markdown(f"### **Total Boxes & Summary Ready for Sharing**")
-            
             col_f1, col_f2 = st.columns(2)
             with col_f1:
                 if st.button("✅ Finalize Order & Clear"):
-                    st.success("Order finalized successfully!")
                     st.session_state["selections"] = []
+                    st.success("Order finalized!")
                     st.rerun()
             with col_f2:
-                joined_text = "\n".join(whatsapp_text_lines)
-                encoded_text = urllib.parse.quote(joined_text)
-                whatsapp_url = f"https://wa.me/?text={encoded_text}"
+                whatsapp_url = f"https://wa.me/?text={urllib.parse.quote('\n'.join(whatsapp_text_lines))}"
                 st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:5px;font-weight:bold;cursor:pointer;">📤 Share Summary via WhatsApp</button></a>', unsafe_allow_html=True)
