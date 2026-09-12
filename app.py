@@ -213,21 +213,20 @@ elif menu == "2. Area-wise Tile Selection":
             default_box_cov = float(chosen_tile.get('box_cov', chosen_tile.get('coverage', 15.0)))
             default_price = float(chosen_tile.get('price', 600.0))
 
-            st.write(f"**Selected Item Specs:** Coverage: {default_box_cov} sq.ft/box")
-
-            if st.button("Add Area & Tile to Queue", key="add_to_queue_btn"):
-    entry = {
-        "floor": floor_level,
-        "category": app_type,
-        "area": specific_area_name,
-        "tile_name": selected_tile_name,
-        "box_cov": default_box_cov,
-        "sqft": 0.0,
-        "boxes": 0,
-        "total": 0.0
+            st.write(f"**Selected Item Specs:** Coverage: {default_box_cov} sq.ft/box") 
+  if st.button("Add Area & Tile to Queue", key="add_to_queue_btn"):
+      entry = {
+         "floor": floor_level,
+         "category": app_type,
+         "area": specific_area_name,
+         "tile_name": selected_tile_name,
+         "box_cov": default_box_cov,
+         "sqft": 0.0,
+         "boxes": 0,
+         "total": 0.0
     }
     
-    if "selections" not in st.session_state or st.session_state["selections"] is None:
+  if "selections" not in st.session_state or st.session_state["selections"] is None:
         st.session_state["selections"] = []
     
     st.session_state["selections"].append(entry)
