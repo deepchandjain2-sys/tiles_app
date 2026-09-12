@@ -57,6 +57,10 @@ if "role" not in st.session_state:
 if "selected_customer" not in st.session_state:
     st.session_state["selected_customer"] = None
 
+# Form input states for clearing
+if "form_clear" not in st.session_state:
+    st.session_state["form_clear"] = False
+
 # Authentication Check
 if not st.session_state["authenticated"]:
     st.title("🔐 Login - Tiles & BOQ App")
@@ -116,36 +120,46 @@ else:
     if page == "1. Customer Registration":
         st.title("📋 Customer Registration & Management")
         
-        with st.form("customer_form"):
-            cust_name = st.text_input("Customer Name")
-            cust_phone = st.text_input("Phone Number")
-            engineer_name = st.text_input("Engineer Name")
-            engineer_mobile = st.text_input("Engineer Mobile")
-            cust_address = st.text_area("Address")
-            
-            submitted = st.form_submit_button("Save Customer to Supabase")
-            if submitted:
-                if cust_name and cust_phone:
-                    cust_data = {
-                        "name": cust_name,
-                        "phone": cust_phone,
-                        "engineer_name": engineer_name,
-                        "engineer_mobile": engineer_mobile,
-                        "address": cust_address,
-                        "branch": branch_name
-                    }
+        # Reset input states if flag is True
+        if st.session_state.get("form_clear", False):
+            st.session_state["c_name"] = ""
+            st.session_state["c_phone"] = ""
+            st.session_state["e_name"] = ""
+            st.session_state["e_mobile"] = ""
+            st.session_state["c_address"] = ""
+            st.session_state["form_clear"] = False
+
+        cust_name = st.text_input("Customer Name", key="c_name")
+        cust_phone = st.text_input("Phone Number", key="c_phone")
+        engineer_name = st.text_input("Engineer Name", key="e_name")
+        engineer_mobile = st.text_input("Engineer Mobile", key="e_mobile")
+        cust_address = st.text_area("Address", key="c_address")
+        
+        if st.button("Save Customer to Supabase"):
+            if cust_name and cust_phone:
+                cust_data = {
+                    "name": cust_name,
+                    "phone": cust_phone,
+                    "engineer_name": engineer_name,
+                    "engineer_mobile": engineer_mobile,
+                    "address": cust_address,
+                    "branch": branch_name
+                }
+                try:
+                    save_customer_to_db(cust_data)
+                    st.success(f"Customer {cust_name} ({cust_phone}) saved successfully!")
+                    st.session_state["form_clear"] = True
+                    st.rerun()
+                except Exception as err:
                     try:
-                        save_customer_to_db(cust_data)
-                        st.success(f"Customer {cust_name} ({cust_phone}) saved to Supabase successfully!")
-                    except Exception as err:
-                        # Fallback if database.py expects positional parameters
-                        try:
-                            save_customer_to_db(cust_name, cust_phone, cust_address, st.session_state['username'])
-                            st.success(f"Customer {cust_name} saved successfully!")
-                        except Exception as e2:
-                            st.error(f"Database Error: {e2}")
-                else:
-                    st.error("Please enter Customer Name and Phone number.")
+                        save_customer_to_db(cust_name, cust_phone, cust_address, st.session_state['username'])
+                        st.success(f"Customer {cust_name} saved successfully!")
+                        st.session_state["form_clear"] = True
+                        st.rerun()
+                    except Exception as e2:
+                        st.error(f"Database Error: {e2}")
+            else:
+                st.error("Please enter Customer Name and Phone number.")
                 
         st.markdown("### Existing Customers (Supabase Database)")
         customers = get_all_customers()
@@ -173,7 +187,7 @@ else:
         # Active Selected Customer Banner
         if st.session_state.get("selected_customer"):
             curr_cust = st.session_state["selected_customer"]
-            st.info(f"**Active Customer:** {curr_cust.get('name')} | **Mobile/Phone:** {curr_cust.get('phone')} | **Address:** {curr_cust.get('address', 'N/A')}")
+            st.info(f"**Active Customer:** {curr_cust.get('name')} | **Mobile:** {curr_cust.get('phone')} | **Address:** {curr_cust.get('address', 'N/A')}")
             if st.button("Change / Clear Customer"):
                 st.session_state["selected_customer"] = None
                 st.rerun()
