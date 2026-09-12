@@ -10,29 +10,28 @@ GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3
 def load_catalog_from_google_sheet():
     try:
         df = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        # Drop first header row if it contains text like 'ITEM NAME'
+        if len(df) > 0 and str(df.iloc[0, 0]).strip().upper() == "ITEM NAME":
+            df = df.iloc[1:].reset_index(drop=True)
+            
         parsed_items = []
         for idx, row in df.iterrows():
-            # Column A (Index 0) for Item Name
             name_val = str(row.iloc[0]) if len(row) > 0 and pd.notna(row.iloc[0]) else f"Item {idx}"
             if name_val.lower() == 'nan' or not name_val.strip() or name_val.lower() == 'item name':
                 continue
                 
-            # Category (Default to Floor if not mapped, or use another column if available)
             cat_val = str(row.iloc[2]) if len(row) > 2 and pd.notna(row.iloc[2]) else "Floor"
             
-            # Column H (Index 7) -> Con Factor
             try:
                 con_factor = float(row.iloc[7]) if len(row) > 7 and pd.notna(row.iloc[7]) else 1.0
             except:
                 con_factor = 1.0
                 
-            # Column I (Index 8) -> Packing Unit
             try:
                 packing_unit = float(row.iloc[8]) if len(row) > 8 and pd.notna(row.iloc[8]) else 15.0
             except:
                 packing_unit = 15.0
                 
-            # Price (If available in sheet, e.g., column F or similar, else default 0)
             try:
                 price = float(row.iloc[5]) if len(row) > 5 and pd.notna(row.iloc[5]) else 0.0
             except:
@@ -48,8 +47,7 @@ def load_catalog_from_google_sheet():
             })
         return parsed_items
     except Exception as e:
-        return []
-CATALOG_ITEMS = load_catalog_from_google_sheet()
+        return []CATALOG_ITEMS = load_catalog_from_google_sheet()
 
 st.set_page_config(page_title="Tiles & BOQ Management App", layout="wide")
 
