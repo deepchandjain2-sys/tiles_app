@@ -35,7 +35,7 @@ def save_customer_to_db(cust_data):
     clean_data = {
         "mobile": m_val,
         "name": n_val,
-        "engineer_name": e_name,
+        "engineer": e_name,
         "engineer_mobile": e_mob,
         "address": addr,
         "branch": branch
@@ -49,7 +49,6 @@ def save_customer_to_db(cust_data):
             st.error(f"Supabase Save Error: {e}")
             return False
     return False
-
 def delete_customer_from_db(customer_id):
     if supabase:
         try:
