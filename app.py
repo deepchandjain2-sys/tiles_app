@@ -77,15 +77,22 @@ if not st.session_state.auth:
     st.stop()
 
 # --- SIDEBAR NAVIGATION ---
-st.sidebar.title(f"👤 {st.session_state.username.upper()}")
-st.sidebar.markdown(f"**Role:** `{st.session_state.role.upper()}`")
-st.sidebar.markdown(f"**Branch:** `{st.session_state.branch}`")
+st.sidebar.write(f"**User:** {st.session_state['username']}")
+st.sidebar.write(f"**Role:** {st.session_state['role']}")
 
-if st.sidebar.button("🚪 Sign Out", use_container_width=True):
-    st.session_state.auth = False
-    st.session_state.customer = None
-    st.rerun()
+branch_selection = st.sidebar.selectbox("Showroom Branch", ["Hiriyur", "Davangere", "New Show Room"])
+branch_name = st.sidebar.text_input("Enter New Showroom Name", "Showroom Branch 3") if branch_selection == "New Show Room" else branch_selection
 
+st.sidebar.markdown(f"**Active Branch:** {branch_name}")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Navigation Flow")
+
+# Navigation options based on role
+nav_pages = ["1. Customer Registration", "2. Area & Tile Selection", "3. BOQ Calculation & Finalize"]
+if st.session_state['role'] == "ADMIN":
+    nav_pages.append("4. Admin User Management")
+
+page = st.sidebar.selectbox("Select Page", nav_pages)
 nav_list = [
     "1. Customer Registration & History", 
     "2. Area & Tile Selection", 
