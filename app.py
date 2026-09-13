@@ -190,21 +190,35 @@ if not st.session_state.auth:
             submit = st.form_submit_button("🚀 Sign In", type="primary", use_container_width=True)
             
             if submit:
-                if (u.upper() in ["DEEPCHAND JAIN", "ADMIN", "GOURAV"] and p in ["deep123", "pass123", "admin123", "GOURAV", "deep1965", "1234"]) or (role_type == "Admin" and p in ["deep123", "admin123", "1234"]):
-                    st.session_state.auth = True
-                    st.session_state.username = u if u else "DEEPCHAND JAIN"
-                    st.session_state.role = "admin"
-                    st.session_state.branch = branch_choice
-                    st.rerun()
-                elif u and p:
+                matched = False
+                user_role = "Salesman"
+                user_branch = branch_choice
+                
+                # 1. Check in Supabase staff_users table dynamically
+                try:
+                    staff_list = get_staff_users_db()
+                    for staff in staff_list:
+                        if staff.get('username', '').strip().lower() == u.lower() and str(staff.get('password')) == str(p):
+                            matched = True
+                            user_role = staff.get('role', 'Salesman')
+                            user_branch = staff.get('branch', branch_choice)
+                            break
+                except Exception:
+                    pass
+                
+                # 2. Master fallback check
+                if (u.upper() in ["DEEPCHAND JAIN", "ADMIN", "GOURAV"] and p in ["deep123", "pass123", "admin123", "GOURAV", "deep1965", "1234"]) or matched:
                     st.session_state.auth = True
                     st.session_state.username = u
-                    st.session_state.role = "salesman"
-                    st.session_state.branch = branch_choice
+                    # Agar database mein role ADMIN hai ya master user hai, toh Admin role assign hoga
+                    if str(user_role).strip().lower() == "admin" or u.upper() in ["DEEPCHAND JAIN", "ADMIN", "GOURAV"]:
+                        st.session_state.role = "Admin"
+                    else:
+                        st.session_state.role = "Salesman"
+                    st.session_state.branch = user_branch
                     st.rerun()
                 else:
-                    st.error("Credentials enter karein.")
-    st.stop()
+                    st.error("Invalid Username or Password.")
 
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.title(f"👤 {st.session_state.username.upper()}")
