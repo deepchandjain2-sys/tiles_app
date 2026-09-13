@@ -28,6 +28,33 @@ def get_all_customers_db():
 # Alias taaki app.py ki import error khatam ho jaye
 def get_all_customers():
     return get_all_customers_db()
+def get_all_customers_db():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id, name, mobile, address, engineer, salesman, status, selections_json, total_sqft, total_boxes, created_at FROM customers_master ORDER BY id DESC")
+    rows = c.fetchall()
+    conn.close()
+    
+    clients = []
+    for r in rows:
+        try:
+            sels = json.loads(r[7])
+        except Exception:
+            sels = []
+        clients.append({
+            "id": r[0],
+            "name": r[1],
+            "mobile": r[2],
+            "address": r[3],
+            "engineer": r[4],
+            "salesman": r[5],
+            "status": r[6],
+            "selections": sels,
+            "total_sqft": r[8],
+            "total_boxes": r[9],
+            "created_at": r[10]
+        })
+    return clients    
 
 def save_customer_to_db(cust_data):
     m_val = str(cust_data.get("mobile", "") or cust_data.get("phone", ""))
