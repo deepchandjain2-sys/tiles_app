@@ -15,41 +15,7 @@ st.set_page_config(
 )
 
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4mWSP3s6r7UIwn-kcX8Ogev4yXWTMpMLvL87PGTR_UwxKjkcbU9NNxy__mbkyYplhDHxvsD2nKFvW/pub?gid=1816720040&single=true&output=csv"
-DB_FILE = "jay_granite_master.db"
-
-# --- SQLITE DATABASE ENGINE ---
-def get_db():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
-
-def init_database():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS customers_master (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            mobile TEXT,
-            address TEXT,
-            engineer TEXT,
-            salesman TEXT,
-            branch TEXT DEFAULT 'Hiriyur',
-            status TEXT DEFAULT 'SELECTION ONLY',
-            selections_json TEXT DEFAULT '[]',
-            total_sqft REAL DEFAULT 0.0,
-            total_boxes REAL DEFAULT 0.0,
-            created_at TEXT
-        )
-    """)
-    conn.commit()
-    try:
-        c.execute("ALTER TABLE customers_master ADD COLUMN branch TEXT DEFAULT 'Hiriyur'")
-        conn.commit()
-    except Exception:
-        pass
-    conn.close()
-
-init_database()
-
+from database import get_all_customers_db, insert_new_customer, update_customer_db, delete_customer_db
 def get_all_customers_db():
     conn = get_db()
     c = conn.cursor()
