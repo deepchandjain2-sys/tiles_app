@@ -13,6 +13,7 @@ except Exception as e:
     st.error(f"Supabase Connection Init Error: {e}")
 
 TABLE_NAME = "customers"
+get_all_customers_db()
 
 def get_all_customers_db():
     if supabase:
