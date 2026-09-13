@@ -60,11 +60,12 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch):
     }
     if supabase:
         try:
+            # Force insert/upsert into Supabase so it appears instantly in database
             res = supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
             if res.data and len(res.data) > 0:
                 cust_data["id"] = res.data[0].get("id", 1)
         except Exception as e:
-            st.error(f"Insert Error: {e}")
+            st.error(f"Supabase Insert Error: {e}")
     return cust_data
 
 def update_customer_db(cust_dict):
