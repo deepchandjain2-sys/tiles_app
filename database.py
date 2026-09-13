@@ -38,7 +38,6 @@ def get_all_customers_db():
             formatted_clients.sort(key=lambda x: x["id"], reverse=True)
             return formatted_clients
         except Exception as e:
-            st.error(f"Supabase Fetch Error: {e}")
             return []
     return []
 
@@ -60,7 +59,6 @@ def insert_new_customer(name, mobile, address, engineer, salesman, branch):
     }
     if supabase:
         try:
-            # Force insert/upsert into Supabase so it appears instantly in database
             res = supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
             if res.data and len(res.data) > 0:
                 cust_data["id"] = res.data[0].get("id", 1)
@@ -100,7 +98,6 @@ def delete_customer_db(cust_id_or_mobile):
                 supabase.table(TABLE_NAME).delete().eq("mobile", val).execute()
             return True
         except Exception as e:
-            st.error(f"Supabase Delete Error: {e}")
             return False
     return False
 
