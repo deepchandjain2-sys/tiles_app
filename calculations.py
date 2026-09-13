@@ -1,40 +1,110 @@
-import pandas as pd
-import math
-import urllib.parse
+import os
+import streamlit as st
+from supabase import create_client, Client
 
-def calculate_totals(selections):
-    """
-    Calculates total square feet and total boxes from selections queue.
-    """
-    total_sqft = 0.0
-    total_boxes = 0.0
-    
-    for item in selections:
-        total_sqft += float(item.get('sqft', 0.0))
-        total_boxes += float(item.get('boxes', 0.0))
-        
-    return round(total_sqft, 2), math.ceil(total_boxes)
+SUPABASE_URL = "https://gedzazirwxaxabnppchc.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdlZHphemlyd3hheGFibnBwY2hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2ODAyOTgsImV4cCI6MjEwNDI1NjI5OH0.CSCbuwInWJtGpL7w_nMFU6ElGWnXxr67bKeMWuTpMMM"
 
-def calculate_boxes_dynamic(sqft, con_factor, packing_unit):
-    """
-    Formula: (Sq.Ft * Con Factor) / Packing Unit, rounded up to next full box.
-    """
-    try:
-        if sqft <= 0 or packing_unit <= 0:
-            return 0.0
-        boxes = (sqft * float(con_factor)) / float(packing_unit)
-        return math.ceil(boxes) # Ceiling to get next full box (e.g. 6.25 -> 7)
-    except:
-        return 0.0
+supabase: Client = None
+try:
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.error(f"Supabase Connection Error: {e}")
 
-def generate_whatsapp_link(mobile, customer_name, selections, total_sqft, total_boxes):
-    message = f"Hello {customer_name},\n\nHere is your Tile Estimate from Jay Granite & Tiles Hub:\n"
-    for idx, item in enumerate(selections, 1):
-        message += f"{idx}. {item['area_type']} - {item['tile_name']} ({item['sqft']} Sq.Ft | {item['boxes']} Boxes)\n"
-    
-    message += f"\n*Total Billable Area:* {total_sqft} Sq.Ft\n*Total Boxes Required:* {total_boxes} Boxes\n\nThank you for choosing us!"
-    
-    encoded_message = urllib.parse.quote(message)
-    clean_mobile = ''.join(filter(str.isdigit, str(mobile)))
-    
-    return f"https://wa.me/91{clean_mobile}?text={encoded_message}"
+TABLE_NAME = "customers"
+
+def get_all_customers_db():
+    if supabase:
+        try:
+            response = supabase.table(TABLE_NAME).select("*").execute()
+            rows = response.data or []
+            formatted_clients = []
+            for r in rows:
+                formatted_clients.append({
+                    "id": r.get("id", 1),
+                    "name": r.get("name", ""),
+                    "mobile": r.get("mobile", ""),
+                    "address": r.get("address", ""),
+                    "engineer": r.get("engineer", ""),
+                    "salesman": r.get("salesman", ""),
+                    "branch": r.get("branch", "Hiriyur"),
+                    "status": r.get("status", "SELECTION ONLY"),
+                    "selections": r.get("selections", []) if isinstance(r.get("selections"), list) else [],
+                    "total_sqft": float(r.get("total_sqft") or 0.0),
+                    "total_boxes": float(r.get("total_boxes") or 0.0),
+                    "created_at": r.get("created_at", "")
+                })
+            formatted_clients.sort(key=lambda x: x["id"], reverse=True)
+            return formatted_clients
+        except Exception as e:
+            st.error(f"Supabase Fetch Error: {e}")
+            return []
+    return []
+
+def insert_new_customer(name, mobile, address, engineer, salesman, branch):
+    from datetime import datetime
+    now_str = datetime.now().strftime("%d-%m-%Y %H:%M")
+    cust_data = {
+        "mobile": str(mobile),
+        "name": str(name),
+        "address": str(address or ""),
+        "engineer": str(engineer or ""),
+        "salesman": str(salesman or ""),
+        "branch": str(branch or "Hiriyur"),
+        "status": "SELECTION ONLY",
+        "selections": [],
+        "total_sqft": 0.0,
+        "total_boxes": 0.0,
+        "created_at": now_str
+    }
+    if supabase:
+        try:
+            # Force insert/upsert into Supabase so it appears instantly in database
+            res = supabase.table(TABLE_NAME).upsert(cust_data, on_conflict="mobile").execute()
+            if res.data and len(res.data) > 0:
+                cust_data["id"] = res.data[0].get("id", 1)
+        except Exception as e:
+            st.error(f"Supabase Insert Error: {e}")
+    return cust_data
+
+def update_customer_db(cust_dict):
+    clean_data = {
+        "mobile": str(cust_dict.get("mobile", "")),
+        "name": str(cust_dict.get("name", "")),
+        "address": str(cust_dict.get("address", "")),
+        "engineer": str(cust_dict.get("engineer", "")),
+        "salesman": str(cust_dict.get("salesman", "")),
+        "branch": str(cust_dict.get("branch", "Hiriyur")),
+        "status": str(cust_dict.get("status", "SELECTION ONLY")),
+        "selections": cust_dict.get("selections", []),
+        "total_sqft": float(cust_dict.get("total_sqft", 0.0)),
+        "total_boxes": float(cust_dict.get("total_boxes", 0.0))
+    }
+    if supabase:
+        try:
+            supabase.table(TABLE_NAME).upsert(clean_data, on_conflict="mobile").execute()
+            return True
+        except Exception as e:
+            st.error(f"⚠️ Supabase Update Error: {e}")
+            return False
+    return False
+
+def delete_customer_db(cust_id_or_mobile):
+    if supabase:
+        try:
+            val = str(cust_id_or_mobile)
+            if val.isdigit() and len(val) < 8:
+                supabase.table(TABLE_NAME).delete().eq("id", int(val)).execute()
+            else:
+                supabase.table(TABLE_NAME).delete().eq("mobile", val).execute()
+            return True
+        except Exception as e:
+            st.error(f"Supabase Delete Error: {e}")
+            return False
+    return False
+
+def get_all_admin_users():
+    return [
+        {"username": "admin", "password": "password", "role": "ADMIN", "branch": "Hiriyur"}
+    ]
