@@ -228,7 +228,7 @@ elif page == "2. Area-wise Tile Selection":
         pu = float(chosen_tile.get('packing_unit', 1.0))
         box_cov = float(chosen_tile.get('box_cov', 16.0))
         
-        st.success(f"📐 **Catalog Specs:** Con Factor (Col D): {cf} | Packing Unit (Col E): {pu} | **Coverage: {box_cov} Sq.Ft / Box**")
+        st.success(f"📐 **Catalog Specs:** Con Factor: {cf} | Packing Unit: {pu} | **Coverage: {box_cov} Sq.Ft / Box**")
         item_price = st.number_input("Price per Box (₹)", min_value=0.0, value=600.0, step=50.0)
 
         if st.button("➕ Add to Queue (Multiple Allowed)", type="primary"):
@@ -248,6 +248,22 @@ elif page == "2. Area-wise Tile Selection":
             cust.setdefault('selections', []).append(entry)
             save_customer_to_db(cust)
             st.success("Item added to queue successfully!")
+
+        # --- Current Queue Preview with Delete Button ---
+        selections = cust.get('selections', []) or []
+        if selections:
+            st.markdown("---")
+            st.markdown("### 🛒 Current Queue Preview")
+            for idx, item in enumerate(selections):
+                col_q1, col_q2 = st.columns([5, 1])
+                with col_q1:
+                    st.write(f"{idx+1}. **{item.get('floor')}** | {item.get('category')} | **{item.get('area')}** -> {item.get('tile_name')}")
+                with col_q2:
+                    if st.button("❌", key=f"remove_queue_{idx}"):
+                        selections.pop(idx)
+                        cust['selections'] = selections
+                        save_customer_to_db(cust)
+                        st.rerun()
 
 # --- PAGE 3: CALCULATION & FINAL ESTIMATE ---
 elif page == "3. Calculation & Final Estimate":
