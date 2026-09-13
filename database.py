@@ -58,7 +58,7 @@ def insert_staff_user_db(username, password, branch, role):
             "branch": branch,
             "role": role
         }
-        response = supabase.table("staff_users").insert(payload).execute()
+        supabase.table("staff_users").insert(payload).execute()
         return True
     except Exception as e:
         return False
