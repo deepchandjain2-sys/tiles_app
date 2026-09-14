@@ -274,15 +274,8 @@ elif page == "3. Calculation & Final Estimate":
             for idx, item in enumerate(selections):
                 matched_tile = next((t for t in CATALOG_ITEMS if str(t.get('item_name')) == str(item.get('tile_name'))), {})
                 
-                c_factor = item.get('con_factor')
-                if c_factor is None or str(c_factor) == 'None':
-                    c_factor = matched_tile.get('con_factor', 1.0)
-                c_factor = float(c_factor)
-                
-                p_unit = item.get('packing_unit')
-                if p_unit is None or str(p_unit) == 'None':
-                    p_unit = matched_tile.get('packing_unit', 1.0)
-                p_unit = float(p_unit)
+                c_factor = float(item.get('con_factor', matched_tile.get('con_factor', 1.0)))
+                p_unit = float(item.get('packing_unit', matched_tile.get('packing_unit', 1.0)))
 
                 effective_coverage = c_factor * p_unit
                 if effective_coverage <= 0:
@@ -320,7 +313,6 @@ elif page == "3. Calculation & Final Estimate":
                 
                 grand_boxes += calc_boxes
                 grand_amount += item_total
-            
             st.markdown(f"### Grand Total Boxes: **{grand_boxes} Boxes**")
             st.markdown(f"### Grand Total Estimate: **₹ {grand_amount}**")
             
