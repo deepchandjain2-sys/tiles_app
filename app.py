@@ -274,8 +274,15 @@ elif page == "3. Calculation & Final Estimate":
             for idx, item in enumerate(selections):
                 matched_tile = next((t for t in CATALOG_ITEMS if str(t.get('item_name')) == str(item.get('tile_name'))), {})
                 
-                c_factor = float(item.get('con_factor', matched_tile.get('con_factor', 1.0)))
-                p_unit = float(item.get('packing_unit', matched_tile.get('packing_unit', 1.0)))
+                c_factor = item.get('con_factor')
+                if c_factor is None or str(c_factor) == 'None':
+                    c_factor = matched_tile.get('con_factor', 1.0)
+                c_factor = float(c_factor)
+                
+                p_unit = item.get('packing_unit')
+                if p_unit is None or str(p_unit) == 'None':
+                    p_unit = matched_tile.get('packing_unit', 1.0)
+                p_unit = float(p_unit)
 
                 effective_coverage = c_factor * p_unit
                 if effective_coverage <= 0:
@@ -308,8 +315,9 @@ elif page == "3. Calculation & Final Estimate":
                 item["packing_unit"] = p_unit
                 
                 st.markdown("---")
-                grand_boxes += calc_boxes
-                grand_amount += item_total    
+                summary_line = str(idx+1) + ". " + str(item.get('floor')) + " (" + str(item.get('category')) + ") - " + str(item.get('area')) + ": " + str(item.get('tile_name')) + " | " + str(user_sqft) + " sq.ft (" + str(calc_boxes) + " Boxes)"
+                whatsapp_text_lines.append(summary_line)
+                
                 grand_boxes += calc_boxes
                 grand_amount += item_total
             
