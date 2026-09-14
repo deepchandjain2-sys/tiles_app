@@ -298,22 +298,45 @@ elif page == "3. BOQ Calculation & Finalize":
             grand_boxes = 0
             grand_amount = 0.0
             
-            for idx, s in enumerate(selections):
-                col_i1, col_i2 = st.columns([3, 1])
-                with col_i1:
-                    st.markdown(f"**{idx+1}. [{s.get('floor')}] {s.get('category')} - {s.get('area')}**")
-                    st.write(f"Tile: {s.get('tile_name')} | Area: {s.get('sqft')} sq.ft | Boxes: **{s.get('boxes')}** | Rate: ₹{s.get('price')}/box")
-                    st.write(f"**Item Total:** ₹{s.get('total')}")
-                with col_i2:
-                    if st.button(f"Remove #{idx+1}", key=f"rem_item_{idx}"):
+            for idx, item in enumerate(selections):
+                matched_tile = next((t for t in CATALOG_ITEMS if str(t.get('item_name')) == str(item.get('tile_name'))), {})
+                
+                c_factor = float(item.get('con_factor', matched_tile.get('con_factor', 1.0)))
+                p_unit = float(item.get('packing_unit', matched_tile.get('packing_unit', 1.0)))
+
+                effective_coverage = c_factor * p_unit
+                if effective_coverage <= 0:
+                    effective_coverage = 1.0
+
+                col1, col2, col3, col4 = st.columns([4, 2, 2, 1])
+                with col1:
+                    st.markdown(f"**{idx+1}. [{item.get('floor')}] {item.get('category')} - {item.get('area')}**")
+                    st.caption(f"Design: {item.get('tile_name')} (Con: {c_factor} × Pack: {p_unit})")
+                with col2:
+                    user_sqft = st.number_input(f"Sq.Ft ({idx})", min_value=0.0, value=float(item.get('sqft', 100.0)), step=10.0, key=f"sqft_input_{idx}", label_visibility="collapsed")
+                
+                calc_boxes = math.ceil(user_sqft / effective_coverage)
+                item_total = calc_boxes * float(item.get('price', 600.0))
+                
+                with col3:
+                    st.markdown(f"📦 **{calc_boxes} Boxes**")
+                    st.caption(f"(₹ {item_total})")
+                with col4:
+                    if st.button("❌", key=f"remove_boq_{idx}"):
                         selections.pop(idx)
                         cust['selections'] = selections
                         save_customer_to_db(cust)
                         st.rerun()
+                
+                item["sqft"] = user_sqft
+                item["boxes"] = calc_boxes
+                item["total"] = item_total
+                item["con_factor"] = c_factor
+                item["packing_unit"] = p_unit
+                
                 st.markdown("---")
-                grand_boxes += s.get('boxes', 0)
-                grand_amount += s.get('total', 0.0)
-            
+                grand_boxes += calc_boxes
+                grand_amount += item_total
             st.markdown(f"### 📦 Grand Total Boxes: **{grand_boxes} Boxes**")
             st.markdown(f"### 💰 Grand Total Estimate: **₹ {grand_amount}**")
             
