@@ -2,10 +2,19 @@ import streamlit as st
 import pandas as pd
 import math
 import json
+import os
 import urllib.parse
 from database import get_all_customers, save_customer_to_db, delete_customer_from_db, get_all_admin_users, update_customer_in_db
 
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4m6SP3s6r7UIwn-KCX80geiv4jXWTmPVEvLB7PGTr_tWxKcbU5NWx_mtkyYp1H0htvs02Nxf-V/pub?gid=181&single=true&output=csv"
+def _cfg(name, default=""):
+    try:
+        if name in st.secrets:
+            return st.secrets[name]
+    except Exception:
+        pass
+    return os.environ.get(name, default)
+
+GOOGLE_SHEET_CSV_URL = _cfg("GOOGLE_SHEET_CSV_URL", "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4m6SP3s6r7UIwn-KCX80geiv4jXWTmPVEvLB7PGTr_tWxKcbU5NWx_mtkyYp1H0htvs02Nxf-V/pub?gid=181&single=true&output=csv")
 
 @st.cache_data(ttl=1)
 def load_catalog_from_google_sheet():
@@ -49,6 +58,7 @@ def load_catalog_from_google_sheet():
             })
         return parsed_items
     except Exception as e:
+        print(f"Catalog load error: {e}")
         return []
 
 CATALOG_ITEMS = load_catalog_from_google_sheet()
@@ -227,6 +237,10 @@ else:
         search_query = st.text_input("🔍 Search Tile by Name / Category", "")
         filtered_catalog = [item for item in CATALOG_ITEMS if search_query.lower() in str(item.get('name', '')).lower() or search_query.lower() in str(item.get('category', '')).lower()] or CATALOG_ITEMS
 
+        if not CATALOG_ITEMS:
+            st.error("⚠️ Tile catalog Google Sheet se load nahi ho paya. Sheet ko File > Share > Publish to web > CSV se publish karke uska link GOOGLE_SHEET_CSV_URL me daalein.")
+            st.stop()
+
         tile_names = [item.get('name', 'Unknown') for item in filtered_catalog]
         selected_tile_name = st.selectbox("Select Tile Design", tile_names)
         chosen_tile = next((t for t in filtered_catalog if str(t.get('name')) == str(selected_tile_name)), CATALOG_ITEMS[0] if CATALOG_ITEMS else {})
@@ -309,5 +323,6 @@ else:
                     st.success("Order finalized!")
                     st.rerun()
             with col_f2:
-                whatsapp_url = f"https://wa.me/?text={urllib.parse.quote('\n'.join(whatsapp_text_lines))}"
+                wa_message = urllib.parse.quote("\n".join(whatsapp_text_lines))
+                whatsapp_url = f"https://wa.me/?text={wa_message}"
                 st.markdown(f'<a href="{whatsapp_url}" target="_blank"><button style="background-color:#25D366;color:white;padding:10px 20px;border:none;border-radius:5px;font-weight:bold;cursor:pointer;">📤 Share Summary via WhatsApp</button></a>', unsafe_allow_html=True)
